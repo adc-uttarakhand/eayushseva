@@ -1,0 +1,5 @@
+{
+  "name": "e-AYUSH Seva",
+  "description": "Premium PWA portal for healthcare in Uttarakhand handling 800+ facilities.",
+  "requestFramePermissions": ["geolocation"]
+}
