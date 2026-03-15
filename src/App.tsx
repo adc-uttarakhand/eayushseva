@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import PharmacyManagerDashboard from './components/PharmacyManagerDashboard';
+import AddMedicineModal from './components/AddMedicineModal';
 import SearchBar from './components/SearchBar';
 import Carousel from './components/Carousel';
 import FacilityCard from './components/FacilityCard';
@@ -14,9 +16,19 @@ import EParchi from './components/EParchi';
 import PatientList from './components/PatientList';
 import DoctorCommandCenter from './components/DoctorCommandCenter';
 import RatePage from './components/RatePage';
+import EmployeeDirectory from './components/EmployeeDirectory';
+import HospitalDirectory from './components/HospitalDirectory';
+import MedicineDemandSystem from './components/MedicineDemandSystem';
+import StateSupplyDashboard from './components/StateSupplyDashboard';
+import DistrictSupplyManager from './components/DistrictSupplyManager';
+import ProfilePage from './components/ProfilePage';
+import LoginDirectory from './components/LoginDirectory';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key } from 'lucide-react';
+import DiseaseManagement from './components/DiseaseManagement';
+import RoleManagement from './components/RoleManagement';
+import StaffDistributionSummary from './components/StaffDistributionSummary';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 interface Hospital {
@@ -55,11 +67,11 @@ export default function App() {
   const [doctorSearchQuery, setDoctorSearchQuery] = useState('');
   const [doctorSearchResults, setDoctorSearchResults] = useState<any[]>([]);
   const [isDoctorSearchOpen, setIsDoctorSearchOpen] = useState(false);
-  const [hospitalRatings, setHospitalRatings] = useState<Record<string, {avg: number, count: number}>>({});
   
   // Edit state
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddMedicineOpen, setIsAddMedicineOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
 
@@ -68,20 +80,20 @@ export default function App() {
 
   useEffect(() => {
     fetchHospitals();
-    fetchRatings();
-  }, []);
+  }, [session]);
 
-  const fetchRatings = async () => {
-    // Mocking ratings for now as there's no ratings table yet
-    const mockRatings: Record<string, {avg: number, count: number}> = {};
-    hospitals.forEach(h => {
-      mockRatings[h.hospital_id] = {
-        avg: 4.0 + (Math.random() * 1.0),
-        count: Math.floor(Math.random() * 100) + 10
-      };
-    });
-    setHospitalRatings(mockRatings);
-  };
+  useEffect(() => {
+    if (activeTab === 'rate' && !userLocation) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+        }, (err) => {
+          console.warn("Location access denied for rating portal", err);
+        });
+      }
+    }
+  }, [activeTab, userLocation]);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // Radius of the earth in km
@@ -144,34 +156,42 @@ export default function App() {
     }
   };
 
-  const handleRateHospital = async (hospitalId: string, rating: number) => {
-    setHospitalRatings(prev => {
-      const current = prev[hospitalId] || { avg: 0, count: 0 };
-      const newCount = current.count + 1;
-      const newAvg = ((current.avg * current.count) + rating) / newCount;
-      return { ...prev, [hospitalId]: { avg: newAvg, count: newCount } };
-    });
-    alert("Thank you for your rating!");
-  };
-
   // Reset tab when role changes
   useEffect(() => {
-    setActiveTab('dashboard');
+    if (session?.role === 'DISTRICT_MEDICINE_INCHARGE') {
+      setActiveTab('demands');
+    } else if (session?.role === 'PHARMACY_MANAGER') {
+      setActiveTab('pharmacy_dashboard');
+    } else {
+      setActiveTab('dashboard');
+    }
   }, [session?.role]);
 
   const fetchHospitals = async () => {
     try {
       setLoading(true);
       setError('');
+      console.log('Active Filters:', session?.access_districts, session?.access_systems);
       
-      const tableNames = ['hospitals', 'hospital', 'hospital_data', 'Hospitals'];
+      const tableNames = ['hospitals', 'hospital'];
       let lastError = null;
       let foundData = false;
 
       for (const tableName of tableNames) {
-        const { data, error: fetchError } = await supabase
-          .from(tableName)
-          .select('*');
+        let query = supabase.from(tableName).select('*');
+
+        if (session) {
+          // State Admin Bypass: If access_districts contains 'All', remove district filter
+          if (session.access_districts && !session.access_districts.includes('All')) {
+            query = query.in('district', session.access_districts);
+          }
+          
+          if (session.access_systems && session.access_systems.length > 0 && !session.access_systems.includes('All')) {
+            query = query.in('system', session.access_systems);
+          }
+        }
+
+        const { data, error: fetchError } = await query;
 
         if (!fetchError && data && data.length > 0) {
           setHospitals(data);
@@ -199,8 +219,21 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const savedSession = localStorage.getItem('session');
+    if (savedSession) {
+      setSession(JSON.parse(savedSession));
+    }
+  }, []);
+
+  const handleLogin = (sess: UserSession) => {
+    setSession(sess);
+    localStorage.setItem('session', JSON.stringify(sess));
+  };
+
   const handleLogout = () => {
     setSession(null);
+    localStorage.removeItem('session');
   };
 
   const isAdmin = session?.role === 'SUPER_ADMIN';
@@ -213,7 +246,7 @@ export default function App() {
 
   const currentHospital = hospitals.find(h => h.hospital_id === (session?.hospitalId || session?.id));
 
-  const getHospitalImage = (id: string | number) => `https://picsum.photos/seed/ayush-${id}/800/600`;
+  const getHospitalImage = (id: string | number) => `https://via.placeholder.com/800x600?text=Hospital`;
 
   const filteredHospitals = hospitals.filter(h => {
     const name = h.facility_name?.toLowerCase() || '';
@@ -261,13 +294,13 @@ export default function App() {
         </div>
       </header>
 
-      {!session && (
-        <BentoGrid 
-          onFindDoctor={() => setIsDoctorSearchOpen(true)} 
-          onFindNearby={handleFindNearby}
-          onRate={() => setActiveTab('rate')}
-        />
-      )}
+      <BentoGrid 
+        onFindDoctor={() => setIsDoctorSearchOpen(true)} 
+        onFindNearby={handleFindNearby}
+        onRate={() => setActiveTab('rate')}
+        onDemands={() => setActiveTab('demands')}
+        isLoggedIn={!!session}
+      />
 
       <main className="max-w-7xl mx-auto">
         {loading ? (
@@ -288,12 +321,12 @@ export default function App() {
         ) : (
           <>
             <Carousel title="Top Rated Centres">
-              {hospitals.slice(0, 10).sort((a, b) => (hospitalRatings[b.hospital_id]?.avg || 0) - (hospitalRatings[a.hospital_id]?.avg || 0)).map(facility => (
+              {hospitals.slice(0, 10).map(facility => (
                 <FacilityCard 
                   key={facility.sr_no} 
                   name={facility.facility_name}
-                  rating={hospitalRatings[facility.hospital_id]?.avg || 4.5}
-                  ratingCount={hospitalRatings[facility.hospital_id]?.count || 0}
+                  rating={4.5}
+                  ratingCount={0}
                   district={facility.district}
                   system={facility.system}
                   image={getHospitalImage(facility.sr_no)}
@@ -302,7 +335,6 @@ export default function App() {
                     setEditingHospital(facility);
                     setIsEditOpen(true);
                   }}
-                  onRate={(rating) => handleRateHospital(facility.hospital_id, rating)}
                 />
               ))}
             </Carousel>
@@ -322,8 +354,8 @@ export default function App() {
                 <FacilityCard 
                   key={facility.sr_no} 
                   name={facility.facility_name}
-                  rating={hospitalRatings[facility.hospital_id]?.avg || 4.5}
-                  ratingCount={hospitalRatings[facility.hospital_id]?.count || 0}
+                  rating={4.5}
+                  ratingCount={0}
                   district={facility.district}
                   system={facility.system}
                   image={getHospitalImage(facility.sr_no)}
@@ -332,7 +364,6 @@ export default function App() {
                     setEditingHospital(facility);
                     setIsEditOpen(true);
                   }}
-                  onRate={(rating) => handleRateHospital(facility.hospital_id, rating)}
                 />
               ))}
             </Carousel>
@@ -491,12 +522,6 @@ export default function App() {
                   >
                     <MapPin size={18} />
                     Navigate
-                  </button>
-                  <button 
-                    onClick={() => handleRateHospital(h.hospital_id, 5)}
-                    className="px-6 py-4 rounded-2xl border border-gray-100 font-bold text-slate-600 hover:bg-slate-50 transition-all"
-                  >
-                    Rate
                   </button>
                 </div>
               </div>
@@ -693,95 +718,61 @@ export default function App() {
 
   const renderProfile = () => {
     if (!session) return null;
-    
-    if (session.role === 'SUPER_ADMIN') {
-      return (
-        <div className="pt-40 text-center">
-          <h2 className="text-2xl font-bold text-slate-300 uppercase tracking-widest">Admin Profile</h2>
-        </div>
-      );
-    }
+    return <ProfilePage session={session} onUpdate={fetchHospitals} />;
+  };
 
-    if (!currentHospital) return (
-      <div className="pt-40 text-center">
-        <Loader2 className="animate-spin mx-auto text-emerald-600 mb-4" size={32} />
-        <p className="text-slate-400">Loading profile data...</p>
+  const renderTools = () => {
+    if (!session) return null;
+    return (
+      <div className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">Admin Tools</h1>
+        {session.role === 'SUPER_ADMIN' && (
+          <div className="space-y-4">
+            <button 
+              onClick={() => setActiveTab('disease_management')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+            >
+              Disease Management
+            </button>
+            <button 
+              onClick={() => setActiveTab('role_management')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+            >
+              Role Management
+            </button>
+            <button 
+              onClick={() => setActiveTab('staff_distribution')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+            >
+              Staff Distribution Summary
+            </button>
+            <button 
+              onClick={() => setIsAddMedicineOpen(true)}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+            >
+              Add New Medicine
+            </button>
+            <AddMedicineModal isOpen={isAddMedicineOpen} onClose={() => setIsAddMedicineOpen(false)} onSuccess={() => alert('Medicine added successfully')} />
+          </div>
+        )}
       </div>
     );
+  };
 
-    return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="pt-24 px-4 sm:px-8 max-w-4xl mx-auto pb-20"
-      >
-        <div className="bg-white border border-gray-100 rounded-[3rem] p-8 sm:p-12 shadow-xl shadow-slate-100/50">
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 mb-12">
-            <div>
-              <h1 className="text-4xl font-bold text-slate-900 tracking-tight">{currentHospital.facility_name}</h1>
-              <div className="flex items-center gap-2 text-emerald-600 font-bold mt-2">
-                <ShieldCheck size={18} />
-                <span className="text-sm uppercase tracking-widest">Verified AYUSH Facility</span>
-              </div>
-            </div>
-            <button 
-              onClick={() => {
-                setEditingHospital(currentHospital);
-                setIsEditOpen(true);
-              }}
-              className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
-            >
-              Edit Profile
-            </button>
-          </div>
+  const renderDiseaseManagement = () => {
+    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    return <DiseaseManagement session={session} />;
+  };
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-neutral-50 rounded-2xl text-slate-400">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">System of Medicine</p>
-                  <p className="text-lg font-bold text-slate-900">{currentHospital.system}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-neutral-50 rounded-2xl text-slate-400">
-                  <MapPin size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Location</p>
-                  <p className="text-lg font-bold text-slate-900">{currentHospital.district}, {currentHospital.taluka}</p>
-                  <p className="text-sm text-slate-500">{currentHospital.location}</p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-neutral-50 rounded-2xl text-slate-400">
-                  <Phone size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Contact</p>
-                  <p className="text-lg font-bold text-slate-900">{currentHospital.mobile}</p>
-                  <p className="text-sm text-slate-500">Incharge: {currentHospital.incharge_name}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-neutral-50 rounded-2xl text-slate-400">
-                  <Mail size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Email</p>
-                  <p className="text-lg font-bold text-slate-900">{currentHospital.email}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
+  const renderRoleManagement = () => {
+    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    return <RoleManagement />;
+  };
+
+  const renderStaffDistributionSummary = () => {
+    console.log('renderStaffDistributionSummary called', { session });
+    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    return <StaffDistributionSummary />;
   };
 
   return (
@@ -913,7 +904,7 @@ export default function App() {
       <LoginModal 
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
-        onLogin={(sess) => setSession(sess)} 
+        onLogin={handleLogin} 
       />
 
       <EditHospitalModal
@@ -937,12 +928,17 @@ export default function App() {
                   setEditingHospital(currentHospital);
                   setIsEditOpen(true);
                 }}
+                onUpdateHospital={fetchHospitals}
               />
             </motion.div>
           ) : (
             renderDashboard()
           )
         )}
+        {activeTab === 'tools' && renderTools()}
+        {activeTab === 'disease_management' && renderDiseaseManagement()}
+        {activeTab === 'role_management' && renderRoleManagement()}
+        {activeTab === 'staff_distribution' && renderStaffDistributionSummary()}
         {activeTab === 'nearby' && renderNearbyHospitals()}
         {activeTab === 'rate' && (
           <motion.div key="rate-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -955,7 +951,11 @@ export default function App() {
           </motion.div>
         )}
         {activeTab === 'stats' && renderStats()}
-        {activeTab === 'hospitals' && renderHospitals()}
+        {activeTab === 'hospitals' && (
+          (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') 
+            ? <HospitalDirectory session={session} /> 
+            : renderHospitals()
+        )}
         {activeTab === 'eparchi' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="eparchi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <EParchi 
@@ -971,6 +971,39 @@ export default function App() {
         {activeTab === 'patients' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="patients" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <PatientList hospitalId={session.hospitalId || session.id} />
+          </motion.div>
+        )}
+        {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="employees" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <EmployeeDirectory hospitals={hospitals} session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'loginDirectory' && session?.role === 'SUPER_ADMIN' && (
+          <motion.div key="loginDirectory" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <LoginDirectory 
+              accessDistricts={session.access_districts} 
+              accessSystems={session.access_systems} 
+            />
+          </motion.div>
+        )}
+        {activeTab === 'demands' && session && (
+          <motion.div key="demands" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <MedicineDemandSystem session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
+          <motion.div key="supply_upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <StateSupplyDashboard />
+          </motion.div>
+        )}
+        {activeTab === 'district_supply' && (session?.role === 'DISTRICT_ADMIN' || session?.role === 'DISTRICT_MEDICINE_INCHARGE') && (
+          <motion.div key="district_supply" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <DistrictSupplyManager session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'pharmacy_dashboard' && session?.role === 'PHARMACY_MANAGER' && (
+          <motion.div key="pharmacy_dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <PharmacyManagerDashboard session={session} />
           </motion.div>
         )}
         {activeTab === 'profile' && renderProfile()}

@@ -62,7 +62,7 @@ export default function RatePage({ hospitals, userLocation, setActiveTab, calcul
       ...h,
       distance: h.latitude && h.longitude ? calculateDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude) : Infinity
     }))
-    .filter(h => h.distance <= 10)
+    .filter(h => h.distance !== Infinity)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 3) : [];
 
@@ -171,7 +171,15 @@ export default function RatePage({ hospitals, userLocation, setActiveTab, calcul
 
         {/* Selection Step */}
         <div className="space-y-8">
-          {nearbyHospitals.length > 0 && (
+          {!userLocation ? (
+            <div className="bg-white border border-gray-100 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center shadow-sm">
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-4 animate-pulse">
+                <MapPin size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Detecting Nearest Facilities</h3>
+              <p className="text-slate-500 mt-2 max-w-xs">Please allow location access to see the hospitals closest to you.</p>
+            </div>
+          ) : nearbyHospitals.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 ml-2">
                 <MapPin size={16} className="text-emerald-600" />
@@ -273,7 +281,7 @@ export default function RatePage({ hospitals, userLocation, setActiveTab, calcul
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <img 
-                        src={`https://picsum.photos/seed/${selectedHospital.hospital_id}/200/200`} 
+                        src={`https://via.placeholder.com/200x200?text=Hospital`} 
                         alt="Hospital" 
                         className="w-20 h-20 rounded-2xl object-cover shadow-md"
                         referrerPolicy="no-referrer"

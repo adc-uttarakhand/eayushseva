@@ -1,13 +1,15 @@
-import { UserCheck, Stethoscope, Video, MapPin, Star } from 'lucide-react';
+import { UserCheck, Stethoscope, Video, MapPin, Star, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface BentoGridProps {
   onFindDoctor: () => void;
   onFindNearby: () => void;
   onRate: () => void;
+  onDemands?: () => void;
+  isLoggedIn?: boolean;
 }
 
-export default function BentoGrid({ onFindDoctor, onFindNearby, onRate }: BentoGridProps) {
+export default function BentoGrid({ onFindDoctor, onFindNearby, onRate, onDemands, isLoggedIn }: BentoGridProps) {
   return (
     <section className="px-4 sm:px-8 py-8">
       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mb-6">Quick Actions</h2>
@@ -42,16 +44,29 @@ export default function BentoGrid({ onFindDoctor, onFindNearby, onRate }: BentoG
         </motion.div>
 
         <div className="grid grid-cols-1 gap-4 col-span-2 md:col-span-1 md:row-span-2">
-          <motion.div 
-            whileHover={{ scale: 0.98 }}
-            onClick={() => window.open('https://bcputtarakhand.in/application/login.php', '_blank')}
-            className="bg-neutral-50 border border-gray-100 rounded-3xl p-5 flex flex-col justify-between cursor-pointer h-full"
-          >
-            <div className="bg-white w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 border border-gray-100">
-              <UserCheck size={20} />
-            </div>
-            <h3 className="font-bold text-slate-900 leading-tight">Verify Practitioner</h3>
-          </motion.div>
+          {isLoggedIn && onDemands ? (
+            <motion.div 
+              whileHover={{ scale: 0.98 }}
+              onClick={onDemands}
+              className="bg-emerald-50 border border-emerald-100 rounded-3xl p-5 flex flex-col justify-between cursor-pointer h-full"
+            >
+              <div className="bg-emerald-600 w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                <ClipboardList size={20} />
+              </div>
+              <h3 className="font-bold text-slate-900 leading-tight">Medicine Demands</h3>
+            </motion.div>
+          ) : (
+            <motion.div 
+              whileHover={{ scale: 0.98 }}
+              onClick={() => window.open('https://bcputtarakhand.in/application/login.php', '_blank')}
+              className="bg-neutral-50 border border-gray-100 rounded-3xl p-5 flex flex-col justify-between cursor-pointer h-full"
+            >
+              <div className="bg-white w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 border border-gray-100">
+                <UserCheck size={20} />
+              </div>
+              <h3 className="font-bold text-slate-900 leading-tight">Verify Practitioner</h3>
+            </motion.div>
+          )}
 
           <motion.div 
             whileHover={{ scale: 0.98 }}

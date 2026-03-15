@@ -84,12 +84,67 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
         updatePayload.password = newPassword.trim();
       }
 
-      const { error: updateError } = await supabase
-        .from('hospitals')
-        .update(updatePayload)
-        .eq('sr_no', formData.sr_no);
+      const tableNames = ['hospitals', 'hospital'];
+      let updateSuccess = false;
 
-      if (updateError) throw updateError;
+      for (const tableName of tableNames) {
+        let targetId = formData.hospital_id;
+        let targetSr = formData.sr_no;
+
+        // Try to find correct identifiers first
+        const { data: searchData } = await supabase
+          .from(tableName)
+          .select('hospital_id, sr_no')
+          .eq('facility_name', formData.facility_name)
+          .eq('district', formData.district)
+          .limit(1);
+
+        if (searchData && searchData.length > 0) {
+          targetId = searchData[0].hospital_id;
+          targetSr = searchData[0].sr_no;
+        }
+
+        // Try hospital_id
+        let { data, error: updateError } = await supabase
+          .from(tableName)
+          .update(updatePayload)
+          .eq('hospital_id', targetId)
+          .select();
+
+        if (!updateError && data && data.length > 0) {
+          updateSuccess = true;
+          break;
+        }
+
+        // Try sr_no
+        const { data: retryData, error: retryError } = await supabase
+          .from(tableName)
+          .update(updatePayload)
+          .eq('sr_no', targetSr)
+          .select();
+        
+        if (!retryError && retryData && retryData.length > 0) {
+          updateSuccess = true;
+          break;
+        }
+
+        // Try id
+        if ((formData as any).id) {
+          const { data: idData, error: idError } = await supabase
+            .from(tableName)
+            .update(updatePayload)
+            .eq('id', (formData as any).id)
+            .select();
+          if (!idError && idData && idData.length > 0) {
+            updateSuccess = true;
+            break;
+          }
+        }
+      }
+
+      if (!updateSuccess) {
+        throw new Error('Hospital record not found for update in any table.');
+      }
 
       onUpdate();
       onClose();
@@ -141,7 +196,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Facility Name</label>
                     <input
                       name="facility_name"
-                      value={formData.facility_name}
+                      value={formData.facility_name || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                       required
@@ -152,7 +207,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">System</label>
                     <select
                       name="system"
-                      value={formData.system}
+                      value={formData.system || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
                     >
@@ -168,7 +223,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">District</label>
                     <select
                       name="district"
-                      value={formData.district}
+                      value={formData.district || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
                     >
@@ -183,7 +238,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Incharge Name</label>
                     <input
                       name="incharge_name"
-                      value={formData.incharge_name}
+                      value={formData.incharge_name || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
@@ -193,7 +248,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Mobile</label>
                     <input
                       name="mobile"
-                      value={formData.mobile}
+                      value={formData.mobile || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
@@ -204,7 +259,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                     <input
                       name="email"
                       type="email"
-                      value={formData.email}
+                      value={formData.email || ''}
                       onChange={handleChange}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />

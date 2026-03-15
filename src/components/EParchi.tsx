@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { PrescriptionMedicine, IndentStock } from '../types/inventory';
+import DiseaseCombobox from './DiseaseCombobox';
+import { normalizeForSearch } from '../lib/utils';
 
 interface Patient {
   id?: string;
@@ -63,14 +66,36 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const isIncharge = session?.isIncharge;
   const isSMO = staffRole === 'Senior Medical Officer';
   const isMO = staffRole === 'Medical Officer';
-  const isReceptionist = staffRole === 'Receptionist' || staffRole === 'Pharmacist' || staffRole === 'Nurse' || (!isIncharge && !isSMO && !isMO);
+  const isPharmacist = staffRole === 'Pharmacist' || staffRole === 'Chief Pharmacy Officer';
 
-  const canRegister = isHospital || isIncharge || isSMO || isMO || isReceptionist;
-  const canConsult = !isHospital && (isIncharge || isSMO || isMO);
+  const canRegister = isIncharge || isHospital || (!isMO && !isSMO && !isPharmacist);
+  const canConsult = isIncharge || isMO || isSMO;
+  const canDispense = isIncharge || isPharmacist;
 
-  const [activeTab, setActiveTab] = useState<'registration' | 'queue'>(canRegister ? 'registration' : 'queue');
+  const [activeTab, setActiveTab] = useState<'registration' | 'queue' | 'dispensing'>(
+    isIncharge ? 'registration' : (isPharmacist ? 'dispensing' : (isMO || isSMO ? 'queue' : 'registration'))
+  );
   const [isNew, setIsNew] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [diseaseMaster, setDiseaseMaster] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchDiseases();
+  }, []);
+
+  const fetchDiseases = async () => {
+    try {
+      const { data, error } = await supabase.from('diseases_master').select('*').eq('is_active', true);
+      console.log('Diseases fetched:', data, error);
+      if (error) {
+        console.error('Error fetching diseases:', error);
+        return;
+      }
+      if (data) setDiseaseMaster(data);
+    } catch (err) {
+      console.error('Unexpected error fetching diseases:', err);
+    }
+  };
   const [searchType, setSearchType] = useState<'name' | 'serial' | 'mobile' | 'aadhar'>('name');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,9 +103,25 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [patientHistory, setPatientHistory] = useState<Patient[]>([]);
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
 
+  const [prescribedMedicines, setPrescribedMedicines] = useState<PrescriptionMedicine[]>([]);
+  const [indentStock, setIndentStock] = useState<IndentStock[]>([]);
+  const [mainInventory, setMainInventory] = useState<any[]>([]);
+  const [availableMedicines, setAvailableMedicines] = useState<string[]>([]);
+  const [newMedicine, setNewMedicine] = useState<Partial<PrescriptionMedicine>>({
+    medicine_name: '',
+    dosage: '1-0-1',
+    frequency: 'After Food',
+    duration_days: 5,
+    is_market_purchase: false,
+    unit_label: 'Tablet'
+  });
+
   const [availableDoctors, setAvailableDoctors] = useState<Staff[]>([]);
   const [queue, setQueue] = useState<Patient[]>([]);
+  const [dispensingQueue, setDispensingQueue] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [dispensingMedicine, setDispensingMedicine] = useState<any | null>(null);
+  const [dispensedQty, setDispensedQty] = useState<string>('');
 
   const [formData, setFormData] = useState<Partial<Patient>>({
     name: '',
@@ -112,6 +153,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [hospitalYearlySerial, setHospitalYearlySerial] = useState('');
   const [dailyOpdNumber, setDailyOpdNumber] = useState('');
   const [revisitCount, setRevisitCount] = useState<number>(0);
+  const historyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (activeTab === 'registration') {
@@ -119,8 +161,54 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       fetchDoctors();
     } else if (activeTab === 'queue') {
       fetchQueue();
+      fetchInventoryData();
+    } else if (activeTab === 'dispensing') {
+      fetchDispensingQueue();
+      fetchInventoryData();
     }
   }, [hospitalId, activeTab]);
+
+  const fetchDispensingQueue = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('hospital_id', hospitalId)
+        .eq('status', 'Completed')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDispensingQueue(data || []);
+    } catch (err) {
+      console.error('Error fetching dispensing queue:', err);
+    }
+  };
+
+  const fetchInventoryData = async () => {
+    try {
+      // Fetch Indent Stock (hospital_indent)
+      const { data: stockData } = await supabase
+        .from('hospital_indent')
+        .select('*')
+        .eq('hospital_id', hospitalId);
+      
+      if (stockData) setIndentStock(stockData);
+
+      // Fetch Main Inventory for Yellow status check
+      const { data: invData } = await supabase
+        .from('medicine_inventory')
+        .select('medicine_name, quantity')
+        .eq('hospital_id', hospitalId);
+      
+      if (invData) {
+        const names = Array.from(new Set(invData.map(i => i.medicine_name)));
+        setAvailableMedicines(names);
+        setMainInventory(invData);
+      }
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+    }
+  };
 
   const fetchDoctors = async () => {
     try {
@@ -139,12 +227,15 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
   const fetchQueue = async () => {
     try {
+      const today = new Date().toISOString().split('T')[0];
       let query = supabase
         .from('patients')
         .select('*')
         .eq('hospital_id', hospitalId)
         .eq('status', 'Waiting')
-        .order('queue_time', { ascending: true });
+        .gte('created_at', `${today}T00:00:00Z`)
+        .lte('created_at', `${today}T23:59:59Z`)
+        .order('daily_opd_number', { ascending: true });
 
       if (!isIncharge) {
         query = query.eq('assigned_doctor_id', session?.id);
@@ -219,7 +310,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     if (!searchQuery) return;
     setLoading(true);
     try {
-      let query = supabase.from('patients').select('*');
+      let query = supabase.from('patients').select('*').eq('hospital_id', hospitalId);
       
       if (searchType === 'name') query = query.ilike('name', `%${searchQuery}%`);
       if (searchType === 'serial') query = query.eq('global_serial', searchQuery);
@@ -294,10 +385,10 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         hospital_id: hospitalId,
         revisit_count: revisitCount,
         is_new: isNew,
-        created_at: new Date().toISOString(),
+        created_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
         status: 'Waiting',
         consultation_mode: 'Online',
-        queue_time: new Date().toISOString(),
+        queue_time: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
       };
 
       const { error } = await supabase.from('patients').insert([payload]);
@@ -324,7 +415,88 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const handleSelectQueuePatient = async (patient: Patient) => {
     setSelectedPatient(patient);
     setFormData(patient);
+    
+    // Parse existing prescription if it's JSON, otherwise clear
+    try {
+      if (patient.prescription && patient.prescription.startsWith('[')) {
+        setPrescribedMedicines(JSON.parse(patient.prescription));
+      } else {
+        setPrescribedMedicines([]);
+      }
+    } catch (e) {
+      setPrescribedMedicines([]);
+    }
+    
     await fetchPatientHistory(patient.aadhar, patient.mobile);
+  };
+
+  const addMedicine = () => {
+    if (!newMedicine.medicine_name) return;
+
+    // Calculate total quantity
+    const dosageParts = newMedicine.dosage?.split('-').map(Number) || [0, 0, 0];
+    const dailyTotal = dosageParts.reduce((a, b) => a + b, 0);
+    const total = dailyTotal * (newMedicine.duration_days || 0);
+
+    const medicine: PrescriptionMedicine = {
+      id: Date.now().toString(),
+      medicine_name: newMedicine.medicine_name,
+      dosage: newMedicine.dosage || '1-0-1',
+      frequency: newMedicine.frequency || 'After Food',
+      duration_days: newMedicine.duration_days || 5,
+      total_quantity: total,
+      is_market_purchase: newMedicine.is_market_purchase || false,
+      unit_label: newMedicine.unit_label || 'Tablet'
+    };
+
+    setPrescribedMedicines([...prescribedMedicines, medicine]);
+    setNewMedicine({
+      medicine_name: '',
+      dosage: '1-0-1',
+      frequency: 'After Food',
+      duration_days: 5,
+      is_market_purchase: false,
+      unit_label: 'Tablet'
+    });
+  };
+
+  const removeMedicine = (id: string) => {
+    setPrescribedMedicines(prescribedMedicines.filter(m => m.id !== id));
+  };
+
+  const checkStock = (medicineName: string, requiredQty: number) => {
+    const normalizedName = normalizeForSearch(medicineName);
+    const indentItems = indentStock.filter(s => normalizeForSearch(s.medicine_name) === normalizedName);
+    const totalLoose = indentItems.reduce((acc, curr) => acc + Number(curr.remaining_loose_quantity || 0), 0);
+    const totalPacking = indentItems.reduce((acc, curr) => acc + Number(curr.remaining_packing_quantity || 0), 0);
+    
+    if (totalLoose > 0 || totalPacking > 0) {
+      return { 
+        status: 'green', 
+        available: true, // Simplified for now
+        current: `${totalPacking} Packing + ${totalLoose} Loose`,
+        message: 'Ready to dispense'
+      };
+    }
+
+    const mainInvItems = mainInventory.filter(i => normalizeForSearch(i.medicine_name) === normalizedName);
+    const totalBulkUnits = mainInvItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+
+    if (totalBulkUnits > 0) {
+      return { 
+        status: 'yellow', 
+        available: false, 
+        current: 0,
+        message: 'Transfer from Main Store required'
+      };
+    }
+
+    return { 
+      status: 'red', 
+      available: false, 
+      current: 0,
+      message: 'Out of Stock'
+    };
   };
 
   const handleConsultationComplete = async (e: React.FormEvent) => {
@@ -332,6 +504,46 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     if (!selectedPatient?.id) return;
     setSaving(true);
     try {
+      // 1. Deduct stock for each prescribed medicine
+      for (const med of prescribedMedicines) {
+        const normalizedName = normalizeForSearch(med.medicine_name);
+        // Find a batch with sufficient stock in the same hospital
+        const batch = indentStock.find(s => 
+          normalizeForSearch(s.medicine_name) === normalizedName && 
+          s.hospital_id === hospitalId &&
+          Number(s.remaining_loose_quantity) >= med.total_quantity
+        );
+
+        if (batch) {
+          // Update indent stock
+          const { error: updateError } = await supabase
+            .from('hospital_indent')
+            .update({ remaining_loose_quantity: Number(batch.remaining_loose_quantity) - med.total_quantity })
+            .eq('id', batch.id)
+            .eq('hospital_id', hospitalId);
+
+          if (updateError) throw updateError;
+
+          // Log consumption
+          const { error: consError } = await supabase.from('daily_consumption').insert([{
+            hospital_id: hospitalId,
+            patient_id: selectedPatient.id,
+            medicine_id: batch.medicine_id,
+            medicine_name: batch.medicine_name,
+            unit_type: batch.unit_type,
+            quantity_dispensed: med.total_quantity,
+            dispensed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+          }]);
+          
+          if (consError) throw consError;
+        } else {
+          console.warn(`Insufficient stock or medicine not found for: ${med.medicine_name}`);
+        }
+      }
+
+      // 2. Update patient status
+      const prescriptionString = JSON.stringify(prescribedMedicines);
+
       const payload = {
         complaints: formData.complaints,
         diagnosis: formData.diagnosis,
@@ -348,8 +560,9 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         ahar_shakti: formData.ahar_shakti,
         satva: formData.satva,
         vyayam_shakti: formData.vyayam_shakti,
-        prescription: formData.prescription,
-        status: 'Completed'
+        prescription: prescriptionString,
+        status: 'Completed/Dispensed',
+        consultation_completed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
       };
 
       const { error } = await supabase
@@ -359,12 +572,13 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
       if (error) throw error;
       
-      alert('Consultation Completed!');
+      alert('Consultation Completed and Stock Dispensed!');
       setSelectedPatient({ ...selectedPatient, ...payload });
       fetchQueue();
+      fetchInventoryData();
     } catch (err) {
       console.error('Save error:', err);
-      alert('Error saving consultation data');
+      alert('Error saving consultation data or dispensing stock');
     } finally {
       setSaving(false);
     }
@@ -418,6 +632,70 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       prescription: 'नुस्खा',
       revisit: 'पुनरावृत्ति गणना',
       preview: 'पर्ची पूर्वावलोकन'
+    }
+  };
+
+  const handleDispense = async (medicine: any) => {
+    if (!selectedPatient?.id) return;
+    
+    const qty = Number(dispensedQty);
+    if (isNaN(qty) || qty <= 0) {
+      alert('Please enter a valid quantity.');
+      return;
+    }
+
+    // Find batch in indent
+    const normalizedName = normalizeForSearch(medicine.medicine_name);
+    const batches = indentStock.filter(s => normalizeForSearch(s.medicine_name) === normalizedName && Number(s.remaining_loose_quantity) > 0);
+    
+    if (batches.length === 0) {
+      alert('Insufficient stock in Dispensary. Please transfer from Main Store.');
+      return;
+    }
+
+    // For simplicity, we'll take the first batch with enough stock or the one with most stock
+    const batch = batches.sort((a, b) => Number(b.remaining_loose_quantity) - Number(a.remaining_loose_quantity))[0];
+
+    if (qty > Number(batch.remaining_loose_quantity)) {
+      alert(`Insufficient stock in Dispensary. Available: ${batch.remaining_loose_quantity}. Please transfer from Main Store.`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. Record Daily Consumption
+      const { error: consError } = await supabase
+        .from('daily_consumption')
+        .insert([{
+          hospital_id: hospitalId,
+          patient_id: selectedPatient.id,
+          medicine_id: batch.medicine_id,
+          medicine_name: batch.medicine_name,
+          unit_type: batch.unit_type,
+          quantity_dispensed: qty,
+          dispensed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+        }]);
+
+      if (consError) throw consError;
+
+      // 2. Update Indent Stock
+      const { error: indentError } = await supabase
+        .from('hospital_indent')
+        .update({ remaining_loose_quantity: Number(batch.remaining_loose_quantity) - qty })
+        .eq('id', batch.id);
+
+      if (indentError) throw indentError;
+
+      alert(`Successfully dispensed ${qty} ${medicine.unit_label}s.`);
+      setDispensingMedicine(null);
+      setDispensedQty('');
+      fetchInventoryData();
+      
+    } catch (err) {
+      console.error('Dispensing error:', err);
+      alert('Error processing dispensing.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -496,7 +774,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
             </div>
             <div className="flex flex-col">
               <p className="text-[7px] font-bold text-slate-500">Diagnosis:</p>
-              <p className="text-[7px] line-clamp-2 font-bold leading-tight">{patientData.diagnosis || '---'}</p>
+              <p className="text-[7px] line-clamp-2 font-bold leading-tight bg-emerald-50 text-emerald-800 px-1 rounded">{patientData.diagnosis || '---'}</p>
             </div>
             <div className="flex flex-col">
               <p className="text-[7px] font-bold text-slate-500">History:</p>
@@ -541,9 +819,37 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
               <p className="text-[8px] font-bold uppercase text-emerald-700">Prescription</p>
             </div>
             
-            <p className="text-[9px] font-mono whitespace-pre-wrap flex-1 overflow-hidden leading-relaxed">
-              {patientData.prescription || '---'}
-            </p>
+            <div className="flex-1 overflow-hidden">
+              {patientData.prescription && patientData.prescription.startsWith('[') ? (
+                <table className="w-full text-[7px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-1 font-bold text-slate-500">Medicine</th>
+                      <th className="text-left py-1 font-bold text-slate-500">Dosage</th>
+                      <th className="text-left py-1 font-bold text-slate-500">Days</th>
+                      <th className="text-right py-1 font-bold text-slate-500">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {JSON.parse(patientData.prescription).map((med: any, i: number) => (
+                      <tr key={i} className="border-b border-slate-100">
+                        <td className="py-1">
+                          <p className="font-bold">{med.medicine_name}</p>
+                          <p className="text-[6px] text-slate-400">{med.frequency}</p>
+                        </td>
+                        <td className="py-1">{med.dosage}</td>
+                        <td className="py-1">{med.duration_days}</td>
+                        <td className="py-1 text-right font-bold">{med.total_quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-[9px] font-mono whitespace-pre-wrap leading-relaxed">
+                  {patientData.prescription || '---'}
+                </p>
+              )}
+            </div>
             
             {/* History Section if old patient */}
             {patientHistory.length > 0 && (
@@ -604,6 +910,14 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
             className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'queue' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
           >
             Consultation Queue
+          </button>
+        )}
+        {canDispense && (
+          <button 
+            onClick={() => { setActiveTab('dispensing'); setSelectedPatient(null); }} 
+            className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'dispensing' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
+          >
+            Pharmacy Dispensing
           </button>
         )}
       </div>
@@ -912,15 +1226,17 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.diagnosis}</label>
-                        <textarea 
+                        <DiseaseCombobox 
+                          options={diseaseMaster}
                           value={formData.diagnosis || ''}
-                          onChange={e => setFormData({...formData, diagnosis: e.target.value})}
-                          className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 min-h-[100px]"
+                          onChange={(val) => setFormData({...formData, diagnosis: val})}
+                          onSelect={() => historyRef.current?.focus()}
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.history}</label>
                         <textarea 
+                          ref={historyRef}
                           value={formData.history || ''}
                           onChange={e => setFormData({...formData, history: e.target.value})}
                           className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 min-h-[100px]"
@@ -966,13 +1282,163 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                   </div>
 
                   <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6">{cur.prescription}</h2>
-                    <textarea 
-                      value={formData.prescription || ''}
-                      onChange={e => setFormData({...formData, prescription: e.target.value})}
-                      placeholder="Write prescription details here..."
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-[2.5rem] py-6 px-8 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 min-h-[300px] font-mono text-sm leading-relaxed"
-                    />
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="text-emerald-600" size={20} />
+                        {cur.prescription}
+                      </h2>
+                      <div className="flex gap-2">
+                        <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Structured Form</span>
+                      </div>
+                    </div>
+
+                    {/* Medicine Input Form */}
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-gray-100 mb-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div className="lg:col-span-2 space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Medicine Name</label>
+                          <div className="relative">
+                            <input 
+                              list="medicines-list"
+                              value={newMedicine.medicine_name}
+                              onChange={e => setNewMedicine({...newMedicine, medicine_name: e.target.value})}
+                              placeholder="Type medicine name..."
+                              className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                            <datalist id="medicines-list">
+                              {availableMedicines.map(m => <option key={m} value={m} />)}
+                            </datalist>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Dosage</label>
+                          <input 
+                            value={newMedicine.dosage}
+                            onChange={e => setNewMedicine({...newMedicine, dosage: e.target.value})}
+                            placeholder="1-0-1"
+                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                          <input 
+                            type="number"
+                            value={newMedicine.duration_days}
+                            onChange={e => setNewMedicine({...newMedicine, duration_days: parseInt(e.target.value) || 0})}
+                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Unit</label>
+                          <select 
+                            value={newMedicine.unit_label}
+                            onChange={e => setNewMedicine({...newMedicine, unit_label: e.target.value})}
+                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          >
+                            <option value="">Select Unit</option>
+                            <option value="Gram">Gram</option>
+                            <option value="Milligram">Milligram</option>
+                            <option value="Tablet">Tablet</option>
+                            <option value="Capsule">Capsule</option>
+                            <option value="ml">ml</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <button 
+                            type="button"
+                            onClick={addMedicine}
+                            className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Plus size={18} /> Add
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={newMedicine.is_market_purchase}
+                            onChange={e => setNewMedicine({...newMedicine, is_market_purchase: e.target.checked})}
+                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Market Purchase (No Stock Impact)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Prescription Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Medicine</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Dosage</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Total Qty</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Stock Status</th>
+                            <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {prescribedMedicines.map(med => {
+                            const stock = checkStock(med.medicine_name, med.total_quantity);
+                            return (
+                              <tr key={med.id} className="group hover:bg-slate-50/50 transition-all">
+                                <td className="py-4 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-900">{med.medicine_name}</span>
+                                    {med.is_market_purchase && (
+                                      <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest">Market</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-400">{med.frequency}</p>
+                                </td>
+                                <td className="py-4 px-4 text-sm font-medium text-slate-600">{med.dosage}</td>
+                                <td className="py-4 px-4 text-sm font-medium text-slate-600">{med.duration_days} Days</td>
+                                <td className="py-4 px-4">
+                                  <span className="font-bold text-slate-900">{med.total_quantity}</span>
+                                  <span className="text-[10px] text-slate-400 ml-1">{med.unit_label}s</span>
+                                </td>
+                                <td className="py-4 px-4">
+                                  {med.is_market_purchase ? (
+                                    <span className="flex items-center gap-1 text-blue-600 text-[10px] font-bold uppercase tracking-widest">
+                                      <ShoppingCart size={12} /> External
+                                    </span>
+                                  ) : stock.status === 'green' ? (
+                                    <span className="flex items-center gap-1 text-emerald-600 text-[10px] font-bold uppercase tracking-widest">
+                                      <CheckCircle size={12} /> {stock.message} ({stock.current})
+                                    </span>
+                                  ) : stock.status === 'yellow' ? (
+                                    <span className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase tracking-widest">
+                                      <AlertTriangle size={12} /> {stock.message}
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1 text-red-500 text-[10px] font-bold uppercase tracking-widest">
+                                      <AlertTriangle size={12} /> {stock.message}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-4 px-4 text-right">
+                                  <button 
+                                    onClick={() => removeMedicine(med.id)}
+                                    className="p-2 text-slate-300 hover:text-red-500 transition-all"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {prescribedMedicines.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="py-12 text-center text-slate-400 italic text-sm">
+                                No medicines prescribed yet. Use the form above to add.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   <button 
@@ -1030,6 +1496,167 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
           )}
         </div>
       )}
+
+      {activeTab === 'dispensing' && (
+        <div className="space-y-8">
+          {!selectedPatient ? (
+            <>
+              <h2 className="text-2xl font-bold text-slate-900">Dispensing Queue (Completed Consultations)</h2>
+              {dispensingQueue.length === 0 ? (
+                <div className="bg-white p-8 rounded-3xl text-center text-slate-500 border border-gray-100">
+                  No prescriptions ready for dispensing.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dispensingQueue.map(p => (
+                    <div key={p.id} onClick={() => handleSelectQueuePatient(p)} className="bg-white p-6 rounded-3xl border border-gray-100 hover:border-emerald-500 cursor-pointer transition-all shadow-sm hover:shadow-md">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
+                          <p className="text-sm text-slate-500">{p.age} yrs • {p.gender}</p>
+                        </div>
+                        <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">Ready</span>
+                      </div>
+                      <div className="text-xs text-slate-400 space-y-1">
+                        <p>Completed: {new Date(p.created_at).toLocaleTimeString()}</p>
+                        <p>Mobile: {p.mobile}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col lg:flex-row gap-8">
+              <div className="flex-1 space-y-8">
+                <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{selectedPatient.name}</h2>
+                    <p className="text-slate-500">{selectedPatient.age} yrs • {selectedPatient.gender} • {selectedPatient.mobile}</p>
+                  </div>
+                  <button type="button" onClick={() => setSelectedPatient(null)} className="flex items-center gap-2 text-slate-400 hover:text-slate-600 font-medium">
+                    <ArrowLeft size={16} /> Back to Queue
+                  </button>
+                </div>
+
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <FileText className="text-emerald-600" size={20} />
+                    Prescribed Medicines
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Medicine</th>
+                          <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Prescribed Qty</th>
+                          <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Stock in Indent</th>
+                          <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {prescribedMedicines.map((med, idx) => {
+                          const stock = checkStock(med.medicine_name, med.total_quantity);
+                          return (
+                            <tr key={idx} className="group hover:bg-slate-50/50 transition-all">
+                              <td className="py-4 px-4">
+                                <p className="font-bold text-slate-900">{med.medicine_name}</p>
+                                <p className="text-[10px] text-slate-400">{med.dosage} • {med.duration_days} Days</p>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="font-bold text-slate-900">{med.total_quantity}</span>
+                                <span className="text-[10px] text-slate-400 ml-1">{med.unit_label}s</span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className={`font-bold ${stock.status === 'green' ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  {stock.current} {med.unit_label}s
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-right">
+                                {!med.is_market_purchase ? (
+                                  <button 
+                                    onClick={() => { setDispensingMedicine(med); setDispensedQty(med.total_quantity.toString()); }}
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all"
+                                  >
+                                    Dispense
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Market Purchase</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div className="hidden lg:block w-[400px]">
+                <div className="sticky top-24 space-y-6">
+                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 px-4">
+                    <FileText className="text-emerald-600" size={20} />
+                    {cur.preview}
+                  </h2>
+                  {renderA4Preview({ ...selectedPatient, ...formData })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {dispensingMedicine && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-white/20"
+            >
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Dispense Medicine</h2>
+              <p className="text-slate-500 mb-6">Enter the actual quantity dispensed to the patient.</p>
+              
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Medicine</p>
+                  <p className="font-bold text-slate-900">{dispensingMedicine.medicine_name}</p>
+                  <p className="text-xs text-slate-500">Prescribed: {dispensingMedicine.total_quantity} {dispensingMedicine.unit_label}s</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Dispensed Quantity ({dispensingMedicine.unit_label}s)</label>
+                  <input 
+                    type="number"
+                    value={dispensedQty}
+                    onChange={e => setDispensedQty(e.target.value)}
+                    className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold text-lg"
+                    placeholder="Enter quantity..."
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setDispensingMedicine(null)}
+                    className="flex-1 py-4 rounded-2xl font-bold text-slate-600 bg-neutral-100 hover:bg-neutral-200 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => handleDispense(dispensingMedicine)}
+                    disabled={saving}
+                    className="flex-1 py-4 rounded-2xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    {saving ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+                    Confirm Dispense
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

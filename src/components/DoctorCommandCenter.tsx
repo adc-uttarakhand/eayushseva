@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
 import HospitalProfile from './HospitalProfile';
+import InventoryManager from './InventoryManager';
+import MedicineDemandSystem from './MedicineDemandSystem';
+import HospitalSupplyPull from './HospitalSupplyPull';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -14,11 +17,13 @@ interface DoctorCommandCenterProps {
   hospitals?: any[];
   onOpenEParchi: () => void;
   onEditHospital?: () => void;
+  onUpdateHospital?: () => void;
   hospitalDetails?: any;
 }
 
 const AVAILABLE_MODULES = [
   { id: 'e_parchi', label: 'E-Parchi Desk (OPD)' },
+  { id: 'inventory', label: 'Inventory Management' },
   { id: 'medicine_demand', label: 'Medicine Demand' },
   { id: 'equipment_demand', label: 'Equipment / Furniture Demand' },
   { id: 'yoga_management', label: 'Yoga Session Management' },
@@ -32,25 +37,9 @@ const UTTARAKHAND_DISTRICTS = [
   "Udham Singh Nagar", "Uttarkashi"
 ];
 
-const STAFF_ROLES = [
-  "Senior Medical Officer",
-  "Medical Officer",
-  "District Pharmacy Officer",
-  "Chief Pharmacy Officer",
-  "Pharmacy Officer",
-  "Staff Nurse",
-  "Panchkarma Sahayak (Male)",
-  "Panchkarma Sahayak (Female)",
-  "Yoga and Naturopathy Assistant",
-  "Yoga Instructor (Male)",
-  "Yoga Instructor (Female)",
-  "Wardboy",
-  "MPW",
-  "Swacchak Cum Chowkidar"
-];
-
-export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, hospitalDetails }: DoctorCommandCenterProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi'>('dashboard');
+export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails }: DoctorCommandCenterProps) {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management'>('dashboard');
+  const [roles, setRoles] = useState<string[]>([]);
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -116,6 +105,36 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     password: ''
   });
   const [selectedModules, setSelectedModules] = useState<string[]>(['profile']);
+  const [isModuleActive, setIsModuleActive] = useState(true);
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      const { data } = await supabase.from('roles').select('role_name');
+      if (data) setRoles(data.map(r => r.role_name));
+    };
+    fetchRoles();
+    
+    const fetchModuleStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('global_settings')
+          .select('is_active')
+          .eq('setting_key', 'medicine_demand_active')
+          .single();
+        
+        if (error) {
+          console.error('Error fetching module status in DoctorCommandCenter:', error);
+        }
+        
+        if (data) {
+          setIsModuleActive(data.is_active);
+        }
+      } catch (err) {
+        console.error('Exception fetching module status:', err);
+      }
+    };
+    fetchModuleStatus();
+  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -522,7 +541,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }
 
     if (!staffForm.employeeId && !staffForm.aadhaarNumber) {
-      alert('Either Employee ID or Aadhaar Number must be provided! / या तो कर्मचारी आईडी या आधार संख्या प्रदान की जानी चाहिए!');
+      alert('Kripya Aadhaar Number ya Employee ID mein se kam se kam ek bharein');
       return;
     }
 
@@ -531,16 +550,33 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       return;
     }
 
-    // Check if staff already exists in DB
-    const { data: existingStaff } = await supabase
-      .from('staff')
-      .select('id')
-      .or(`mobile_number.eq.${staffForm.mobile}${staffForm.employeeId ? `,employee_id.eq.${staffForm.employeeId}` : ''}${staffForm.aadhaarNumber ? `,aadhaar_number.eq.${staffForm.aadhaarNumber}` : ''}`)
-      .maybeSingle();
+    // Check for duplicates
+    if (staffForm.aadhaarNumber) {
+      const { data: existingAadhaar } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('aadhaar_number', staffForm.aadhaarNumber)
+        .neq('id', editingStaffId || -1)
+        .maybeSingle();
+      
+      if (existingAadhaar) {
+        alert('Aadhaar Number already exists');
+        return;
+      }
+    }
 
-    if (existingStaff && !editingStaffId) {
-      alert('Staff is already in the system, search it! / स्टाफ पहले से ही सिस्टम में है, इसे खोजें!');
-      return;
+    if (staffForm.employeeId) {
+      const { data: existingEmpId } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('employee_id', staffForm.employeeId)
+        .neq('id', editingStaffId || -1)
+        .maybeSingle();
+      
+      if (existingEmpId) {
+        alert('Employee ID already exists');
+        return;
+      }
     }
 
     const payload = {
@@ -627,13 +663,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const showHospitalProfile = isIncharge;
   const showEParchi = isHospital || isIncharge || (isAssignedStaff && assignedModules.includes('e_parchi'));
   const showPatients = isHospital || isIncharge || (isAssignedStaff && assignedModules.includes('e_parchi'));
+  const showMedicineManagement = !isHospital && (isIncharge || (isAssignedStaff && assignedModules.includes('inventory')));
+  const showMedicineDemand = (isIncharge || (isAssignedStaff && assignedModules.includes('medicine_demand'))) && isModuleActive;
+  const showDistrictSupply = userRole === 'DISTRICT_ADMIN';
 
   // Set default active tab based on permissions
   React.useEffect(() => {
     if (!showDashboard && showProfile) {
       setActiveTab('profile');
     }
-  }, [showDashboard, showProfile]);
+    if (activeTab === 'medicine_demand' && !showMedicineDemand) {
+      setActiveTab('dashboard');
+    }
+    if (activeTab === 'inventory' && !showMedicineManagement) {
+      setActiveTab('dashboard');
+    }
+  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement, activeTab]);
 
   const calculateDuration = (startDateStr: string) => {
     if (!startDateStr) return '---';
@@ -753,12 +798,20 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               <Users size={18} /> Patients
             </button>
           )}
-          {isAssignedStaff && assignedModules.includes('medicine_demand') && (
+          {showMedicineDemand && (
             <button 
-              onClick={() => setActiveTab('medicine_demand' as any)} 
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'medicine_demand' as any ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+              onClick={() => setActiveTab('medicine_demand')} 
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'medicine_demand' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
             >
-              <Package size={18} /> Medicine Demand
+              <ClipboardList size={18} /> Medicine Demand
+            </button>
+          )}
+          {showMedicineManagement && (
+            <button 
+              onClick={() => setActiveTab('inventory')} 
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'inventory' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <Package size={18} /> Medicine Management
             </button>
           )}
         </div>
@@ -773,7 +826,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       >
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* Stats Bento */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
                 <div className="bg-emerald-50 w-14 h-14 rounded-2xl flex items-center justify-center text-emerald-600">
@@ -804,8 +856,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               </div>
             </div>
 
-            {/* CTA Bento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* CTA Bento */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 text-center md:text-left flex flex-col justify-between gap-6">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">Patient Registration</h2>
@@ -819,6 +871,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   Open e-Parchi Desk
                 </button>
               </div>
+
+              {showMedicineManagement && (
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 text-center md:text-left flex flex-col justify-between gap-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Inventory Management</h2>
+                    <p className="text-slate-500 mt-1">Manage medicine stock, indent, and daily consumption logs.</p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('inventory')} 
+                    className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 whitespace-nowrap"
+                  >
+                    <Package size={24} />
+                    Open Inventory
+                  </button>
+                </div>
+              )}
 
               {isIncharge && (
                 <div className="bg-slate-900 rounded-3xl p-8 shadow-sm text-white flex flex-col justify-between gap-6">
@@ -935,7 +1003,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Role</option>
-                    {STAFF_ROLES.map(role => (
+                    {roles.map(role => (
                       <option key={role} value={role}>{role}</option>
                     ))}
                   </select>
@@ -1520,9 +1588,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'hospital_profile' && showHospitalProfile && (
           <HospitalProfile 
             hospitalDetails={hospitalDetails} 
-            onUpdate={() => {
-              // Optionally trigger a refresh of hospital details
-            }} 
+            onUpdate={() => onUpdateHospital?.()} 
+            session={session}
           />
         )}
 
@@ -1619,6 +1686,18 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             />
           </div>
         )}
+
+        {showMedicineManagement && activeTab === 'inventory' && (
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+            <InventoryManager hospitalId={session.hospitalId || session.id} district={profile.presentDistrict} />
+          </div>
+        )}
+
+        {showMedicineDemand && activeTab === 'medicine_demand' && (
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+            <MedicineDemandSystem session={session} />
+          </div>
+        )}
       </motion.div>
 
       {/* Add / Edit Staff Modal */}
@@ -1684,7 +1763,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         onChange={e => setStaffForm({...staffForm, role: e.target.value})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       >
-                        {STAFF_ROLES.map(role => (
+                        {roles.map(role => (
                           <option key={role} value={role}>{role}</option>
                         ))}
                       </select>
