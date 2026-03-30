@@ -191,7 +191,7 @@ export default function PrescriptionTable({ hospitalId, onPrescriptionChange, in
         </div>
 
         {searchResults.length > 0 && (
-          <div className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+          <div className="absolute z-[100] left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
             {searchResults.map(medicine => (
               <button
                 key={medicine.id}

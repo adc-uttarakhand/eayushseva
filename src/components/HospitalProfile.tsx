@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, Save, MapPin, Eye, EyeOff, Star, ShieldCheck, Upload, Camera, Loader2, X } from 'lucide-react';
+import { Building2, Save, MapPin, Eye, EyeOff, Star, ShieldCheck, Upload, Camera, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import ChangeInchargeModal from './ChangeInchargeModal';
@@ -33,8 +33,12 @@ const CENTRES_OF_EXCELLENCE = [
 
 export default function HospitalProfile({ hospitalDetails, onUpdate, session }: HospitalProfileProps) {
   const [formData, setFormData] = useState({
+    type: '',
+    taluka: '',
+    ipd_services: '',
+    mobile: '',
+    hospital_password: '',
     email: '',
-    password: '',
     special_services: [] as string[],
     centre_of_excellence: '',
     supraja_centre: false,
@@ -47,13 +51,23 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
     block: '',
     region_indicator: '',
     operational_status: '',
-    status: ''
+    status: '',
+    location: '',
+    building_status: '',
+    no_of_rooms: '',
+    total_area: '',
+    construction_year: '',
+    no_of_beds: '',
+    altitude: '',
+    above_7000_feet: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [incharge, setIncharge] = useState<any>(null);
+  const [staff, setStaff] = useState<any[]>([]);
   const [showLocationConfirm, setShowLocationConfirm] = useState(false);
+  const [fetchingAltitude, setFetchingAltitude] = useState(false);
   const [isChangeInchargeOpen, setIsChangeInchargeOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,7 +75,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
     if (hospitalDetails) {
       setFormData({
         email: hospitalDetails.email || '',
-        password: hospitalDetails.password || '',
+        hospital_password: hospitalDetails.hospital_password || '',
         special_services: hospitalDetails.special_services || [],
         centre_of_excellence: hospitalDetails.centre_of_excellence || '',
         supraja_centre: hospitalDetails.supraja_centre || false,
@@ -74,22 +88,40 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         block: hospitalDetails.block || '',
         region_indicator: hospitalDetails.region_indicator || '',
         operational_status: hospitalDetails.operational_status || '',
-        status: hospitalDetails.status || ''
+        status: hospitalDetails.status || '',
+        type: hospitalDetails.type || '',
+        taluka: hospitalDetails.taluka || '',
+        ipd_services: hospitalDetails.ipd_services || '',
+        mobile: hospitalDetails.mobile || '',
+        location: hospitalDetails.location || '',
+        building_status: hospitalDetails.building_status || '',
+        no_of_rooms: hospitalDetails.no_of_rooms?.toString() || '',
+        total_area: hospitalDetails.total_area_sqft?.toString() || '',
+        construction_year: hospitalDetails.construction_year?.toString() || '',
+        no_of_beds: hospitalDetails.no_of_beds?.toString() || '',
+        altitude: hospitalDetails.altitude?.toString() || '',
+        above_7000_feet: hospitalDetails.above_7000_feet || ''
       });
       
-      const fetchIncharge = async () => {
+      const fetchInchargeAndStaff = async () => {
         if (hospitalDetails.incharge_staff_id) {
           const { data } = await supabase
             .from('staff')
-            .select('full_name, role, mobile_number, aadhaar_number, employee_id')
+            .select('full_name, role, mobile_number, aadhaar_number, employee_id, id')
             .eq('id', hospitalDetails.incharge_staff_id)
             .single();
           setIncharge(data);
         } else {
           setIncharge(null);
         }
+
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('full_name, role, mobile_number')
+          .eq('hospital_id', hospitalDetails.hospital_id);
+        setStaff(staffData || []);
       };
-      fetchIncharge();
+      fetchInchargeAndStaff();
     }
   }, [hospitalDetails]);
 
@@ -105,16 +137,15 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         useWebWorker: true,
       });
 
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${hospitalDetails.hospital_id}-${Math.random()}.${fileExt}`;
+      const fileName = `hospital_${hospitalDetails.hospital_id}.jpg`;
       
       const { error: uploadError } = await supabase.storage
-        .from('hospital-photos')
-        .upload(fileName, compressedFile);
+        .from('hospital_photo')
+        .upload(fileName, compressedFile, { upsert: true, contentType: 'image/jpeg' });
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('hospital-photos').getPublicUrl(fileName);
+      const { data } = supabase.storage.from('hospital_photo').getPublicUrl(fileName);
       
       const { error: updateError } = await supabase
         .from('hospitals')
@@ -151,15 +182,61 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
     }
   };
 
+  const fetchAltitude = () => {
+    if ('geolocation' in navigator) {
+      setFetchingAltitude(true);
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        try {
+          let altitudeInMeters = position.coords.altitude;
+          
+          if (altitudeInMeters === null) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
+            if (!response.ok) throw new Error('Failed to fetch from Elevation API');
+            
+            const data = await response.json();
+            if (data.elevation && data.elevation.length > 0) {
+              altitudeInMeters = data.elevation[0];
+            }
+          }
+
+          if (altitudeInMeters !== null) {
+            const altitudeInFeet = Math.round(altitudeInMeters * 3.28084);
+            const isAbove = altitudeInFeet >= 7000 ? 'Yes' : 'No';
+            setFormData(prev => ({
+              ...prev,
+              altitude: altitudeInFeet.toString(),
+              above_7000_feet: isAbove
+            }));
+          } else {
+            alert('GPS altitude not available and Elevation API failed. Please enter manually.');
+          }
+        } catch (err: any) {
+          alert('Error fetching elevation data: ' + err.message);
+        } finally {
+          setFetchingAltitude(false);
+        }
+      }, (error) => {
+        alert('Error fetching altitude: ' + error.message);
+        setFetchingAltitude(false);
+      }, { enableHighAccuracy: true });
+    } else {
+      alert('Geolocation is not supported by your browser.');
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const updateData = {
+      const isAdmin = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role);
+      const updateData: any = {
         email: formData.email,
-        password: formData.password,
+        hospital_password: formData.hospital_password,
         special_services: formData.special_services,
-        centre_of_excellence: formData.centre_of_excellence,
+        centre_of_excellence: formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' ? (formData.centre_of_excellence === 'True' ? null : formData.centre_of_excellence) : null,
         supraja_centre: formData.supraja_centre,
         panchakarma_centre: formData.panchakarma_centre,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -169,17 +246,58 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         block: formData.block,
         region_indicator: formData.region_indicator,
         operational_status: formData.operational_status,
-        status: formData.status
+        status: formData.status,
+        taluka: formData.taluka,
+        ipd_services: formData.ipd_services,
+        mobile: formData.mobile,
+        location: formData.location,
+        building_status: formData.building_status,
+        no_of_rooms: formData.no_of_rooms ? parseInt(formData.no_of_rooms) : null,
+        total_area_sqft: formData.total_area ? parseFloat(formData.total_area) : null,
+        construction_year: formData.construction_year ? parseInt(formData.construction_year) : null,
+        no_of_beds: formData.no_of_beds ? parseInt(formData.no_of_beds) : null,
+        altitude: formData.altitude ? parseInt(formData.altitude.toString().replace(/ft|feet/gi, '').trim()) : null,
+        above_7000_feet: formData.above_7000_feet || 'No'
       };
 
-      const tableNames = ['hospitals', 'hospital'];
+      if (isAdmin) {
+        updateData.is_verified = true;
+        updateData.last_edited_on = new Date().toISOString();
+        updateData.verified_by = session?.name || session?.id || 'Admin';
+        updateData.verified_at = new Date().toISOString();
+      }
+
+      if (formData.construction_year && !/^\d{4}$/.test(formData.construction_year)) {
+        throw new Error('Construction Year must be a 4-digit number.');
+      }
+      if (formData.no_of_beds && parseInt(formData.no_of_beds) < 0) {
+        throw new Error('No. of Beds cannot be negative.');
+      }
+
+      const tableNames = ['hospitals'];
       let updateSuccess = false;
 
       for (const tableName of tableNames) {
+        // Try id first (most reliable)
+        if (hospitalDetails.id) {
+          console.log(`Attempting update on ${tableName} with id: ${hospitalDetails.id}`);
+          const { data: idData, error: idError } = await supabase
+            .from(tableName)
+            .update(updateData)
+            .eq('id', hospitalDetails.id)
+            .select();
+          if (idError) console.error(`Error updating ${tableName} with id ${hospitalDetails.id}:`, idError);
+          if (!idError && idData && idData.length > 0) {
+            updateSuccess = true;
+            break;
+          }
+        }
+
         let targetId = hospitalDetails.hospital_id;
         let targetSr = hospitalDetails.sr_no;
 
         // Try to find correct identifiers first
+        console.log(`Searching for ${tableName} with facility_name: ${hospitalDetails.facility_name}, district: ${hospitalDetails.district}`);
         const { data: searchData } = await supabase
           .from(tableName)
           .select('hospital_id, sr_no')
@@ -187,46 +305,40 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
           .eq('district', hospitalDetails.district)
           .limit(1);
 
+        if (searchData) console.log(`Search result for ${tableName}:`, searchData);
+        else console.log(`No search result for ${tableName}`);
+
         if (searchData && searchData.length > 0) {
           targetId = searchData[0].hospital_id;
           targetSr = searchData[0].sr_no;
         }
 
         // Try hospital_id
+        console.log(`Attempting update on ${tableName} with hospital_id: ${targetId}`);
         let { data, error } = await supabase
           .from(tableName)
           .update(updateData)
           .eq('hospital_id', targetId)
           .select();
 
+        if (error) console.error(`Error updating ${tableName} with hospital_id ${targetId}:`, error);
         if (!error && data && data.length > 0) {
           updateSuccess = true;
           break;
         }
 
         // Try sr_no
+        console.log(`Attempting update on ${tableName} with sr_no: ${targetSr}`);
         const { data: retryData, error: retryError } = await supabase
           .from(tableName)
           .update(updateData)
           .eq('sr_no', targetSr)
           .select();
         
+        if (retryError) console.error(`Error updating ${tableName} with sr_no ${targetSr}:`, retryError);
         if (!retryError && retryData && retryData.length > 0) {
           updateSuccess = true;
           break;
-        }
-
-        // Try id
-        if (hospitalDetails.id) {
-          const { data: idData, error: idError } = await supabase
-            .from(tableName)
-            .update(updateData)
-            .eq('id', hospitalDetails.id)
-            .select();
-          if (!idError && idData && idData.length > 0) {
-            updateSuccess = true;
-            break;
-          }
         }
       }
 
@@ -281,7 +393,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
 
         const updatePayload = { 
           incharge_staff_id: staff.id,
-          incharge_name: staff.full_name
+          incharge_name: staff.full_name,
+          mobile: staff.mobile_number
         };
 
         const { data, error } = await supabase
@@ -382,31 +495,67 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
           </div>
 
           <div className="flex-1">
-            <input 
-              value={formData.facility_name}
-              onChange={e => setFormData({...formData, facility_name: e.target.value})}
-              className="text-4xl font-bold text-slate-900 tracking-tight w-full bg-transparent border-none focus:ring-0 p-0"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
-            />
+            <div className="flex items-center gap-3">
+              <input 
+                value={formData.facility_name}
+                onChange={e => setFormData({...formData, facility_name: e.target.value})}
+                className="text-2xl font-bold text-slate-900 tracking-tight w-full bg-transparent border-none focus:ring-0 p-0"
+                disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              />
+              {hospitalDetails.is_verified && (
+                <div className="flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full whitespace-nowrap">
+                  <CheckCircle2 size={16} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Verified</span>
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2 mt-3">
+              <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">SR NO: {hospitalDetails.sr_no}</span>
               <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">ID: {hospitalDetails.hospital_id}</span>
-              <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">{hospitalDetails.type}</span>
               <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">{hospitalDetails.system}</span>
               {formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' && (
-                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Centre of Excellence</span>
+                <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Centre of Excellence</span>
+              )}
+              {formData.panchakarma_centre && (
+                <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Panchakarma Centre</span>
+              )}
+              {formData.supraja_centre && (
+                <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Supraja Centre</span>
               )}
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 pt-8 border-t border-gray-100">
+          <div className="col-span-2 md:col-span-4">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Address</label>
+            <input 
+              value={formData.location}
+              onChange={e => setFormData({...formData, location: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">SR NO</label>
+            <p className="font-bold text-slate-900">{hospitalDetails.sr_no}</p>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Type</label>
+            <p className="font-bold text-slate-900">{hospitalDetails.type || 'N/A'}</p>
+          </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">District</label>
             <p className="font-bold text-slate-900">{hospitalDetails.district}</p>
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Taluka</label>
-            <p className="font-bold text-slate-900">{hospitalDetails.taluka}</p>
+            <input 
+              value={formData.taluka}
+              onChange={e => setFormData({...formData, taluka: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Block</label>
@@ -425,6 +574,20 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
               disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
             />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">System</label>
+            <select 
+              value={hospitalDetails.system}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled
+            >
+              <option value={hospitalDetails.system}>{hospitalDetails.system}</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Mobile</label>
+            <p className="font-bold text-slate-900">{hospitalDetails.mobile}</p>
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Region</label>
@@ -463,25 +626,91 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
             </select>
           </div>
           <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">IPD Services</label>
+            <select 
+              value={formData.ipd_services}
+              onChange={e => setFormData({...formData, ipd_services: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            >
+              <option value="OPD Only">OPD Only</option>
+              <option value="IPD">IPD</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Hospital Password</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? 'text' : 'password'}
+                value={formData.hospital_password}
+                onChange={e => setFormData({...formData, hospital_password: e.target.value})}
+                className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1 pr-10"
+                disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <div className="col-span-2 md:col-span-4">
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Email ID</label>
-            <p className="font-bold text-slate-900 break-all">{formData.email}</p>
+            <input 
+              value={formData.email}
+              onChange={e => setFormData({...formData, email: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
           </div>
           <div className="col-span-2 md:col-span-4">
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Special Services</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {formData.special_services.map((service, index) => (
-                <span key={index} className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                  {service}
-                </span>
-              ))}
-            </div>
+            <input 
+              value={formData.special_services.join(', ')}
+              onChange={e => setFormData({...formData, special_services: e.target.value.split(',').map(s => s.trim())})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
           </div>
-          {formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' && (
-            <div className="col-span-2 md:col-span-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Centre of Excellence</label>
-              <p className="font-bold text-slate-900">{formData.centre_of_excellence}</p>
+          <div className="col-span-2 md:col-span-4 flex flex-col gap-4">
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">Centre of Excellence</span>
+                <input 
+                  type="checkbox" 
+                  checked={!!formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false'} 
+                  onChange={e => setFormData({...formData, centre_of_excellence: e.target.checked ? 'True' : ''})} 
+                  disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                />
+                {!!formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' && <CheckCircle2 className="text-emerald-500" size={16} />}
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">Panchakarma Centre</span>
+                <input type="checkbox" checked={formData.panchakarma_centre} onChange={e => setFormData({...formData, panchakarma_centre: e.target.checked})} disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)} />
+                {formData.panchakarma_centre && <CheckCircle2 className="text-emerald-500" size={16} />}
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">Supraja Centre</span>
+                <input type="checkbox" checked={formData.supraja_centre} onChange={e => setFormData({...formData, supraja_centre: e.target.checked})} disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)} />
+                {formData.supraja_centre && <CheckCircle2 className="text-emerald-500" size={16} />}
+              </label>
             </div>
-          )}
+            
+            {!!formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' && (
+              <div className="w-full md:w-1/2">
+                <input 
+                  type="text"
+                  value={formData.centre_of_excellence === 'True' ? '' : formData.centre_of_excellence}
+                  onChange={e => setFormData({...formData, centre_of_excellence: e.target.value})}
+                  placeholder="e.g. Eye Disorder, Pediatric, etc."
+                  className="font-bold text-slate-900 w-full bg-slate-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -518,62 +747,131 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
               placeholder="e.g. 77.2090"
             />
           </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Altitude (in Feet)</label>
+            <input 
+              type="text"
+              value={formData.altitude}
+              onChange={e => {
+                const val = e.target.value.replace(/ft|feet/gi, '').trim();
+                const isAbove = val ? (parseInt(val) >= 7000 ? 'Yes' : 'No') : 'No';
+                setFormData({...formData, altitude: val, above_7000_feet: isAbove});
+              }}
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              placeholder="e.g. 7500"
+              disabled={!['HOSPITAL', 'DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Above 7000 ft</label>
+            <select
+              value={formData.above_7000_feet || 'No'}
+              onChange={e => setFormData({...formData, above_7000_feet: e.target.value})}
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+              disabled={!['HOSPITAL', 'DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            >
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={fetchAltitude}
+            disabled={fetchingAltitude}
+            className="flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {fetchingAltitude ? (
+              <><Loader2 size={16} className="animate-spin" /> Fetching Elevation Data...</>
+            ) : (
+              <><MapPin size={16} /> Get Precise Altitude (Feet)</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Infrastructure Details</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Building Status</label>
+            <select 
+              value={formData.building_status}
+              onChange={e => setFormData({...formData, building_status: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            >
+              <option value="">Select Status</option>
+              <option value="Own">Own</option>
+              <option value="Rented">Rented</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No. of Rooms</label>
+            <input 
+              type="number"
+              value={formData.no_of_rooms}
+              onChange={e => setFormData({...formData, no_of_rooms: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Area (sq feet)</label>
+            <input 
+              type="number"
+              value={formData.total_area}
+              onChange={e => setFormData({...formData, total_area: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Construction Year</label>
+            <input 
+              type="number"
+              value={formData.construction_year}
+              onChange={e => setFormData({...formData, construction_year: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No. of Beds</label>
+            <input 
+              type="number"
+              value={formData.no_of_beds}
+              onChange={e => setFormData({...formData, no_of_beds: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+            />
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-slate-900">Incharge Details</h2>
-          <div className="flex items-center gap-2">
-            {incharge && ['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role) && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const { error } = await supabase
-                    .from('hospitals')
-                    .update({ incharge_staff_id: null })
-                    .eq('sr_no', hospitalDetails.sr_no);
-                  if (error) console.error('Error removing incharge:', error);
-                  else onUpdate();
-                }}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-xl"
-              >
-                <X size={18} />
-              </button>
-            )}
-            {['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role) && (
-              <button
-                type="button"
-                onClick={() => setIsChangeInchargeOpen(true)}
-                className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-colors"
-              >
-                {incharge ? 'Change' : 'Assign'} Incharge
-              </button>
-            )}
-          </div>
         </div>
         
         {incharge ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Name</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Incharge Name</label>
               <p className="font-bold text-slate-900">{incharge.full_name}</p>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Role</label>
-              <p className="font-bold text-slate-900">{incharge.role}</p>
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Mobile</label>
               <p className="font-bold text-slate-900">{incharge.mobile_number}</p>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Aadhaar</label>
-              <p className="font-bold text-slate-900">{incharge.aadhaar_number}</p>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Employee ID</label>
-              <p className="font-bold text-slate-900">{incharge.employee_id}</p>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Incharge Staff ID</label>
+              <p className="font-bold text-slate-900">{incharge.id}</p>
             </div>
           </div>
         ) : (
@@ -581,7 +879,50 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Staff</h2>
+        </div>
+        
+        {staff.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr>
+                  <th className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2">Name</th>
+                  <th className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2">Role</th>
+                  <th className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2">Mobile</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((employee, index) => (
+                  <tr key={index} className="border-t border-gray-100">
+                    <td className="py-3 font-bold text-slate-900">{employee.full_name}</td>
+                    <td className="py-3 font-bold text-slate-900">{employee.role}</td>
+                    <td className="py-3 font-bold text-slate-900">{employee.mobile_number}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500 italic">No staff members found.</p>
+        )}
+      </div>
+
+      <div className="flex justify-end items-center gap-6">
+        <div className="flex flex-col items-end gap-1">
+          {hospitalDetails.last_edited_on && (
+            <div className="text-sm text-slate-500 font-medium">
+              Last edited on: {new Date(hospitalDetails.last_edited_on).toLocaleString()}
+            </div>
+          )}
+          {hospitalDetails.verified_at && (
+            <div className="text-sm text-emerald-600 font-bold">
+              Last Verified on: {new Date(hospitalDetails.verified_at).toLocaleString()}
+            </div>
+          )}
+        </div>
         <button 
           type="submit"
           disabled={saving}
@@ -589,7 +930,11 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         >
           {saving ? 'Saving...' : (
             <>
-              <Save size={20} /> Save Profile
+              {['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role) ? (
+                <><CheckCircle2 size={20} /> Verify Profile</>
+              ) : (
+                <><Save size={20} /> Save Profile</>
+              )}
             </>
           )}
         </button>

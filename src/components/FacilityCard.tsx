@@ -14,9 +14,10 @@ interface FacilityCardProps {
   isAdmin?: boolean;
   onEdit?: () => void;
   onRate?: (rating: number) => void;
+  hideRateOption?: boolean;
 }
 
-export default function FacilityCard({ name, rating, ratingCount = 0, district, image, system, isAdmin, onEdit, onRate }: FacilityCardProps) {
+export default function FacilityCard({ name, rating, ratingCount = 0, district, image, system, isAdmin, onEdit, onRate, hideRateOption }: FacilityCardProps) {
   const [showRating, setShowRating] = React.useState(false);
 
   return (
@@ -48,15 +49,17 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
           </span>
         </div>
         
-        <div 
-          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowRating(true);
-          }}
-        >
-          <span className="bg-white text-emerald-600 px-4 py-2 rounded-full font-bold text-sm">Rate this Centre</span>
-        </div>
+        {!hideRateOption && (
+          <div 
+            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowRating(true);
+            }}
+          >
+            <span className="bg-white text-emerald-600 px-4 py-2 rounded-full font-bold text-sm">Rate this Centre</span>
+          </div>
+        )}
       </div>
       
       <div className="p-5">
@@ -71,7 +74,7 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
           <div className="flex flex-col items-end">
             <div className="flex items-center gap-1 bg-neutral-50 px-2 py-1 rounded-lg">
               <Star size={14} className="fill-amber-400 text-amber-400" />
-              <span className="text-sm font-bold">{rating.toFixed(1)}</span>
+              <span className="text-sm font-bold">{(Number(rating) || 0).toFixed(1)}</span>
             </div>
             <span className="text-[10px] text-slate-400 font-bold mt-1">({ratingCount} reviews)</span>
           </div>

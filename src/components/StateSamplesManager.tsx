@@ -49,8 +49,8 @@ export default function StateSamplesManager() {
   }, [orders]);
 
   const filteredGroups = groupedOrders.filter((g: any) => 
-    g.order_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.medicine_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    (g.order_no || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (g.medicine_name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   useEffect(() => {

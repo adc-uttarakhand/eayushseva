@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase } from 'lucide-react';
+import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
+import AddEmployeeModal from './AddEmployeeModal';
 
 interface Staff {
   id: string;
   full_name: string;
   role: string;
   mobile_number: string;
+  employee_id?: string;
   is_active: boolean;
   hospital_id: string;
   photograph_url?: string;
@@ -22,14 +24,16 @@ interface Hospital {
   hospital_id: string;
   facility_name: string;
   district: string;
+  system: string;
 }
 
 interface EmployeeDirectoryProps {
   hospitals: Hospital[];
   session?: UserSession | null;
+  onStaffClick: (staffId: string) => void;
 }
 
-export default function EmployeeDirectory({ hospitals, session }: EmployeeDirectoryProps) {
+export default function EmployeeDirectory({ hospitals, session, onStaffClick }: EmployeeDirectoryProps) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +41,7 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
   const [selectedRole, setSelectedRole] = useState('All');
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const [roles, setRoles] = useState<string[]>([]);
 
@@ -52,25 +57,25 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
 
   const fetchStaff = async () => {
     setLoading(true);
-    console.log('Active Filters:', session?.access_districts, session?.access_systems);
+    console.log('Fetching staff. District Admin Access Districts:', session?.access_districts);
+    
+    if (!session?.access_districts || session.access_districts.length === 0) {
+      console.warn('Warning: District Admin has no access_districts defined!');
+    }
     
     // Join staff with hospitals to filter by district and system
     let query = supabase
       .from('staff')
-      .select('*, hospitals!inner(district, system)');
+      .select('*');
 
-    if (session) {
-      // State Admin Bypass: If access_districts contains 'All', remove district filter
-      if (session.access_districts && !session.access_districts.includes('All')) {
-        query = query.in('hospitals.district', session.access_districts);
-      }
-      
-      if (session.access_systems && session.access_systems.length > 0 && !session.access_systems.includes('All')) {
-        query = query.in('hospitals.system', session.access_systems);
-      }
-    }
-
+    console.log('Executing Supabase query...');
     const { data, error } = await query;
+    
+    if (error) {
+      console.error('Supabase fetch error:', error);
+    } else {
+      console.log('Supabase fetch successful. Staff count:', data?.length);
+    }
     
     if (data) {
       setStaff(data);
@@ -101,15 +106,24 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
 
   const districts = ['All', ...Array.from(new Set(hospitals.map(h => h.district)))].sort();
 
-  const filteredStaff = staff.filter(s => {
+  const filteredStaff = (staff || []).filter(s => {
     const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
+    
+    // Access Control
+    const hasAccess = !session || (
+      (!session.access_districts || session.access_districts.includes('All') || (hospital && session.access_districts.includes(hospital.district))) &&
+      (!session.access_systems || session.access_systems.includes('All') || (hospital && session.access_systems.includes(hospital.system)))
+    );
+
     const matchesSearch = s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          s.mobile_number.includes(searchQuery);
     const matchesDistrict = selectedDistrict === 'All' || hospital?.district === selectedDistrict;
     const matchesRole = selectedRole === 'All' || s.role === selectedRole;
     
-    return matchesSearch && matchesDistrict && matchesRole;
+    return hasAccess && matchesSearch && matchesDistrict && matchesRole;
   });
+
+  const canAddEmployee = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role || '');
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
@@ -120,7 +134,16 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
             <p className="text-slate-500 mt-2 font-medium">Manage all AYUSH healthcare staff across the state.</p>
           </div>
           
-          <div className="flex flex-wrap gap-4 w-full md:w-auto">
+          <div className="flex flex-wrap gap-4 w-full md:w-auto items-center">
+            {canAddEmployee && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                <Plus size={20} />
+                Add Employee
+              </button>
+            )}
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -158,66 +181,52 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
             <p className="text-slate-400 font-medium">Fetching staff records...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredStaff.map(s => {
-              const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
-              return (
-                <motion.div 
-                  key={s.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-xl transition-all group"
-                >
-                  <div className="flex items-start gap-4 mb-6">
-                    <div className="relative">
-                      {s.photograph_url ? (
-                        <img src={s.photograph_url} alt={s.full_name} className="w-16 h-16 rounded-2xl object-cover shadow-md" />
-                      ) : (
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                          <User size={24} />
-                        </div>
-                      )}
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${s.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-slate-900 text-lg leading-tight">{s.full_name}</h3>
-                      <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">{s.role}</p>
-                    </div>
-                    <button 
-                      onClick={() => setEditingStaff(s)}
-                      className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-colors"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-slate-500">
-                      <Building2 size={16} className="text-slate-400" />
-                      <span className="text-sm font-medium">{hospital?.facility_name || 'Unknown Hospital'}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-slate-500">
-                      <MapPin size={16} className="text-slate-400" />
-                      <span className="text-sm font-medium">{hospital?.district || 'Unknown District'}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-slate-500">
-                      <Phone size={16} className="text-slate-400" />
-                      <span className="text-sm font-medium">{s.mobile_number}</span>
-                    </div>
-                    {s.service_dossier && (
-                      <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-gray-50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Briefcase size={14} className="text-emerald-600" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Service Dossier</span>
-                        </div>
-                        <p className="text-xs text-slate-600 line-clamp-2 italic">"{s.service_dossier}"</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
+          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 bg-slate-50/50">
+                  <th className="py-4 px-6 font-bold text-slate-900">Name</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">Emp ID</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">Role</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">Hospital</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">District</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">Mobile</th>
+                  <th className="py-4 px-6 font-bold text-slate-900">Verification Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStaff.map(s => {
+                  const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
+                  return (
+                      <tr key={s.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors cursor-pointer" onClick={() => onStaffClick(s.id)}>
+                      <td className="py-4 px-6 font-bold text-slate-900 flex items-center gap-3">
+                        {s.photograph_url ? (
+                          <img src={s.photograph_url} alt={s.full_name} className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <User size={14} />
+                          </div>
+                        )}
+                        {s.full_name}
+                        {s.is_verified && (
+                          <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">
+                            Verified
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-slate-600 font-medium">{s.employee_id || '-'}</td>
+                      <td className="py-4 px-6 text-slate-600 font-medium">{s.role}</td>
+                      <td className="py-4 px-6 text-slate-600">{hospital?.facility_name || 'N/A'}</td>
+                      <td className="py-4 px-6 text-slate-600">{hospital?.district || 'N/A'}</td>
+                      <td className="py-4 px-6 text-slate-600">{s.mobile_number}</td>
+                      <td className="py-4 px-6 text-slate-500 text-xs">
+                        {s.is_verified && s.last_verified_on ? `Verified on: ${new Date(s.last_verified_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'Not verified'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -353,6 +362,15 @@ export default function EmployeeDirectory({ hospitals, session }: EmployeeDirect
           </div>
         )}
       </AnimatePresence>
+
+      <AddEmployeeModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={() => {
+          fetchStaff();
+        }}
+        hospitals={hospitals}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ interface DoctorCommandCenterProps {
   session: any;
   hospitalName?: string;
   hospitals?: any[];
+  offices?: any[];
   onOpenEParchi: () => void;
   onEditHospital?: () => void;
   onUpdateHospital?: () => void;
@@ -22,7 +23,11 @@ interface DoctorCommandCenterProps {
 }
 
 const AVAILABLE_MODULES = [
-  { id: 'e_parchi', label: 'E-Parchi Desk (OPD)' },
+  { id: 'e_parchi', label: 'E-Parchi Desk (OPD) - All Access' },
+  { id: 'eparchi_registration', label: 'E-Parchi: Registration' },
+  { id: 'eparchi_consultation', label: 'E-Parchi: Consultation' },
+  { id: 'eparchi_queue', label: 'E-Parchi: Queue' },
+  { id: 'eparchi_pharmacy', label: 'E-Parchi: Pharmacy Dispensing' },
   { id: 'inventory', label: 'Inventory Management' },
   { id: 'medicine_demand', label: 'Medicine Demand' },
   { id: 'equipment_demand', label: 'Equipment / Furniture Demand' },
@@ -34,20 +39,222 @@ const AVAILABLE_MODULES = [
 const UTTARAKHAND_DISTRICTS = [
   "Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", 
   "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudraprayag", "Tehri Garhwal", 
-  "Udham Singh Nagar", "Uttarkashi"
+  "Udham Singh Nagar", "Uttarkashi", "Outside Uttarakhand"
 ];
 
-export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails }: DoctorCommandCenterProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management'>('dashboard');
+const HospitalSearchInput = ({ 
+  value, 
+  onChange, 
+  hospitals, 
+  placeholder = "Search hospital...", 
+  className = "",
+  isTextarea = false
+}: { 
+  value: string, 
+  onChange: (val: string) => void, 
+  hospitals: any[], 
+  placeholder?: string,
+  className?: string,
+  isTextarea?: boolean
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  const filteredHospitals = (hospitals || [])
+    .filter(h => (h.facility_name || '').toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 10);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      {isTextarea ? (
+        <textarea
+          rows={2}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none leading-tight ${className}`}
+          placeholder={placeholder}
+        />
+      ) : (
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${className}`}
+          placeholder={placeholder}
+        />
+      )}
+      {isOpen && query && filteredHospitals.length > 0 && (
+        <div className="absolute z-[100] w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-1 max-h-48 overflow-y-auto">
+          {filteredHospitals.map(h => (
+            <button
+              key={h.hospital_id}
+              type="button"
+              onClick={() => {
+                onChange(h.facility_name);
+                setQuery(h.facility_name);
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-sm font-bold text-slate-700 border-b border-gray-50 last:border-0"
+            >
+              {h.facility_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OfficeSearchInput = ({ 
+  value, 
+  onChange, 
+  offices, 
+  placeholder = "Search office...", 
+  className = "",
+  isTextarea = false
+}: { 
+  value: string, 
+  onChange: (val: string) => void, 
+  offices: any[], 
+  placeholder?: string,
+  className?: string,
+  isTextarea?: boolean
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  const filteredOffices = offices
+    .filter(o => (o.office_name || '').toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 10);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      {isTextarea ? (
+        <textarea
+          rows={2}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none leading-tight ${className}`}
+          placeholder={placeholder}
+        />
+      ) : (
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${className}`}
+          placeholder={placeholder}
+        />
+      )}
+      
+      {isOpen && query && filteredOffices.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {filteredOffices.map((o, idx) => (
+            <div
+              key={idx}
+              className="px-4 py-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0"
+              onClick={() => {
+                setQuery(o.office_name);
+                onChange(o.office_name);
+                setIsOpen(false);
+              }}
+            >
+              <div className="font-bold text-slate-700 text-sm">{o.office_name}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{o.district}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], offices = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails }: DoctorCommandCenterProps) {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback'>('dashboard');
+  const [profileSubTab, setProfileSubTab] = useState<'basic' | 'service' | 'trainings'>('basic');
   const [roles, setRoles] = useState<string[]>([]);
 
   const [showPassword, setShowPassword] = useState(false);
 
   const maskDate = (value: string) => {
-    const clean = value.replace(/\D/g, '').slice(0, 8);
-    if (clean.length <= 2) return clean;
-    if (clean.length <= 4) return `${clean.slice(0, 2)}-${clean.slice(2)}`;
-    return `${clean.slice(0, 2)}-${clean.slice(2, 4)}-${clean.slice(4)}`;
+    // Remove all characters that are not digits or letters
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '');
+    
+    let result = '';
+    
+    // Day (first 2 digits)
+    const day = clean.slice(0, 2).replace(/\D/g, '');
+    result += day;
+    
+    if (clean.length > 2) {
+      result += '-';
+      // Month (next 3 letters)
+      let month = clean.slice(2, 5).replace(/[0-9]/g, '');
+      if (month.length > 0) {
+        // Capitalize first letter, lowercase others
+        month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+      }
+      result += month;
+      
+      if (clean.length > 5) {
+        result += '-';
+        // Year (next 4 digits)
+        const year = clean.slice(5, 9).replace(/\D/g, '');
+        result += year;
+      }
+    }
+    
+    return result;
   };
 
   // Profile State
@@ -72,20 +279,27 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     currentResidentialAddress: '',
     system: '',
     hospitalConnectedName: '',
-    registrationNo: '',
+    bcpRegistrationNo: '',
     specialization: 'General',
     qualification: '',
+    clinicalExperienceSince: '',
     keywords: '',
     trainings: [{ id: Date.now().toString(), title: '', year: '' }],
-    dateOfJoining: '',
-    postings: [{ id: Date.now().toString(), hospitalName: '', fromDate: '', toDate: '', status: 'Sugam' }],
-    attachments: [{ id: Date.now().toString(), hospital: '', from: '', to: '', status: 'Sugam', days: 0 }]
+    dateOfFirstAppointment: '',
+    dateOfFirstJoiningDepartment: '',
+    firstPostingPlace: '',
+    homeDistrict: '',
+    longLeaves: [{ id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
+    postings: [{ id: Date.now().toString(), postingType: 'Hospital', hospitalName: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
+    attachments: [{ id: Date.now().toString(), postingType: 'Hospital', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
   });
 
   // Staff State
   const [staffList, setStaffList] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [avgRating, setAvgRating] = useState(0);
+  const [hospitalReviews, setHospitalReviews] = useState<any[]>([]);
+  const [hospitalAvgRating, setHospitalAvgRating] = useState(0);
 
   // Modal State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
@@ -102,7 +316,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     employeeId: '',
     aadhaarNumber: '',
     role: 'Pharmacist',
-    password: ''
+    password: '',
+    firstPostingPlace: ''
   });
   const [selectedModules, setSelectedModules] = useState<string[]>(['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
@@ -142,10 +357,26 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
       const formatDateForUI = (dateStr: string) => {
         if (!dateStr || dateStr === "") return "";
+        
+        // If it's already in DD-MMM-YYYY format, return it
+        if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(dateStr)) return dateStr;
+        
+        // If it's in YYYY-MM-DD format (from DB)
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           const [y, m, d] = dateStr.split('-');
-          return `${d}-${m}-${y}`;
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthStr = months[parseInt(m) - 1];
+          return `${d}-${monthStr}-${y}`;
         }
+        
+        // If it's in DD-MM-YYYY format
+        if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+          const [d, m, y] = dateStr.split('-');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthStr = months[parseInt(m) - 1];
+          return `${d}-${monthStr}-${y}`;
+        }
+        
         return dateStr;
       };
       
@@ -194,25 +425,54 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         currentResidentialAddress: staffData?.current_residential_address || '',
         system: hospitalInfo?.system || '',
         hospitalConnectedName: hospitalInfo?.facility_name || '',
-        registrationNo: docData?.state_board_registration_no || '',
+        bcpRegistrationNo: staffData?.bcp_registration_no || '',
         specialization: docData?.specialization || 'General',
         qualification: docData?.highest_qualification || '',
+        clinicalExperienceSince: docData?.clinical_experience_since || '',
         keywords: docData?.keywords || '',
         trainings: staffData?.trainings && staffData.trainings.length > 0 ? staffData.trainings : [{ id: Date.now().toString(), title: '', year: '' }],
-        dateOfJoining: formatDateForUI(staffData?.date_of_joining || ''),
+        dateOfFirstAppointment: formatDateForUI(staffData?.date_of_first_appointment || ''),
+        dateOfFirstJoiningDepartment: formatDateForUI(staffData?.first_joining_date || ''),
+        homeDistrict: staffData?.home_district || '',
+        longLeaves: staffData?.long_leaves && staffData.long_leaves.length > 0 
+          ? staffData.long_leaves.map((l: any) => ({
+              ...l,
+              fromDate: formatDateForUI(l.fromDate),
+              toDate: formatDateForUI(l.toDate)
+            }))
+          : [{ id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
         postings: staffData?.postings && staffData.postings.length > 0 
-          ? staffData.postings.map((p: any) => ({
-              ...p,
-              fromDate: formatDateForUI(p.fromDate),
-              toDate: formatDateForUI(p.toDate)
-            }))
-          : [{ id: Date.now().toString(), hospitalName: '', fromDate: '', toDate: '', status: 'Sugam' }],
+          ? staffData.postings.map((p: any) => {
+              const latestHospital = hospitals.find(h => h.hospital_id === p.hospital_id);
+              const start = parseDateStr(formatDateForUI(p.fromDate));
+              const end = parseDateStr(formatDateForUI(p.toDate));
+              const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
+              return {
+                ...p,
+                hospitalName: latestHospital ? latestHospital.facility_name : p.hospitalName,
+                fromDate: formatDateForUI(p.fromDate),
+                toDate: formatDateForUI(p.toDate),
+                above7000: p.above7000 || 'No',
+                days: days > 0 ? days : 0
+              };
+            })
+          : [{ id: Date.now().toString(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
         attachments: staffData?.attachments && staffData.attachments.length > 0 
-          ? staffData.attachments.map((a: any) => ({
-              ...a,
-              from: formatDateForUI(a.from),
-              to: formatDateForUI(a.to)
-            }))
+          ? staffData.attachments.map((a: any) => {
+              const latestHospital = hospitals.find(h => h.hospital_id === a.hospital_id);
+              const start = parseDateStr(formatDateForUI(a.from));
+              const end = parseDateStr(formatDateForUI(a.to));
+              const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
+              return {
+                ...a,
+                hospital: latestHospital ? latestHospital.facility_name : a.hospital,
+                status: latestHospital ? (latestHospital.status || 'Sugam') : (a.status || 'Sugam'),
+                above7000: latestHospital ? (latestHospital.above_7000_feet || 'No') : (a.above7000 || 'No'),
+                from: formatDateForUI(a.from),
+                to: formatDateForUI(a.to),
+                days: days > 0 ? days : 0
+              };
+            })
           : [{ id: Date.now().toString(), hospital: '', from: '', to: '', status: 'Sugam', days: 0 }]
       });
 
@@ -225,12 +485,31 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
       if (reviewData) {
         setReviews(reviewData);
-        const total = reviewData.reduce((acc, r) => acc + r.rating, 0);
-        setAvgRating(reviewData.length > 0 ? total / reviewData.length : 0);
+        const total = reviewData.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+        const avg = reviewData.length > 0 ? total / reviewData.length : 0;
+        setAvgRating(isNaN(avg) ? 0 : avg);
+      }
+
+      // Fetch hospital reviews if user is incharge
+      if (session?.role === 'HOSPITAL' || session?.hospitalId) {
+        const targetHospitalId = session?.role === 'HOSPITAL' ? session.id : session?.hospitalId;
+        const { data: hospReviewData } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('hospital_id', targetHospitalId)
+          .is('doctor_id', null)
+          .order('created_at', { ascending: false });
+
+        if (hospReviewData) {
+          setHospitalReviews(hospReviewData);
+          const total = hospReviewData.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+          const avg = hospReviewData.length > 0 ? total / hospReviewData.length : 0;
+          setHospitalAvgRating(isNaN(avg) ? 0 : avg);
+        }
       }
     };
     fetchProfile();
-  }, [session?.id]);
+  }, [session?.id, session?.role, session?.hospitalId, hospitals]);
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -256,7 +535,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         })));
       }
     };
-    if (activeTab === 'staff') fetchStaff();
+    if (activeTab === 'staff' || activeTab === 'dashboard') fetchStaff();
   }, [session?.hospitalId, activeTab, profile.mobile, session?.id, session?.role]);
 
   const toggleStaffStatus = async (staffId: number, currentStatus: boolean) => {
@@ -266,28 +545,149 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const parseDateStr = (d: string) => {
     if (!d) return new Date(NaN);
+    
+    // Handle DD-MMM-YYYY
+    if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(d)) {
+      const [day, monthStr, year] = d.split('-');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+      if (monthIndex !== -1) {
+        return new Date(parseInt(year), monthIndex, parseInt(day));
+      }
+    }
+    
+    // Handle DD-MM-YYYY
     if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
       const [day, month, year] = d.split('-');
-      return new Date(`${year}-${month}-${day}`);
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     }
+    
     return new Date(d);
   };
 
-  const calculateServiceDays = (postings: any[]) => {
+  const formatDaysToYMD = (totalDays: number) => {
+    const years = Math.floor(totalDays / 365);
+    const remainingDaysAfterYears = totalDays % 365;
+    const months = Math.floor(remainingDaysAfterYears / 30);
+    const days = remainingDaysAfterYears % 30;
+    return `${years}Y ${months}M ${days}D`;
+  };
+
+  const calculateServiceDays = (postings: any[], attachments: any[] = [], longLeaves: any[] = [], currentJoiningDate: string = '', hDetails: any = null) => {
     let sugam = 0;
-    let durgam = 0;
-    postings.forEach(p => {
-      if (p.fromDate && p.toDate) {
-        const start = parseDateStr(p.fromDate);
-        const end = parseDateStr(p.toDate);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-          if (p.status === 'Sugam') sugam += days;
-          else durgam += days;
-        }
+    let durgamNoAbove7000 = 0;
+    let durgamAbove7000 = 0;
+    
+    let attachmentSugam = 0;
+    let attachmentDurgamNoAbove7000 = 0;
+    let attachmentDurgamAbove7000 = 0;
+
+    let totalLeaves = 0;
+
+    // Helper to get days between dates
+    const getDays = (startStr: string, endStr: string) => {
+      const start = parseDateStr(startStr);
+      const end = parseDateStr(endStr);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+      return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    // Helper to check if a range overlaps with another
+    const overlaps = (s1: Date, e1: Date, s2: Date, e2: Date) => s1 <= e2 && s2 <= e1;
+
+    // Process all postings (including current)
+    const allPostings = [...postings];
+    if (currentJoiningDate) {
+      allPostings.push({
+        isAuto: true,
+        fromDate: currentJoiningDate,
+        toDate: new Date().toISOString().split('T')[0], // Simplified for now
+        status: hDetails?.status || 'Sugam',
+        above7000: (hDetails?.region_indicator === 'Above 7000' || hDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'
+      });
+    }
+
+    allPostings.forEach(p => {
+      const start = parseDateStr(p.fromDate);
+      const end = parseDateStr(p.toDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+
+      let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + (p.isAuto ? 0 : 1);
+      let pSugam = 0, pDurgamNoAbove7000 = 0, pDurgamAbove7000 = 0;
+
+      if (p.status === 'Sugam') pSugam = days;
+      else {
+        if (p.above7000 === 'Yes') pDurgamAbove7000 = days;
+        else pDurgamNoAbove7000 = days;
       }
+
+      // Rule A & B: Leaves
+      longLeaves.forEach(l => {
+        if (l.totalDays > 30) {
+          const lStart = parseDateStr(l.fromDate);
+          const lEnd = parseDateStr(l.toDate);
+          if (overlaps(start, end, lStart, lEnd)) {
+            const overlapStart = new Date(Math.max(start.getTime(), lStart.getTime()));
+            const overlapEnd = new Date(Math.min(end.getTime(), lEnd.getTime()));
+            const overlapDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            
+            if (overlapDays > 0) {
+              totalLeaves += overlapDays;
+              if (p.status !== 'Sugam') {
+                if (p.above7000 === 'Yes') pDurgamAbove7000 -= overlapDays;
+                else pDurgamNoAbove7000 -= overlapDays;
+                pSugam += overlapDays;
+              }
+            }
+          }
+        }
+      });
+
+      // Rule C: Attachments
+      attachments.forEach(a => {
+        const aStart = parseDateStr(a.from);
+        const aEnd = parseDateStr(a.to);
+        if (overlaps(start, end, aStart, aEnd)) {
+          const overlapStart = new Date(Math.max(start.getTime(), aStart.getTime()));
+          const overlapEnd = new Date(Math.min(end.getTime(), aEnd.getTime()));
+          const overlapDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          
+          if (overlapDays > 0) {
+            const aAbove7000 = a.above7000 === 'Yes';
+            
+            // Determine posting category
+            let pCategory = p.status === 'Sugam' ? 'Sugam' : (p.above7000 === 'Yes' ? 'DurgamAbove7000' : 'DurgamNoAbove7000');
+            
+            // Determine attachment category
+            let aCategory = a.status === 'Sugam' ? 'Sugam' : (aAbove7000 ? 'DurgamAbove7000' : 'DurgamNoAbove7000');
+
+            // Subtract from posting category
+            if (pCategory === 'Sugam') pSugam -= overlapDays;
+            else if (pCategory === 'DurgamAbove7000') pDurgamAbove7000 -= overlapDays;
+            else pDurgamNoAbove7000 -= overlapDays;
+
+            // Add to attachment category
+            if (aCategory === 'Sugam') attachmentSugam += overlapDays;
+            else if (aCategory === 'DurgamAbove7000') attachmentDurgamAbove7000 += overlapDays;
+            else attachmentDurgamNoAbove7000 += overlapDays;
+          }
+        }
+      });
+
+      sugam += pSugam;
+      durgamNoAbove7000 += pDurgamNoAbove7000;
+      durgamAbove7000 += pDurgamAbove7000;
     });
-    return { sugam, durgam };
+
+    return { 
+        totalSugam: sugam + attachmentSugam, 
+        totalDurgam: durgamNoAbove7000 + attachmentDurgamNoAbove7000, 
+        totalDurgamAbove7000: durgamAbove7000 + attachmentDurgamAbove7000,
+        attachmentSugam,
+        attachmentDurgam: attachmentDurgamNoAbove7000,
+        attachmentDurgamAbove7000,
+        totalLeaves
+    };
   };
 
   const [uploading, setUploading] = useState(false);
@@ -335,18 +735,40 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }
   };
 
-  const serviceDays = calculateServiceDays(profile.postings);
+  const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation for Permanent Employees
+    if (profile.employmentType === 'Permanent') {
+      if (!profile.dateOfFirstJoiningDepartment || !profile.firstPostingPlace) {
+        alert('Please fill "Date of 1st Joining in Dept" and "First Posting Place" in Service Record Details.\nकृपया सेवा रिकॉर्ड विवरण में "विभाग में प्रथम कार्यभार ग्रहण करने की तिथि" और "प्रथम तैनाती स्थल" भरें।');
+        return;
+      }
+    }
+
     try {
       // Helper to sanitize and format dates for DB (DD-MM-YYYY -> YYYY-MM-DD)
       const formatDateForDB = (dateStr: string) => {
         if (!dateStr || dateStr === "") return null;
+        
+        // Handle DD-MMM-YYYY
+        if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(dateStr)) {
+          const [d, mStr, y] = dateStr.split('-');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const m = months.findIndex(month => month.toLowerCase() === mStr.toLowerCase()) + 1;
+          if (m > 0) {
+            return `${y}-${m.toString().padStart(2, '0')}-${d}`;
+          }
+        }
+        
+        // Handle DD-MM-YYYY
         if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
           const [d, m, y] = dateStr.split('-');
           return `${y}-${m}-${d}`;
         }
+        
         return dateStr;
       };
 
@@ -361,6 +783,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         ...a,
         from: formatDateForDB(a.from),
         to: formatDateForDB(a.to)
+      }));
+
+      const sanitizedLongLeaves = profile.longLeaves.map(l => ({
+        ...l,
+        fromDate: formatDateForDB(l.fromDate),
+        toDate: formatDateForDB(l.toDate)
       }));
 
       // 1. Upsert staff table
@@ -384,7 +812,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         permanent_address: profile.permanentAddress,
         current_residential_address: profile.currentResidentialAddress,
         role: profile.designation,
-        date_of_joining: formatDateForDB(profile.dateOfJoining),
+        date_of_first_appointment: formatDateForDB(profile.dateOfFirstAppointment),
+        first_joining_date: formatDateForDB(profile.dateOfFirstJoiningDepartment),
+        home_district: profile.homeDistrict,
+        bcp_registration_no: profile.bcpRegistrationNo,
+        long_leaves: sanitizedLongLeaves,
         trainings: profile.trainings,
         postings: sanitizedPostings,
         attachments: sanitizedAttachments
@@ -397,9 +829,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       // 2. Upsert doctor_profiles table
       const { error: docError } = await supabase.from('doctor_profiles').upsert({
         staff_id: session.id, // Conflict target
-        state_board_registration_no: profile.registrationNo,
         specialization: profile.specialization,
         highest_qualification: profile.qualification,
+        clinical_experience_since: profile.clinicalExperienceSince,
         keywords: profile.keywords
       }, { onConflict: 'staff_id' });
 
@@ -428,6 +860,53 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }));
   };
 
+  const addLongLeave = () => {
+    setProfile(prev => ({
+      ...prev,
+      longLeaves: [...prev.longLeaves, { id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }]
+    }));
+  };
+
+  const removeLongLeave = (id: string) => {
+    setProfile(prev => ({
+      ...prev,
+      longLeaves: prev.longLeaves.filter(l => l.id !== id)
+    }));
+  };
+
+  const updateLongLeave = (id: string, field: string, value: any) => {
+    setProfile(prev => {
+      const newLeaves = prev.longLeaves.map(l => {
+        if (l.id === id) {
+          const updated = { ...l, [field]: value };
+          
+          // Auto-calculate days if both dates are present
+          if (field === 'fromDate' || field === 'toDate') {
+            const from = field === 'fromDate' ? value : l.fromDate;
+            const to = field === 'toDate' ? value : l.toDate;
+            
+            if (from && to && /^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(from) && /^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(to)) {
+              const parseDate = (s: string) => {
+                const [d, mStr, y] = s.split('-');
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const m = months.indexOf(mStr);
+                return new Date(parseInt(y), m, parseInt(d));
+              };
+              const d1 = parseDate(from);
+              const d2 = parseDate(to);
+              const diffTime = d2.getTime() - d1.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+              updated.totalDays = diffDays > 0 ? diffDays : 0;
+            }
+          }
+          return updated;
+        }
+        return l;
+      });
+      return { ...prev, longLeaves: newLeaves };
+    });
+  };
+
   const updateTraining = (id: string, field: string, value: string) => {
     setProfile(prev => ({
       ...prev,
@@ -438,7 +917,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addPosting = () => {
     setProfile(prev => ({
       ...prev,
-      postings: [...prev.postings, { id: Date.now().toString(), hospitalName: '', fromDate: '', toDate: '', status: 'Sugam' }]
+      postings: [...prev.postings, { id: Date.now().toString(), postingType: 'Hospital', hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }]
     }));
   };
 
@@ -451,7 +930,34 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const updatePosting = (id: string, field: string, value: string) => {
     setProfile(prev => {
-      const newPostings = prev.postings.map(p => p.id === id ? { ...p, [field]: value } : p);
+      let newPostings = prev.postings.map(p => p.id === id ? { ...p, [field]: value } : p);
+      
+      // Auto-fetch hospital/office details if name or type changes
+      if (field === 'hospitalName' || field === 'postingType') {
+        newPostings = newPostings.map(p => {
+          if (p.id === id) {
+            if (p.postingType === 'Office') {
+              const o = offices.find(o => o.office_name === p.hospitalName);
+              return {
+                ...p,
+                hospital_id: o ? o.office_id : '',
+                status: o ? (o.status || 'Sugam') : p.status,
+                above7000: 'No'
+              };
+            } else {
+              const h = hospitals.find(h => h.facility_name === p.hospitalName);
+              return { 
+                ...p, 
+                hospital_id: h ? h.hospital_id : '',
+                status: h ? (h.status || 'Sugam') : p.status, 
+                above7000: h ? (h.region_indicator === 'Above 7000' ? 'Yes' : 'No') : p.above7000
+              };
+            }
+          }
+          return p;
+        });
+      }
+
       // Auto-calculate days if from/to dates are present
       const updatedPostings = newPostings.map(p => {
         if (p.id === id && (field === 'fromDate' || field === 'toDate')) {
@@ -461,7 +967,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             const start = parseDateStr(startStr);
             const end = parseDateStr(endStr);
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
               return { ...p, days: days > 0 ? days : 0 };
             }
           }
@@ -475,7 +981,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addAttachment = () => {
     setProfile(prev => ({
       ...prev,
-      attachments: [...prev.attachments, { id: Date.now().toString(), hospital: '', from: '', to: '', status: 'Sugam', days: 0 }]
+      attachments: [...prev.attachments, { id: Date.now().toString(), postingType: 'Hospital', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
     }));
   };
 
@@ -488,7 +994,32 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const updateAttachment = (id: string, field: string, value: string) => {
     setProfile(prev => {
-      const newAttachments = prev.attachments.map(a => a.id === id ? { ...a, [field]: value } : a);
+      let newAttachments = prev.attachments.map(a => a.id === id ? { ...a, [field]: value } : a);
+      
+      // Auto-fetch hospital/office details if name or type changes
+      if (field === 'hospital' || field === 'postingType') {
+        newAttachments = newAttachments.map(a => {
+          if (a.id === id) {
+            if (a.postingType === 'Office') {
+              const o = offices.find(o => o.office_name === a.hospital);
+              return {
+                ...a,
+                status: o ? (o.status || 'Sugam') : a.status,
+                above7000: 'No'
+              };
+            } else {
+              const h = hospitals.find(h => h.facility_name === a.hospital);
+              return { 
+                ...a, 
+                status: h ? (h.status || 'Sugam') : a.status, 
+                above7000: h ? ((h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No') : a.above7000
+              };
+            }
+          }
+          return a;
+        });
+      }
+
       // Auto-calculate days if from/to dates are present
       const updatedAttachments = newAttachments.map(a => {
         if (a.id === id && (field === 'from' || field === 'to')) {
@@ -498,7 +1029,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             const start = parseDateStr(startStr);
             const end = parseDateStr(endStr);
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
               return { ...a, days: days > 0 ? days : 0 };
             }
           }
@@ -517,7 +1048,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       employeeId: staff.employee_id || '', 
       aadhaarNumber: staff.aadhaar_number || '',
       role: staff.role, 
-      password: '' 
+      password: '',
+      firstPostingPlace: staff.first_posting_place || '',
+      firstPostingType: staff.first_posting_type || 'Hospital'
     });
     setSelectedModules(staff.assigned_modules || ['profile']);
     setIsStaffModalOpen(true);
@@ -579,16 +1112,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       }
     }
 
-    const payload = {
+    const payload: any = {
       hospital_id: session.hospitalId,
       full_name: staffForm.fullName,
-      mobile_number: staffForm.mobile,
-      employee_id: staffForm.employeeId,
+      mobile_number: staffForm.mobile.trim(),
+      employee_id: staffForm.employeeId.trim(),
       aadhaar_number: staffForm.aadhaarNumber,
       role: staffForm.role,
       assigned_modules: selectedModules,
       login_password: staffForm.password || 'ayush@123',
-      is_active: true
+      is_active: true,
+      first_posting_place: staffForm.firstPostingPlace
     };
 
     if (editingStaffId) {
@@ -598,6 +1132,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         return;
       }
     } else {
+      // For new employees, if first posting place is blank, use current hospital name
+      if (!payload.first_posting_place && hospitalName) {
+        payload.first_posting_place = hospitalName;
+      }
       const { error } = await supabase.from('staff').insert([payload]);
       if (error) {
         alert('Addition failed: ' + error.message);
@@ -661,30 +1199,59 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const showProfile = !isHospital && (isIncharge || (isAssignedStaff && assignedModules.includes('profile')));
   const showStaff = isHospital || isIncharge;
   const showHospitalProfile = isIncharge;
-  const showEParchi = isHospital || isIncharge || (isAssignedStaff && assignedModules.includes('e_parchi'));
-  const showPatients = isHospital || isIncharge || (isAssignedStaff && assignedModules.includes('e_parchi'));
+  const showEParchi = isHospital || isIncharge || (isAssignedStaff && (
+    assignedModules.includes('e_parchi') || 
+    assignedModules.includes('eparchi_registration') || 
+    assignedModules.includes('eparchi_consultation') || 
+    assignedModules.includes('eparchi_queue') || 
+    assignedModules.includes('eparchi_pharmacy')
+  ));
+  const showPatients = isHospital || isIncharge || (isAssignedStaff && (
+    assignedModules.includes('e_parchi') || 
+    assignedModules.includes('eparchi_registration') || 
+    assignedModules.includes('eparchi_consultation') || 
+    assignedModules.includes('eparchi_queue') || 
+    assignedModules.includes('eparchi_pharmacy')
+  ));
   const showMedicineManagement = !isHospital && (isIncharge || (isAssignedStaff && assignedModules.includes('inventory')));
   const showMedicineDemand = (isIncharge || (isAssignedStaff && assignedModules.includes('medicine_demand'))) && isModuleActive;
   const showDistrictSupply = userRole === 'DISTRICT_ADMIN';
 
   // Set default active tab based on permissions
   React.useEffect(() => {
-    if (!showDashboard && showProfile) {
+    if (activeTab === 'dashboard' && !showDashboard && showProfile) {
       setActiveTab('profile');
     }
     if (activeTab === 'medicine_demand' && !showMedicineDemand) {
-      setActiveTab('dashboard');
+      setActiveTab(showDashboard ? 'dashboard' : 'profile');
     }
     if (activeTab === 'inventory' && !showMedicineManagement) {
-      setActiveTab('dashboard');
+      setActiveTab(showDashboard ? 'dashboard' : 'profile');
     }
-  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement, activeTab]);
+  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement]);
 
   const calculateDuration = (startDateStr: string) => {
     if (!startDateStr) return '---';
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(startDateStr)) return '---';
-    const [d, m, y] = startDateStr.split('-');
-    const startDate = new Date(`${y}-${m}-${d}`);
+    
+    let startDate: Date;
+    
+    // Handle DD-MMM-YYYY
+    if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(startDateStr)) {
+      const [day, monthStr, year] = startDateStr.split('-');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+      if (monthIndex !== -1) {
+        startDate = new Date(parseInt(year), monthIndex, parseInt(day));
+      } else {
+        return '---';
+      }
+    } else if (/^\d{2}-\d{2}-\d{4}$/.test(startDateStr)) {
+      const [d, m, y] = startDateStr.split('-');
+      startDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    } else {
+      startDate = new Date(startDateStr);
+    }
+
     if (isNaN(startDate.getTime())) return '---';
 
     const today = new Date();
@@ -712,7 +1279,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     return parts.length > 0 ? parts.join(', ') : '0 Days';
   };
 
-  const isMedicalOfficer = profile.designation === 'Medical Officer' || profile.designation === 'Senior Medical Officer';
+  const isMedicalOfficer = ['Medical Officer', 'Senior Medical Officer', 'SMO / ADAUO', 'DAUO', 'JD'].includes(profile.designation);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 pb-32 bg-slate-50 min-h-screen">
@@ -764,6 +1331,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'profile' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <User size={18} /> My Profile
+            </button>
+          )}
+          {isMedicalOfficer && (
+            <button 
+              onClick={() => setActiveTab('deep_profile')} 
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'deep_profile' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <UserCircle2 size={18} /> Deep Profile
+            </button>
+          )}
+          {isMedicalOfficer && (
+            <button 
+              onClick={() => setActiveTab('doctor_feedback')} 
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'doctor_feedback' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <Star size={18} /> Doctor Feedback
             </button>
           )}
           {showHospitalProfile && (
@@ -889,36 +1472,53 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               )}
 
               {isIncharge && (
-                <div className="bg-slate-900 rounded-3xl p-8 shadow-sm text-white flex flex-col justify-between gap-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Administrative Actions</h2>
-                    <p className="text-slate-400 mt-1">Manage your facility's staff and profile.</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setActiveTab('staff')} 
-                      className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <Users size={18} />
-                      Manage Staff
-                    </button>
+                <div className="bg-slate-900 rounded-3xl p-8 shadow-sm text-white flex flex-col gap-6">
+                  <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold">Facility Staff</h2>
+                      <p className="text-slate-400 mt-1">Manage your facility's staff members.</p>
+                    </div>
                     <button 
                       onClick={handleOpenAddStaff} 
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                       <Plus size={18} />
                       Add New Staff
                     </button>
-                    {onEditHospital && (
-                      <button 
-                        onClick={onEditHospital} 
-                        className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 sm:col-span-2"
-                      >
-                        <Edit2 size={18} />
-                        Edit Hospital Profile
-                      </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {staffList.length > 0 ? (
+                      staffList.map(staff => (
+                        <div key={staff.id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center border border-white/10">
+                          <div>
+                            <p className="font-bold text-white">{staff.name}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{staff.role}</p>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab('staff')}
+                            className="text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors"
+                          >
+                            Manage
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 bg-white/5 rounded-xl border border-white/10">
+                        <p className="text-slate-400 text-sm">No staff members found.</p>
+                      </div>
                     )}
                   </div>
+
+                  {onEditHospital && (
+                    <button 
+                      onClick={onEditHospital} 
+                      className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full mt-auto"
+                    >
+                      <Edit2 size={18} />
+                      Edit Hospital Profile
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -927,7 +1527,34 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
         {activeTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="space-y-6">
-            {/* Basic Info Section */}
+            {/* Sub-tabs */}
+            <div className="flex gap-4 border-b border-gray-200 mb-6">
+              <button 
+                type="button"
+                onClick={() => setProfileSubTab('basic')}
+                className={`pb-3 font-bold text-sm ${profileSubTab === 'basic' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                Basic Info
+              </button>
+              <button 
+                type="button"
+                onClick={() => setProfileSubTab('service')}
+                className={`pb-3 font-bold text-sm ${profileSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                Service Record
+              </button>
+              <button 
+                type="button"
+                onClick={() => setProfileSubTab('trainings')}
+                className={`pb-3 font-bold text-sm ${profileSubTab === 'trainings' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                Trainings
+              </button>
+            </div>
+
+            {profileSubTab === 'basic' && (
+              <>
+                {/* Basic Info Section */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -1048,6 +1675,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">BCP Registration Number</label>
+                  <input 
+                    value={profile.bcpRegistrationNo} 
+                    onChange={e => setProfile({...profile, bcpRegistrationNo: e.target.value})} 
+                    placeholder="Optional"
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                  />
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Father's Name</label>
                   <input 
                     value={profile.fatherName} 
@@ -1141,7 +1777,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Birth</label>
                   <input 
                     type="text"
-                    placeholder="DD-MM-YYYY"
+                    placeholder="DD-MMM-YYYY"
                     value={profile.dob} 
                     onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
@@ -1201,71 +1837,628 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               </div>
             </div>
 
-            {/* Current Posting Info */}
+              </>
+            )}
+
+            {profileSubTab === 'service' && (
+              <>
+                {/* Current Posting Info */}
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                  <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Building2 className="text-emerald-600" size={20} /> Service Record Details
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of First Appointment</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={profile.dateOfFirstAppointment} 
+                        onChange={e => setProfile({...profile, dateOfFirstAppointment: maskDate(e.target.value)})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of 1st Joining in Dept</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={profile.dateOfFirstJoiningDepartment} 
+                        onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Type</label>
+                      <select 
+                        value={profile.firstPostingType} 
+                        onChange={e => setProfile({...profile, firstPostingType: e.target.value as 'Hospital' | 'Office'})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="Hospital">Hospital</option>
+                        <option value="Office">Office</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
+                      {profile.firstPostingType === 'Office' ? (
+                        <OfficeSearchInput
+                          value={profile.firstPostingPlace}
+                          onChange={val => setProfile({...profile, firstPostingPlace: val})}
+                          offices={offices}
+                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                        />
+                      ) : (
+                        <HospitalSearchInput
+                          value={profile.firstPostingPlace}
+                          onChange={val => setProfile({...profile, firstPostingPlace: val})}
+                          hospitals={hospitals}
+                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                        />
+                      )}
+                      {profile.firstPostingPlace && (
+                        <div className="flex gap-4 ml-4 mt-1">
+                          {(() => {
+                            if (profile.firstPostingType === 'Office') {
+                              const o = offices.find(o => o.office_name === profile.firstPostingPlace);
+                              if (!o) return null;
+                              return (
+                                <>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {o.status || 'Sugam'}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-400">
+                                    District: <span className="text-slate-600">{o.district || 'N/A'}</span>
+                                  </span>
+                                </>
+                              );
+                            } else {
+                              const h = hospitals.find(h => h.facility_name === profile.firstPostingPlace);
+                              if (!h) return null;
+                              return (
+                                <>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {h.status || 'Sugam'}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-400">
+                                    Above 7000 ft: <span className="text-slate-600">{(h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
+                                  </span>
+                                </>
+                              );
+                            }
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting Place</label>
+                      <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold min-h-[3rem] flex items-center">
+                        {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
+                      </div>
+                      {hospitalDetails && (
+                        <div className="flex gap-4 ml-4 mt-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${hospitalDetails.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {hospitalDetails.status || 'Sugam'}
+                          </span>
+                          {hospitalDetails.facility_name && (
+                            <span className="text-[10px] font-bold text-slate-400">
+                              Above 7000 ft: <span className="text-slate-600">{(hospitalDetails.region_indicator === 'Above 7000' || hospitalDetails.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting District</label>
+                      <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold">
+                        {hospitalDetails?.district || '---'}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Joining at Present Posting</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={profile.currentPostingJoiningDate} 
+                        onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employment Type</label>
+                      <select 
+                        value={profile.employmentType} 
+                        onChange={e => setProfile({...profile, employmentType: e.target.value as any})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option>Permanent</option>
+                        <option>Contractual</option>
+                        <option>Outsourced</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Home District</label>
+                      <select 
+                        value={profile.homeDistrict} 
+                        onChange={e => setProfile({...profile, homeDistrict: e.target.value})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="">Select Home District</option>
+                        {UTTARAKHAND_DISTRICTS.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+            <div className={`bg-white rounded-3xl p-8 shadow-sm border border-gray-100 transition-all ${profile.employmentType !== 'Permanent' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
+              </h2>
+              <div className="space-y-4">
+                {profile.postings.map((posting, index) => (
+                  <div key={posting.id} className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${index === 0 ? 'border-emerald-200 bg-emerald-50/20' : 'border-gray-100 bg-slate-50'}`}>
+                    <div className="space-y-1 md:col-span-5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
+                        {index === 0 ? 'First Posting Place (Auto Fetched)' : 'Subsequent Posting'}
+                      </label>
+                      {index === 0 ? (
+                        <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
+                          {posting.hospitalName}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <select 
+                            value={posting.postingType} 
+                            onChange={e => updatePosting(posting.id, 'postingType', e.target.value)} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          >
+                            <option value="Hospital">Hospital</option>
+                            <option value="Office">Office</option>
+                          </select>
+                          {posting.postingType === 'Office' ? (
+                            <OfficeSearchInput
+                              isTextarea
+                              value={posting.hospitalName}
+                              onChange={val => updatePosting(posting.id, 'hospitalName', val)}
+                              offices={offices}
+                              placeholder="Type office name..."
+                            />
+                          ) : (
+                            <HospitalSearchInput
+                              isTextarea
+                              value={posting.hospitalName}
+                              onChange={val => updatePosting(posting.id, 'hospitalName', val)}
+                              hospitals={hospitals}
+                              placeholder="Type hospital name..."
+                            />
+                          )}
+                        </div>
+                      )}
+                      <div className="flex gap-3 ml-2 mt-1">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {posting.status || 'Sugam'}
+                        </span>
+                        {posting.postingType === 'Hospital' && (
+                          <span className="text-[9px] font-bold text-slate-400">
+                            Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={posting.fromDate} 
+                        onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
+                        className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${index === 0 ? 'bg-slate-100 cursor-not-allowed' : ''}`} 
+                        readOnly={index === 0}
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={posting.toDate} 
+                        onChange={e => updatePosting(posting.id, 'toDate', maskDate(e.target.value))} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                        <div className="text-lg">{posting.days || 0}</div>
+                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(posting.days || 0)}</div>
+                      </div>
+                    </div>
+                    <div className="md:col-span-1 flex justify-center pt-6">
+                      <button 
+                        type="button"
+                        onClick={() => removePosting(posting.id)}
+                        className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all ${index === 0 ? 'hidden' : ''}`}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Current Posting Row (Auto-added format) */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
+                  <div className="space-y-1 md:col-span-6">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place (Auto)</label>
+                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
+                      {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
+                    </div>
+                    <div className="flex gap-3 ml-2 mt-1">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitalDetails?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {hospitalDetails?.status || 'Sugam'}
+                      </span>
+                      {hospitalDetails?.facility_name && (
+                        <span className="text-[9px] font-bold text-slate-400">
+                          Above 7000 ft: <span className="text-slate-600">{(hospitalDetails?.region_indicator === 'Above 7000' || hospitalDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
+                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600">
+                      {profile.currentPostingJoiningDate || '---'}
+                    </div>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
+                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600 font-bold italic">
+                      Present
+                    </div>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Days (Auto)</label>
+                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-center font-bold text-emerald-700">
+                      {(() => {
+                        const start = parseDateStr(profile.currentPostingJoiningDate);
+                        if (isNaN(start.getTime())) return '---';
+                        const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                        return (
+                          <>
+                            <div className="text-lg">{days} Days</div>
+                            <div className="text-[10px] text-emerald-500">{formatDaysToYMD(days)}</div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={addPosting}
+                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
+                >
+                  <Plus size={16} /> Add Another Posting
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Building2 className="text-emerald-600" size={20} /> Current Posting Details
+                <Calendar className="text-emerald-600" size={20} /> Long Leaves ({'>'}30 Days)
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Assigned Place</label>
-                  <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold">
-                    {hospitalName || 'Not Assigned'}
+              <div className="space-y-4">
+                {profile.longLeaves.map((leave, index) => (
+                  <div key={leave.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={leave.fromDate} 
+                        onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={leave.toDate} 
+                        onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Leave Type</label>
+                      <input 
+                        value={leave.leaveType} 
+                        onChange={e => updateLongLeave(leave.id, 'leaveType', e.target.value)} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                        placeholder="e.g. Study Leave"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Total Days</label>
+                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                        <div className="text-lg">{leave.totalDays || 0}</div>
+                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(leave.totalDays || 0)}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => removeLongLeave(leave.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px]"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Status</label>
-                  <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold">
-                    {hospitalDetails?.status || '---'}
+                ))}
+                <button 
+                  type="button"
+                  onClick={addLongLeave}
+                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:bg-emerald-50 p-3 rounded-2xl transition-all w-full justify-center border-2 border-dashed border-emerald-100"
+                >
+                  <Plus size={18} /> Add Leave
+                </button>
+
+                {/* Total Leaves Duration Display */}
+                <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                  <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration ({'>'}30 days)</span>
+                  <div className="text-2xl font-black text-slate-700">
+                    <div>{serviceDays.totalLeaves} Days</div>
+                    <div className="text-sm text-slate-400">{formatDaysToYMD(serviceDays.totalLeaves)}</div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Joining Date at Current Place</label>
-                  <input 
-                    type="text"
-                    placeholder="DD-MM-YYYY"
-                    value={profile.currentPostingJoiningDate} 
-                    onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
-                    {hospitalDetails?.status === 'Durgam' ? 'Durgam' : 'Sugam'} Days at Current Place
-                  </label>
-                  <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold">
-                    {calculateDuration(profile.currentPostingJoiningDate)}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="space-y-1 text-center bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-600">Total Sugam Days</p>
-                  <p className="text-xl font-black text-emerald-700">{serviceDays.sugam}</p>
-                </div>
-                <div className="space-y-1 text-center bg-amber-50 p-3 rounded-2xl border border-amber-100">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-amber-600">Total Durgam Days</p>
-                  <p className="text-xl font-black text-amber-700">{serviceDays.durgam}</p>
                 </div>
               </div>
             </div>
 
-            {isMedicalOfficer && (
+            {/* Attachments Section */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <Upload className="text-emerald-600" size={20} /> Attachments (If any)
+              </h2>
+              <div className="space-y-4">
+                {profile.attachments.map((att) => (
+                  <div key={att.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border border-gray-100 p-4 rounded-2xl bg-slate-50">
+                    <div className="space-y-1 md:col-span-5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Place</label>
+                      <div className="space-y-2">
+                        <select 
+                          value={att.postingType} 
+                          onChange={e => updateAttachment(att.id, 'postingType', e.target.value)} 
+                          className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          <option value="Hospital">Hospital</option>
+                          <option value="Office">Office</option>
+                        </select>
+                        {att.postingType === 'Office' ? (
+                          <OfficeSearchInput
+                            isTextarea
+                            value={att.hospital}
+                            onChange={val => updateAttachment(att.id, 'hospital', val)}
+                            offices={offices}
+                            placeholder="Search office..."
+                          />
+                        ) : (
+                          <HospitalSearchInput
+                            isTextarea
+                            value={att.hospital}
+                            onChange={val => updateAttachment(att.id, 'hospital', val)}
+                            hospitals={hospitals}
+                            placeholder="Search hospital..."
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-3 ml-2 mt-1">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${att.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {att.status || 'Sugam'}
+                        </span>
+                        {att.postingType === 'Hospital' && (
+                          <span className="text-[9px] font-bold text-slate-400">
+                            Above 7000 ft: <span className="text-slate-600">{att.above7000 || 'No'}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={att.from} 
+                        onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={att.to} 
+                        onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
+                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                        <div className="text-lg">{att.days || 0}</div>
+                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(att.days || 0)}</div>
+                      </div>
+                    </div>
+                    <div className="md:col-span-1 flex justify-center pt-6">
+                      <button 
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button 
+                  type="button"
+                  onClick={addAttachment}
+                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
+                >
+                  <Plus size={16} /> Add More Attachments
+                </button>
+
+                {/* Attachment Summary Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Total Sugam Attachment Days</p>
+                    <div className="text-2xl font-black text-emerald-700">
+                      <div>{serviceDays.attachmentSugam}</div>
+                      <div className="text-sm text-emerald-500">{formatDaysToYMD(serviceDays.attachmentSugam)}</div>
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">Total Durgam (Below 7000ft) Attachment Days</p>
+                    <div className="text-2xl font-black text-amber-700">
+                      <div>{serviceDays.attachmentDurgam}</div>
+                      <div className="text-sm text-amber-500">{formatDaysToYMD(serviceDays.attachmentDurgam)}</div>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-1">Total Durgam (Above 7000 ft: Yes) Attachment Days</p>
+                    <div className="text-2xl font-black text-red-700">
+                      <div>{serviceDays.attachmentDurgamAbove7000}</div>
+                      <div className="text-sm text-red-500">{formatDaysToYMD(serviceDays.attachmentDurgamAbove7000)}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-slate-100">
+              <div className="space-y-1 text-center bg-emerald-600 p-6 rounded-3xl shadow-lg shadow-emerald-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-100">Total Sugam Days</p>
+                <div className="text-4xl font-black text-white">
+                  <div>{serviceDays.totalSugam}</div>
+                  <div className="text-lg text-emerald-100">{formatDaysToYMD(serviceDays.totalSugam)}</div>
+                </div>
+              </div>
+              <div className="space-y-1 text-center bg-amber-500 p-6 rounded-3xl shadow-lg shadow-amber-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-50">Total Durgam (Below 7000ft) Days</p>
+                <div className="text-4xl font-black text-white">
+                  <div>{serviceDays.totalDurgam}</div>
+                  <div className="text-lg text-amber-100">{formatDaysToYMD(serviceDays.totalDurgam)}</div>
+                </div>
+              </div>
+              <div className="space-y-1 text-center bg-red-600 p-6 rounded-3xl shadow-lg shadow-red-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-100">Total Durgam (Above 7000 ft: Yes) Days</p>
+                <div className="text-4xl font-black text-white">
+                  <div>{serviceDays.totalDurgamAbove7000}</div>
+                  <div className="text-lg text-red-100">{formatDaysToYMD(serviceDays.totalDurgamAbove7000)}</div>
+                </div>
+              </div>
+            </div>
+              </>
+            )}
+
+            {profileSubTab === 'trainings' && (
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
                 <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <Activity className="text-emerald-600" size={20} /> Deep Profile
+                  <Activity className="text-emerald-600" size={20} /> Trainings Attended
                 </h2>
+                <div className="space-y-4">
+                  {profile.trainings.map((training, index) => (
+                    <div key={training.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Training Title</label>
+                        <input 
+                          value={training.title} 
+                          onChange={e => updateTraining(training.id, 'title', e.target.value)} 
+                          className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                          placeholder="e.g. Panchakarma Workshop"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Year</label>
+                        <input 
+                          value={training.year} 
+                          onChange={e => updateTraining(training.id, 'year', e.target.value)} 
+                          className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                          placeholder="e.g. 2025"
+                        />
+                      </div>
+                      <div className="space-y-1 flex gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => removeTraining(training.id)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px] mt-auto w-full flex items-center justify-center"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button 
+                    type="button"
+                    onClick={addTraining}
+                    className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
+                  >
+                    <Plus size={16} /> Add Another Training
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+              <Save size={24} />
+              Save Profile Details
+            </button>
+
+          </form>
+        )}
+
+        {activeTab === 'deep_profile' && isMedicalOfficer && (
+          <form onSubmit={handleSaveProfile} className="space-y-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <Activity className="text-emerald-600" size={20} /> Deep Profile
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">State Medical Council Registration No</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">BCP Registration Number</label>
                   <input 
-                    value={profile.registrationNo} 
-                    onChange={e => setProfile({...profile, registrationNo: e.target.value})} 
+                    value={profile.bcpRegistrationNo} 
+                    onChange={e => setProfile({...profile, bcpRegistrationNo: e.target.value})} 
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Specialization</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Degree / Highest Qualification</label>
+                  <input 
+                    value={profile.qualification} 
+                    onChange={e => setProfile({...profile, qualification: e.target.value})} 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Clinical Experience since year</label>
+                  <input 
+                    type="number"
+                    placeholder="YYYY"
+                    value={profile.clinicalExperienceSince} 
+                    onChange={e => setProfile({...profile, clinicalExperienceSince: e.target.value})} 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Specialization If any</label>
                   <select 
                     value={profile.specialization} 
                     onChange={e => setProfile({...profile, specialization: e.target.value})} 
@@ -1281,14 +2474,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Highest Qualification</label>
-                  <input 
-                    value={profile.qualification} 
-                    onChange={e => setProfile({...profile, qualification: e.target.value})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
-                </div>
-                <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Expertise Keywords (e.g. Diabetes, NCD Reversal)</label>
                   <input 
                     value={profile.keywords} 
@@ -1297,260 +2482,114 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Joining</label>
-                  <input 
-                    type="text"
-                    placeholder="DD-MM-YYYY"
-                    value={profile.dateOfJoining} 
-                    onChange={e => setProfile({...profile, dateOfJoining: maskDate(e.target.value)})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
-                </div>
-              </div>
-            </div>
-            )}
-
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Activity className="text-emerald-600" size={20} /> Trainings Attended
-              </h2>
-              <div className="space-y-4">
-                {profile.trainings.map((training, index) => (
-                  <div key={training.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Training Title</label>
-                      <input 
-                        value={training.title} 
-                        onChange={e => updateTraining(training.id, 'title', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                        placeholder="e.g. Panchakarma Workshop"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Year</label>
-                      <input 
-                        value={training.year} 
-                        onChange={e => updateTraining(training.id, 'year', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                        placeholder="e.g. 2025"
-                      />
-                    </div>
-                    <div className="space-y-1 flex gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => removeTraining(training.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px] mt-auto w-full flex items-center justify-center"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  type="button"
-                  onClick={addTraining}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
-                >
-                  <Plus size={16} /> Add Another Training
-                </button>
-              </div>
-            </div>
-
-            <div className={`bg-white rounded-3xl p-8 shadow-sm border border-gray-100 transition-all ${profile.employmentType !== 'Permanent' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
-              </h2>
-              <div className="space-y-4">
-                {profile.postings.map((posting, index) => (
-                  <div key={posting.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
-                        {index === 0 ? 'First Posting Place' : 'Subsequent Posting'}
-                      </label>
-                      <input 
-                        list="hospitals-list"
-                        value={posting.hospitalName} 
-                        onChange={e => updatePosting(posting.id, 'hospitalName', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                        placeholder="Search hospital..."
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MM-YYYY"
-                        value={posting.fromDate} 
-                        onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MM-YYYY"
-                        value={posting.toDate} 
-                        onChange={e => updatePosting(posting.id, 'toDate', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Status</label>
-                      <select 
-                        value={posting.status} 
-                        onChange={e => updatePosting(posting.id, 'status', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option>Sugam</option>
-                        <option>Durgam</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1 flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
-                        <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                          {posting.days || 0}
-                        </div>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => removePosting(posting.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px] mt-auto"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  type="button"
-                  onClick={addPosting}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
-                >
-                  <Plus size={16} /> Add Another Posting
-                </button>
-              </div>
-            </div>
-
-            {/* Attachments Section */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Upload className="text-emerald-600" size={20} /> Attachments (If any)
-              </h2>
-              <div className="space-y-4">
-                {profile.attachments.map((att) => (
-                  <div key={att.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Hospital</label>
-                      <input 
-                        list="hospitals-list"
-                        value={att.hospital} 
-                        onChange={e => updateAttachment(att.id, 'hospital', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                        placeholder="Search hospital..."
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MM-YYYY"
-                        value={att.from} 
-                        onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MM-YYYY"
-                        value={att.to} 
-                        onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Status</label>
-                      <select 
-                        value={att.status} 
-                        onChange={e => updateAttachment(att.id, 'status', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option>Sugam</option>
-                        <option>Durgam</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1 flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
-                        <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                          {att.days || 0}
-                        </div>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => removeAttachment(att.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px] mt-auto"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  type="button"
-                  onClick={addAttachment}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
-                >
-                  <Plus size={16} /> Add More Attachments
-                </button>
               </div>
             </div>
 
             <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
               <Save size={24} />
-              Save Profile Details
+              Save Deep Profile Details
             </button>
+          </form>
+        )}
 
-            <datalist id="hospitals-list">
-              {hospitals.map(h => (
-                <option key={h.hospital_id} value={h.facility_name} />
-              ))}
-            </datalist>
+        {activeTab === 'doctor_feedback' && isMedicalOfficer && (
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <Star className="text-amber-400 fill-amber-400" size={24} /> Doctor Feedback
+                </h2>
+                <p className="text-slate-500 mt-1">What patients are saying about your service.</p>
+              </div>
+              <div className="bg-slate-50 px-6 py-4 rounded-[2rem] border border-gray-100 flex items-center gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-black text-slate-900">{(avgRating || 0).toFixed(1)}</div>
+                  <div className="flex gap-0.5 mt-1">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star key={s} size={12} className={`${avgRating >= s ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                    ))}
+                  </div>
+                </div>
+                <div className="w-px h-10 bg-gray-200" />
+                <div className="text-center">
+                  <div className="text-3xl font-black text-slate-900">{reviews.length}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Reviews</div>
+                </div>
+              </div>
+            </div>
 
-            {/* Public Feedback Section */}
-            {isMedicalOfficer && (
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-12">
+            <div className="space-y-4">
+              {reviews.length > 0 ? (
+                reviews.map((review, idx) => (
+                  <div key={review.id || idx} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(s => (
+                          <Star key={s} size={14} className={`${review.rating >= s ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="text-slate-700 italic font-medium leading-relaxed">
+                      "{review.comments || 'No specific comments left.'}"
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {review.reviewer_name ? `Review by ${review.reviewer_name}` : 'Verified Patient'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-gray-200">
+                  <Star size={40} className="mx-auto text-slate-200 mb-3" />
+                  <p className="text-slate-400 font-medium">No public feedback received yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'hospital_profile' && showHospitalProfile && (
+          <div className="space-y-8">
+            <HospitalProfile 
+              hospitalDetails={hospitalDetails} 
+              onUpdate={() => onUpdateHospital?.()} 
+              session={session}
+            />
+
+            {/* Hospital Feedback Section */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <Star className="text-amber-400 fill-amber-400" size={24} /> Public Feedback
+                    <Star className="text-amber-400 fill-amber-400" size={24} /> Hospital Ratings
                   </h2>
-                  <p className="text-slate-500 mt-1">What patients are saying about your service.</p>
+                  <p className="text-slate-500 mt-1">What patients are saying about your facility.</p>
                 </div>
                 <div className="bg-slate-50 px-6 py-4 rounded-[2rem] border border-gray-100 flex items-center gap-6">
                   <div className="text-center">
-                    <div className="text-3xl font-black text-slate-900">{avgRating.toFixed(1)}</div>
+                    <div className="text-3xl font-black text-slate-900">{(hospitalAvgRating || 0).toFixed(1)}</div>
                     <div className="flex gap-0.5 mt-1">
                       {[1, 2, 3, 4, 5].map(s => (
-                        <Star key={s} size={12} className={`${avgRating >= s ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                        <Star key={s} size={12} className={`${hospitalAvgRating >= s ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
                       ))}
                     </div>
                   </div>
                   <div className="w-px h-10 bg-gray-200" />
                   <div className="text-center">
-                    <div className="text-3xl font-black text-slate-900">{reviews.length}</div>
+                    <div className="text-3xl font-black text-slate-900">{hospitalReviews.length}</div>
                     <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Reviews</div>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                {reviews.length > 0 ? (
-                  reviews.map((review, idx) => (
+                {hospitalReviews.length > 0 ? (
+                  hospitalReviews.map((review, idx) => (
                     <div key={review.id || idx} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex gap-1">
@@ -1576,21 +2615,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 ) : (
                   <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-gray-200">
                     <Star size={40} className="mx-auto text-slate-200 mb-3" />
-                    <p className="text-slate-400 font-medium">No public feedback received yet.</p>
+                    <p className="text-slate-400 font-medium">No hospital feedback received yet.</p>
                   </div>
                 )}
               </div>
             </div>
-            )}
-          </form>
-        )}
-
-        {activeTab === 'hospital_profile' && showHospitalProfile && (
-          <HospitalProfile 
-            hospitalDetails={hospitalDetails} 
-            onUpdate={() => onUpdateHospital?.()} 
-            session={session}
-          />
+          </div>
         )}
 
         {activeTab === 'staff' && (
@@ -1742,6 +2772,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Mobile Number</label>
                       <input 
+                        type="tel"
+                        pattern="[0-9]{10}"
+                        title="Please enter a valid 10-digit mobile number"
                         required
                         value={staffForm.mobile} 
                         onChange={e => setStaffForm({...staffForm, mobile: e.target.value})} 
@@ -1767,6 +2800,35 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                           <option key={role} value={role}>{role}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Type</label>
+                      <select 
+                        value={staffForm.firstPostingType} 
+                        onChange={e => setStaffForm({...staffForm, firstPostingType: e.target.value as 'Hospital' | 'Office'})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="Hospital">Hospital</option>
+                        <option value="Office">Office</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
+                      {staffForm.firstPostingType === 'Office' ? (
+                        <OfficeSearchInput
+                          value={staffForm.firstPostingPlace}
+                          onChange={val => setStaffForm({...staffForm, firstPostingPlace: val})}
+                          offices={offices}
+                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                        />
+                      ) : (
+                        <HospitalSearchInput
+                          value={staffForm.firstPostingPlace}
+                          onChange={val => setStaffForm({...staffForm, firstPostingPlace: val})}
+                          hospitals={hospitals}
+                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                        />
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
@@ -1924,7 +2986,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <button 
                       onClick={() => {
                         setEditingStaffId(null);
-                        setStaffForm({ fullName: '', mobile: '', employeeId: '', aadhaarNumber: '', role: 'Pharmacist', password: '' });
+                        setStaffForm({ fullName: '', mobile: '', employeeId: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '', firstPostingType: 'Hospital' });
                         setSelectedModules(['profile']);
                         setIsStaffModalOpen(true);
                         setIsStaffSearchOpen(false);

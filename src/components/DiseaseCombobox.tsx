@@ -104,7 +104,7 @@ export default function DiseaseCombobox({ options, value, onChange, placeholder 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden max-h-80 flex flex-col"
+            className="absolute z-[100] w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden max-h-80 flex flex-col"
           >
             <div className="overflow-y-auto flex-1">
               <div className="p-2">

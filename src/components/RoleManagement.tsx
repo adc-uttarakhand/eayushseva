@@ -185,7 +185,7 @@ export default function RoleManagement() {
       </div>
 
       {roleToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
           <div className="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full">
             <h3 className="text-lg font-bold mb-2">Confirm Delete</h3>
             <p className="text-slate-600 mb-6">Are you sure you want to delete the role "{roleToDelete.role_name}"? This action cannot be undone.</p>

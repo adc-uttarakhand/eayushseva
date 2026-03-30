@@ -71,6 +71,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
             name: adminData.name || adminData.admin_name || adminData.admin_userid,
             access_districts: adminData.access_districts || [],
             access_systems: adminData.access_systems || [],
+            district: adminData.district,
           });
           onClose();
           return;

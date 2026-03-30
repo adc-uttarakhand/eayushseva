@@ -25,6 +25,8 @@ interface Hospital {
   hospital_id: string;
   doctor_id: string;
   password?: string;
+  altitude?: number;
+  above_7000_feet?: string;
 }
 
 interface EditHospitalModalProps {
@@ -32,6 +34,7 @@ interface EditHospitalModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: () => void;
+  onLogout: () => void;
   isAdmin?: boolean;
 }
 
@@ -41,7 +44,7 @@ const UTTARAKHAND_DISTRICTS = [
   "Udham Singh Nagar", "Uttarkashi"
 ];
 
-export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate, isAdmin }: EditHospitalModalProps) {
+export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate, onLogout, isAdmin }: EditHospitalModalProps) {
   const [formData, setFormData] = useState<Hospital | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,15 +52,34 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
 
   useEffect(() => {
     if (hospital) {
-      setFormData({ ...hospital });
+      setFormData({ 
+        ...hospital,
+        altitude: hospital.altitude || 0,
+        above_7000_feet: hospital.above_7000_feet || 'No'
+      });
       setNewPassword('');
     }
   }, [hospital]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!formData) return;
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    let { name, value } = e.target;
+    
+    if (name === 'altitude') {
+      // Strip "ft" or "feet"
+      const numericValue = value.replace(/ft|feet/gi, '').trim();
+      // Ensure only numbers
+      if (!/^\d*$/.test(numericValue)) return;
+      
+      const altitude = parseInt(numericValue, 10) || 0;
+      setFormData({ 
+        ...formData, 
+        altitude: altitude,
+        above_7000_feet: altitude >= 7000 ? 'Yes' : 'No'
+      });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +99,8 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
         mobile: formData.mobile,
         email: formData.email,
         operational_status: formData.operational_status,
+        altitude: formData.altitude,
+        above_7000_feet: formData.above_7000_feet,
       };
 
       // Only update password if a new one is provided
@@ -147,6 +171,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
       }
 
       onUpdate();
+      onLogout();
       onClose();
     } catch (err: any) {
       console.error('Error updating hospital:', err);
@@ -231,6 +256,30 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
                       {UTTARAKHAND_DISTRICTS.map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Altitude (in Feet)</label>
+                    <input
+                      name="altitude"
+                      value={formData.altitude || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. 7500"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Above 7000 ft</label>
+                    <select
+                      name="above_7000_feet"
+                      value={formData.above_7000_feet || 'No'}
+                      onChange={handleChange}
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
                     </select>
                   </div>
 

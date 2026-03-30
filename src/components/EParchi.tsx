@@ -68,12 +68,14 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const isMO = staffRole === 'Medical Officer';
   const isPharmacist = staffRole === 'Pharmacist' || staffRole === 'Chief Pharmacy Officer';
 
-  const canRegister = isIncharge || isHospital || (!isMO && !isSMO && !isPharmacist);
-  const canConsult = isIncharge || isMO || isSMO;
-  const canDispense = isIncharge || isPharmacist;
+  const assignedModules = session?.modules || [];
+  const canRegister = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_registration');
+  const canConsult = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_consultation');
+  const canViewQueue = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_queue');
+  const canDispense = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_pharmacy');
 
   const [activeTab, setActiveTab] = useState<'registration' | 'queue' | 'dispensing'>(
-    isIncharge ? 'registration' : (isPharmacist ? 'dispensing' : (isMO || isSMO ? 'queue' : 'registration'))
+    canRegister ? 'registration' : (canViewQueue || canConsult ? 'queue' : 'dispensing')
   );
   const [isNew, setIsNew] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -216,7 +218,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         .from('staff')
         .select('id, full_name, role, hospital_id')
         .eq('hospital_id', hospitalId)
-        .in('role', ['Senior Medical Officer', 'Medical Officer']);
+        .in('role', ['Medical Officer', 'Senior Medical Officer', 'SMO / ADAUO', 'DAUO', 'JD']);
 
       if (error) throw error;
       setAvailableDoctors(data || []);
@@ -904,7 +906,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
             Registration
           </button>
         )}
-        {canConsult && (
+        {(canViewQueue || canConsult) && (
           <button 
             onClick={() => { setActiveTab('queue'); setSelectedPatient(null); }} 
             className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'queue' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
@@ -1166,29 +1168,49 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
           {!selectedPatient ? (
             <>
               <h2 className="text-2xl font-bold text-slate-900 print:hidden">Consultation Queue</h2>
-              {queue.length === 0 ? (
-                <div className="bg-white p-8 rounded-3xl text-center text-slate-500 border border-gray-100 print:hidden">
-                  No patients waiting in the queue.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:hidden">
-                  {queue.map(p => (
-                    <div key={p.id} onClick={() => handleSelectQueuePatient(p)} className="bg-white p-6 rounded-3xl border border-gray-100 hover:border-emerald-500 cursor-pointer transition-all shadow-sm hover:shadow-md">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
-                          <p className="text-sm text-slate-500">{p.age} yrs • {p.gender}</p>
-                        </div>
-                        <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">Waiting</span>
-                      </div>
-                      <div className="text-xs text-slate-400 space-y-1">
-                        <p>Queue Time: {new Date(p.queue_time || p.created_at).toLocaleTimeString()}</p>
-                        <p>Mobile: {p.mobile}</p>
-                      </div>
+                  {queue.length === 0 && (
+                    <div className="bg-white p-8 rounded-3xl text-center text-slate-500 border border-gray-100 print:hidden">
+                      No patients waiting in the queue.
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
+                  {canConsult && queue.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:hidden">
+                      {queue.map(p => (
+                        <div key={p.id} onClick={() => handleSelectQueuePatient(p)} className="bg-white p-6 rounded-3xl border border-gray-100 hover:border-emerald-500 cursor-pointer transition-all shadow-sm hover:shadow-md">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
+                              <p className="text-sm text-slate-500">{p.age} yrs • {p.gender}</p>
+                            </div>
+                            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">Waiting</span>
+                          </div>
+                          <div className="text-xs text-slate-400 space-y-1">
+                            <p>Queue Time: {new Date(p.queue_time || p.created_at).toLocaleTimeString()}</p>
+                            <p>Mobile: {p.mobile}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!canConsult && canViewQueue && queue.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:hidden">
+                      {queue.map(p => (
+                        <div key={p.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
+                              <p className="text-sm text-slate-500">{p.age} yrs • {p.gender}</p>
+                            </div>
+                            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">Waiting</span>
+                          </div>
+                          <div className="text-xs text-slate-400 space-y-1">
+                            <p>Queue Time: {new Date(p.queue_time || p.created_at).toLocaleTimeString()}</p>
+                            <p>Mobile: {p.mobile}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
             </>
           ) : (
             <div className="flex flex-col lg:flex-row gap-8 print:hidden">

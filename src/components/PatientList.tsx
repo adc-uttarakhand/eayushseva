@@ -32,10 +32,10 @@ export default function PatientList({ hospitalId }: PatientListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const maskDate = (value: string) => {
-    const clean = value.replace(/\D/g, '').slice(0, 8);
-    if (clean.length <= 2) return clean;
-    if (clean.length <= 4) return `${clean.slice(0, 2)}-${clean.slice(2)}`;
-    return `${clean.slice(0, 2)}-${clean.slice(2, 4)}-${clean.slice(4)}`;
+    const v = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (v.length <= 2) return v;
+    if (v.length <= 5) return `${v.slice(0, 2)}-${v.slice(2)}`;
+    return `${v.slice(0, 2)}-${v.slice(2, 5)}-${v.slice(5, 9)}`;
   };
 
   const [stats, setStats] = useState({
@@ -75,6 +75,15 @@ export default function PatientList({ hospitalId }: PatientListProps) {
         start = new Date(now.getFullYear(), 0, 1);
       } else if (timeRange === 'custom' && startDate && endDate) {
         const parseDate = (d: string) => {
+          if (/^\d{2}-[A-Z]{3}-\d{4}$/i.test(d)) {
+            const months: { [key: string]: string } = {
+              'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
+              'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+            };
+            const [day, month, year] = d.split('-');
+            const monthNum = months[month.toUpperCase()];
+            return new Date(`${year}-${monthNum}-${day}`);
+          }
           if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
             const [day, month, year] = d.split('-');
             return new Date(`${year}-${month}-${day}`);
@@ -145,14 +154,14 @@ export default function PatientList({ hospitalId }: PatientListProps) {
             <div className="flex gap-2">
               <input 
                 type="text" 
-                placeholder="DD-MM-YYYY"
+                placeholder="DD-MMM-YYYY"
                 value={startDate}
                 onChange={(e) => setStartDate(maskDate(e.target.value))}
                 className="bg-neutral-50 border border-gray-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 w-32"
               />
               <input 
                 type="text" 
-                placeholder="DD-MM-YYYY"
+                placeholder="DD-MMM-YYYY"
                 value={endDate}
                 onChange={(e) => setEndDate(maskDate(e.target.value))}
                 className="bg-neutral-50 border border-gray-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 w-32"

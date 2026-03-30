@@ -5,8 +5,7 @@ async function fetchSpec() {
   try {
     const res = await fetch(`${supabaseUrl}/rest/v1/?apikey=${supabaseKey}`);
     const spec = await res.json();
-    console.log('medicine_inventory:', Object.keys(spec.definitions.medicine_inventory.properties));
-    console.log('medicine_master:', Object.keys(spec.definitions.medicine_master.properties));
+    console.log('offices:', Object.keys(spec.definitions.offices.properties));
   } catch (err) {
     console.error(err.message);
   }

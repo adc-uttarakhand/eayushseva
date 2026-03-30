@@ -712,10 +712,10 @@ export default function MedicineDemandSystem({ session }: MedicineDemandSystemPr
       }
 
       // Source Type
-      if (filterSourceType && filterSourceType !== 'all' && d.medicine_master?.source_type?.toLowerCase() !== filterSourceType.toLowerCase()) return false;
+      if (filterSourceType && filterSourceType !== 'all' && (d.medicine_master?.source_type || '').toLowerCase() !== (filterSourceType || '').toLowerCase()) return false;
 
       // Category
-      if (filterCategory && filterCategory !== 'all' && d.medicine_master?.category?.toLowerCase() !== filterCategory.toLowerCase()) return false;
+      if (filterCategory && filterCategory !== 'all' && (d.medicine_master?.category || '').toLowerCase() !== (filterCategory || '').toLowerCase()) return false;
 
       return true;
     });

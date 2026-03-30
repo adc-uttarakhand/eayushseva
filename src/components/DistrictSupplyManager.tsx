@@ -1671,7 +1671,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
                     )}
                   </div>
 
-                  {districtHospitals.filter(h => h.facility_name.toLowerCase().includes(hospitalSearchQuery.toLowerCase())).map(h => (
+                  {districtHospitals.filter(h => (h.facility_name || '').toLowerCase().includes((hospitalSearchQuery || '').toLowerCase())).map(h => (
                     <div key={h.hospital_id} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                       <div
                         role="button"
@@ -1819,7 +1819,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
                       )}
                     </div>
                   ))}
-                  {districtHospitals.filter(h => h.facility_name.toLowerCase().includes(hospitalSearchQuery.toLowerCase())).length === 0 && (
+                  {districtHospitals.filter(h => (h.facility_name || '').toLowerCase().includes((hospitalSearchQuery || '').toLowerCase())).length === 0 && (
                     <div className="text-center py-12 bg-white rounded-[3rem] border border-slate-100">
                       <Building2 size={48} className="mx-auto text-slate-300 mb-4" />
                       <h3 className="text-xl font-bold text-slate-900">No Hospitals Found</h3>
@@ -2171,7 +2171,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
           </AnimatePresence>
         )}
         {alertMessage && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}

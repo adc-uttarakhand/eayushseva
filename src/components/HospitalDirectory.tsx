@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, User, Globe, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, Filter, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, User, Globe, Activity, CheckCircle2, AlertCircle, Download, Plus, HelpCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
 import HospitalProfile from './HospitalProfile';
+import EmployeeDirectory from './EmployeeDirectory';
+import EmployeeDetailsPage from './EmployeeDetailsPage';
+import InchargeManagement from './InchargeManagement';
+import AddHospitalModal from './AddHospitalModal';
+import * as XLSX from 'xlsx';
 
 interface Hospital {
   sr_no: number;
@@ -33,6 +38,10 @@ interface Hospital {
   centre_of_excellence?: string;
   supraja_centre?: boolean;
   panchakarma_centre?: boolean;
+  is_verified?: boolean;
+  last_edited_on?: string;
+  verified_by?: string;
+  verified_at?: string;
 }
 
 const UTTARAKHAND_DISTRICTS = [
@@ -48,6 +57,7 @@ interface HospitalDirectoryProps {
 export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'employees' | 'incharges'>('hospitals');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     district: 'All',
@@ -59,6 +69,8 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddHospitalOpen, setIsAddHospitalOpen] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHospitals();
@@ -66,12 +78,9 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
 
   const fetchHospitals = async () => {
     setLoading(true);
-    console.log('Active Filters:', session?.access_districts, session?.access_systems);
-    
-    let query = supabase.from('hospitals').select('*');
+    let query = supabase.from('hospitals').select('*').limit(10000);
 
     if (session) {
-      // State Admin Bypass: If access_districts contains 'All', remove district filter
       if (session.access_districts && !session.access_districts.includes('All')) {
         query = query.in('district', session.access_districts);
       }
@@ -84,8 +93,6 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
     const { data, error } = await query.order('facility_name');
     
     if (data && data.length > 0) {
-      console.log('Sample Hospital from DB:', data[0]);
-      console.log('Columns in hospitals table:', Object.keys(data[0]));
       setHospitals(data);
       setLoading(false);
       return data;
@@ -95,11 +102,9 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
   };
 
   const handleUpdate = async () => {
-    console.log('Refreshing hospitals list...');
     const updatedData = await fetchHospitals();
     if (selectedHospital) {
       const updated = updatedData.find(h => h.sr_no === selectedHospital.sr_no);
-      console.log('Found updated hospital in list:', updated);
       if (updated) {
         setSelectedHospital(updated);
       }
@@ -122,7 +127,6 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
         let targetId = hospital_id;
         let targetSr = sr_no;
 
-        // Try to find correct identifiers first
         const { data: searchData } = await supabase
           .from(tableName)
           .select('hospital_id, sr_no')
@@ -135,7 +139,6 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           targetSr = searchData[0].sr_no;
         }
 
-        // Try hospital_id
         let { data, error } = await supabase
           .from(tableName)
           .update(updateData)
@@ -148,7 +151,6 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           break;
         }
 
-        // Try sr_no
         const { data: retryData, error: retryError } = await supabase
           .from(tableName)
           .update(updateData)
@@ -161,7 +163,6 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           break;
         }
 
-        // Try id
         if ((selectedHospital as any).id) {
           const { data: idData, error: idError } = await supabase
             .from(tableName)
@@ -197,8 +198,8 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
   const statuses = ['All', ...Array.from(new Set(hospitals.map(h => h.status).filter(Boolean)))].sort();
 
   const filteredHospitals = hospitals.filter(h => {
-    const matchesSearch = h.facility_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         h.district.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (h.facility_name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) || 
+                         (h.district || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     const matchesDistrict = filters.district === 'All' || h.district === filters.district;
     const matchesType = filters.type === 'All' || h.type === filters.type;
     const matchesSystem = filters.system === 'All' || h.system === filters.system;
@@ -208,7 +209,27 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
     return matchesSearch && matchesDistrict && matchesType && matchesSystem && matchesRegion && matchesStatus;
   });
 
-  const getHospitalImage = (id: number) => `https://via.placeholder.com/800x600?text=Hospital`;
+  const handleDownloadExcel = () => {
+    const dataToExport = filteredHospitals.map(h => {
+      const row: any = { ...h };
+      
+      // Format arrays and objects for Excel compatibility
+      Object.keys(row).forEach(key => {
+        if (Array.isArray(row[key])) {
+          row[key] = row[key].join(', ');
+        } else if (typeof row[key] === 'object' && row[key] !== null) {
+          row[key] = JSON.stringify(row[key]);
+        }
+      });
+      
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Hospitals");
+    XLSX.writeFile(workbook, "Hospital_Directory.xlsx");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
@@ -219,114 +240,181 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
             <p className="text-slate-500 mt-2 font-medium">State-wide registry of all AYUSH healthcare facilities.</p>
           </div>
           
-          <div className="w-full lg:w-auto space-y-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-              <input 
-                type="text"
-                placeholder="Search by facility name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full lg:w-96 bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium shadow-sm"
-              />
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              <select 
-                value={filters.district}
-                onChange={(e) => setFilters({...filters, district: e.target.value})}
-                className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          {/* Tabs with Glass Effect */}
+          <div className="flex items-center gap-2 p-1 bg-white/50 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm">
+            {(['hospitals', 'employees', 'incharges'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-3 rounded-xl font-bold capitalize transition-all ${
+                  activeTab === tab 
+                    ? 'bg-white text-emerald-600 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
-                <option value="All">All Districts</option>
-                {districts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select 
-                value={filters.type}
-                onChange={(e) => setFilters({...filters, type: e.target.value})}
-                className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="All">All Types</option>
-                {types.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <select 
-                value={filters.system}
-                onChange={(e) => setFilters({...filters, system: e.target.value})}
-                className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="All">All Systems</option>
-                {systems.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select 
-                value={filters.region}
-                onChange={(e) => setFilters({...filters, region: e.target.value})}
-                className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="All">All Regions</option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <select 
-                value={filters.status}
-                onChange={(e) => setFilters({...filters, status: e.target.value})}
-                className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="All">All Status</option>
-                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-emerald-600" size={40} />
-            <p className="text-slate-400 font-medium">Loading hospital registry...</p>
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-gray-100 bg-slate-50/50">
-                  <th className="py-4 px-6 font-bold text-slate-900">Facility Name</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">District</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Type</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">System</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHospitals.map(h => (
-                  <tr 
-                    key={h.sr_no} 
-                    className="border-b border-gray-100 hover:bg-emerald-50/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      setSelectedHospital(h);
-                      setIsDossierOpen(true);
-                    }}
+        {activeTab === 'hospitals' && (
+          <>
+            <div className="w-full lg:w-auto space-y-4 mb-8">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input 
+                    type="text"
+                    placeholder="Search by facility name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium shadow-sm"
+                  />
+                </div>
+                <button
+                  onClick={handleDownloadExcel}
+                  className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
+                >
+                  <Download size={20} />
+                  Download Excel
+                </button>
+                {session?.role === 'SUPER_ADMIN' && (
+                  <button
+                    onClick={() => setIsAddHospitalOpen(true)}
+                    className="flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-sm whitespace-nowrap"
                   >
-                    <td className="py-4 px-6 font-bold text-slate-900">{h.facility_name}</td>
-                    <td className="py-4 px-6 text-slate-600">{h.district}</td>
-                    <td className="py-4 px-6 text-slate-600">{h.type}</td>
-                    <td className="py-4 px-6 text-slate-600">{h.system}</td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
-                        {h.status || 'N/A'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <Plus size={20} />
+                    Add Hospital
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                <select 
+                  value={filters.district}
+                  onChange={(e) => setFilters({...filters, district: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">All Districts</option>
+                  {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select 
+                  value={filters.type}
+                  onChange={(e) => setFilters({...filters, type: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">All Types</option>
+                  {types.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select 
+                  value={filters.system}
+                  onChange={(e) => setFilters({...filters, system: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">All Systems</option>
+                  {systems.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select 
+                  value={filters.region}
+                  onChange={(e) => setFilters({...filters, region: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">All Regions</option>
+                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <select 
+                  value={filters.status}
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">All Status</option>
+                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="animate-spin text-emerald-600" size={40} />
+                <p className="text-slate-400 font-medium">Loading hospital registry...</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-slate-50/50">
+                      <th className="py-4 px-6 font-bold text-slate-900">Facility Name</th>
+                      <th className="py-4 px-6 font-bold text-slate-900">District</th>
+                      <th className="py-4 px-6 font-bold text-slate-900">Type</th>
+                      <th className="py-4 px-6 font-bold text-slate-900">System</th>
+                      <th className="py-4 px-6 font-bold text-slate-900">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHospitals.map(h => (
+                      <tr 
+                        key={h.sr_no} 
+                        className="border-b border-gray-100 hover:bg-emerald-50/50 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setSelectedHospital(h);
+                          setIsDossierOpen(true);
+                        }}
+                      >
+                        <td className="py-4 px-6 font-bold text-slate-900">
+                          <div className="flex flex-col gap-1 items-start">
+                            <div className="flex items-center gap-2">
+                              {h.is_verified ? (
+                                <CheckCircle2 size={16} className="text-emerald-500" title="Verified" />
+                              ) : (
+                                <HelpCircle size={16} className="text-slate-400" title="Not Verified" />
+                              )}
+                              <span>{h.facility_name}</span>
+                            </div>
+                            {!!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false' && (
+                              <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                                CoE: {h.centre_of_excellence === 'True' ? 'Yes' : h.centre_of_excellence}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-slate-600">{h.district}</td>
+                        <td className="py-4 px-6 text-slate-600">{h.type}</td>
+                        <td className="py-4 px-6 text-slate-600">{h.system}</td>
+                        <td className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
+                            {h.status || 'N/A'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {filteredHospitals.length === 0 && !loading && (
+              <div className="text-center py-20">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto mb-4">
+                  <Building2 size={40} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">No facilities found</h3>
+                <p className="text-slate-500 mt-2">Try adjusting your search or filters.</p>
+              </div>
+            )}
+          </>
         )}
 
-        {filteredHospitals.length === 0 && !loading && (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto mb-4">
-              <Building2 size={40} />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900">No facilities found</h3>
-            <p className="text-slate-500 mt-2">Try adjusting your search or filters.</p>
-          </div>
+        {activeTab === 'employees' && session && (
+          selectedStaffId ? (
+            <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+          ) : (
+            <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
+          )
+        )}
+
+        {activeTab === 'incharges' && session && (
+          <InchargeManagement session={session} />
         )}
       </div>
 
@@ -366,6 +454,11 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           </div>
         )}
       </AnimatePresence>
+      <AddHospitalModal 
+        isOpen={isAddHospitalOpen} 
+        onClose={() => setIsAddHospitalOpen(false)} 
+        onSuccess={fetchHospitals} 
+      />
     </div>
   );
 }

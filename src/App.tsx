@@ -17,12 +17,16 @@ import PatientList from './components/PatientList';
 import DoctorCommandCenter from './components/DoctorCommandCenter';
 import RatePage from './components/RatePage';
 import EmployeeDirectory from './components/EmployeeDirectory';
+import EmployeeDetailsPage from './components/EmployeeDetailsPage';
 import HospitalDirectory from './components/HospitalDirectory';
 import MedicineDemandSystem from './components/MedicineDemandSystem';
 import StateSupplyDashboard from './components/StateSupplyDashboard';
 import DistrictSupplyManager from './components/DistrictSupplyManager';
 import ProfilePage from './components/ProfilePage';
 import LoginDirectory from './components/LoginDirectory';
+import InchargeManagement from './components/InchargeManagement';
+import HospitalDetailsModal from './components/HospitalDetailsModal';
+import TransferRequests from './components/TransferRequests';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
@@ -30,6 +34,14 @@ import RoleManagement from './components/RoleManagement';
 import StaffDistributionSummary from './components/StaffDistributionSummary';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  timestamp: string;
+}
 
 interface Hospital {
   sr_no: number;
@@ -53,10 +65,14 @@ interface Hospital {
   hospital_id: string;
   doctor_id: string;
   password?: string;
+  last_edited_on?: string;
+  verified_at?: string;
+  is_verified?: boolean;
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [hospitalSubTab, setHospitalSubTab] = useState<'directory' | 'employees' | 'incharge'>('directory');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -71,9 +87,59 @@ export default function App() {
   // Edit state
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isHospitalDetailsOpen, setIsHospitalDetailsOpen] = useState(false);
   const [isAddMedicineOpen, setIsAddMedicineOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [hasNotifications, setHasNotifications] = useState(true);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    try {
+      const savedReadIds = JSON.parse(localStorage.getItem('readNotifications') || '[]');
+      const defaultNotifications = [
+        {
+          id: '1',
+          title: 'Welcome to AYUSH Portal',
+          message: 'Your account has been successfully created and verified.',
+          read: false,
+          timestamp: new Date().toISOString()
+        },
+        {
+          id: '2',
+          title: 'Profile Update Required',
+          message: 'Please complete your deep profile details to unlock all features.',
+          read: false,
+          timestamp: new Date(Date.now() - 86400000).toISOString()
+        }
+      ];
+      return defaultNotifications.filter(n => !savedReadIds.includes(n.id));
+    } catch (e) {
+      return [];
+    }
+  });
+  const hasNotifications = notifications.length > 0;
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  const handleMarkAllAsRead = () => {
+    try {
+      const currentReadIds = JSON.parse(localStorage.getItem('readNotifications') || '[]');
+      const newReadIds = [...new Set([...currentReadIds, ...notifications.map(n => n.id)])];
+      localStorage.setItem('readNotifications', JSON.stringify(newReadIds));
+    } catch (e) {
+      // ignore
+    }
+    setNotifications([]);
+  };
+
+  const handleNotificationClick = (id: string) => {
+    try {
+      const currentReadIds = JSON.parse(localStorage.getItem('readNotifications') || '[]');
+      if (!currentReadIds.includes(id)) {
+        localStorage.setItem('readNotifications', JSON.stringify([...currentReadIds, id]));
+      }
+    } catch (e) {
+      // ignore
+    }
+    setNotifications(notifications.filter(n => n.id !== id));
+  };
 
   // Search/Filter state for Hospitals tab
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,6 +187,44 @@ export default function App() {
     }, () => {
       alert("Unable to retrieve your location");
     });
+  };
+
+  const [isTransferEnabled, setIsTransferEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchTransferStatus();
+  }, []);
+
+  const fetchTransferStatus = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('global_settings')
+      .select('is_active')
+      .eq('setting_key', 'transfer_module_enabled')
+      .maybeSingle();
+    
+    if (data) {
+      setIsTransferEnabled(data.is_active);
+    }
+    setLoading(false);
+  };
+
+  const toggleTransferModule = async () => {
+    const newState = !isTransferEnabled;
+    if (window.confirm(`Are you sure you want to ${newState ? 'enable' : 'disable'} the transfer module for all districts?`)) {
+      setLoading(true);
+      const { error } = await supabase
+        .from('global_settings')
+        .update({ is_active: newState })
+        .eq('setting_key', 'transfer_module_enabled');
+      
+      if (!error) {
+        setIsTransferEnabled(newState);
+      } else {
+        alert('Error updating transfer module status: ' + error.message);
+      }
+      setLoading(false);
+    }
   };
 
   const handleDoctorSearch = async (query: string) => {
@@ -178,7 +282,7 @@ export default function App() {
       let foundData = false;
 
       for (const tableName of tableNames) {
-        let query = supabase.from(tableName).select('*');
+        let query = supabase.from(tableName).select('*').limit(10000);
 
         if (session) {
           // State Admin Bypass: If access_districts contains 'All', remove district filter
@@ -329,12 +433,9 @@ export default function App() {
                   ratingCount={0}
                   district={facility.district}
                   system={facility.system}
-                  image={getHospitalImage(facility.sr_no)}
-                  isAdmin={canEditFacility(facility)}
-                  onEdit={() => {
-                    setEditingHospital(facility);
-                    setIsEditOpen(true);
-                  }}
+                  image={facility.photo_url || getHospitalImage(facility.sr_no)}
+                  isAdmin={false}
+                  hideRateOption={true}
                 />
               ))}
             </Carousel>
@@ -358,12 +459,9 @@ export default function App() {
                   ratingCount={0}
                   district={facility.district}
                   system={facility.system}
-                  image={getHospitalImage(facility.sr_no)}
-                  isAdmin={canEditFacility(facility)}
-                  onEdit={() => {
-                    setEditingHospital(facility);
-                    setIsEditOpen(true);
-                  }}
+                  image={facility.photo_url || getHospitalImage(facility.sr_no)}
+                  isAdmin={false}
+                  hideRateOption={true}
                 />
               ))}
             </Carousel>
@@ -434,7 +532,7 @@ export default function App() {
                               <Building2 size={14} /> {doc.hospitalName}
                             </p>
                           </div>
-                          {doc.distance !== null && (
+                          {doc.distance !== null && !isNaN(doc.distance) && (
                             <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold">
                               {doc.distance.toFixed(1)} km away
                             </div>
@@ -656,63 +754,83 @@ export default function App() {
           <p className="text-slate-500 mt-2">Explore and manage 800+ healthcare facilities</p>
         </div>
         
-        <div className="w-full md:w-auto flex gap-3">
-          <div className="relative flex-1 md:w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text"
-              placeholder="Search by name, district..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-neutral-50 border border-gray-100 rounded-full py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-            />
-          </div>
-          <button className="bg-neutral-50 border border-gray-100 p-3 rounded-full text-slate-600 hover:bg-neutral-100 transition-all">
-            <Filter size={20} />
-          </button>
+        <div className="flex bg-neutral-100 p-1 rounded-full">
+          {(['directory', 'employees', 'incharge'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setHospitalSubTab(tab)}
+              className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-widest transition-all ${hospitalSubTab === tab ? 'bg-white text-emerald-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-40 gap-4">
-          <Loader2 className="animate-spin text-emerald-600" size={40} />
-          <p className="text-slate-400 font-medium">Loading hospital directory...</p>
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center py-40 gap-4 text-center px-4">
-          <p className="text-red-500 font-medium max-w-md">{error}</p>
-          <button 
-            onClick={fetchHospitals}
-            className="bg-emerald-600 text-white px-8 py-3 rounded-full font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-          >
-            Retry Connection
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredHospitals.map(facility => (
-            <FacilityCard 
-              key={facility.sr_no} 
-              name={facility.facility_name}
-              rating={4.5 + (Math.random() * 0.5)}
-              district={facility.district}
-              system={facility.system}
-              image={getHospitalImage(facility.sr_no)}
-              isAdmin={canEditFacility(facility)}
-              onEdit={() => {
-                setEditingHospital(facility);
-                setIsEditOpen(true);
-              }}
-            />
-          ))}
-        </div>
+      {hospitalSubTab === 'directory' && (
+        <>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+            <div className="w-full md:w-auto flex gap-3">
+              <div className="relative flex-1 md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text"
+                  placeholder="Search by name, district..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-neutral-50 border border-gray-100 rounded-full py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+              <button className="bg-neutral-50 border border-gray-100 p-3 rounded-full text-slate-600 hover:bg-neutral-100 transition-all">
+                <Filter size={20} />
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-40 gap-4">
+              <Loader2 className="animate-spin text-emerald-600" size={40} />
+              <p className="text-slate-400 font-medium">Loading hospital directory...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-40 gap-4 text-center px-4">
+              <p className="text-red-500 font-medium max-w-md">{error}</p>
+              <button 
+                onClick={fetchHospitals}
+                className="bg-emerald-600 text-white px-8 py-3 rounded-full font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+              >
+                Retry Connection
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredHospitals.map(facility => (
+                <FacilityCard 
+                  key={facility.sr_no} 
+                  name={facility.facility_name}
+                  rating={4.5 + (Math.random() * 0.5)}
+                  district={facility.district}
+                  system={facility.system}
+                  image={getHospitalImage(facility.sr_no)}
+                  isAdmin={canEditFacility(facility)}
+                  onEdit={() => {
+                    setEditingHospital(facility);
+                    setIsEditOpen(true);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
-      
-      {!loading && filteredHospitals.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-slate-400 text-lg">No facilities found matching your search.</p>
-        </div>
+      {hospitalSubTab === 'employees' && (
+        selectedStaffId ? (
+          <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+        ) : (
+          <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
+        )
       )}
+      {hospitalSubTab === 'incharge' && session && <InchargeManagement session={session} />}
     </motion.div>
   );
 
@@ -726,35 +844,65 @@ export default function App() {
     return (
       <div className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Admin Tools</h1>
-        {session.role === 'SUPER_ADMIN' && (
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {session.role === 'SUPER_ADMIN' && (
+            <>
+              <button 
+                onClick={() => setActiveTab('disease_management')}
+                className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
+              >
+                Disease Management
+              </button>
+              <button 
+                onClick={() => setActiveTab('role_management')}
+                className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
+              >
+                Role Management
+              </button>
+              <button 
+                onClick={() => setActiveTab('staff_distribution')}
+                className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
+              >
+                Staff Distribution Summary
+              </button>
+              <button 
+                onClick={() => setIsAddMedicineOpen(true)}
+                className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
+              >
+                Add New Medicine
+              </button>
+            </>
+          )}
+          {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN') && (
             <button 
-              onClick={() => setActiveTab('disease_management')}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+              onClick={toggleTransferModule}
+              className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all flex flex-col items-start gap-4"
             >
-              Disease Management
+              <div className="flex justify-between w-full items-center">
+                <span>Transfer Module Control</span>
+                <div className={`px-3 py-1 rounded-full font-bold text-xs ${isTransferEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                  {isTransferEnabled ? 'LIVE' : 'DISABLED'}
+                </div>
+              </div>
+              <p className="text-sm text-slate-500 font-normal">Master switch to enable or disable the transfer module for all districts.</p>
             </button>
+          )}
+          {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || (session.role === 'DISTRICT_ADMIN' && isTransferEnabled)) && (
             <button 
-              onClick={() => setActiveTab('role_management')}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+              onClick={() => setActiveTab('transfer_requests')}
+              className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
             >
-              Role Management
+              Transfer Requests
             </button>
-            <button 
-              onClick={() => setActiveTab('staff_distribution')}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
-            >
-              Staff Distribution Summary
-            </button>
-            <button 
-              onClick={() => setIsAddMedicineOpen(true)}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
-            >
-              Add New Medicine
-            </button>
-            <AddMedicineModal isOpen={isAddMedicineOpen} onClose={() => setIsAddMedicineOpen(false)} onSuccess={() => alert('Medicine added successfully')} />
-          </div>
-        )}
+          )}
+          <button 
+            onClick={() => setActiveTab('loginDirectory')}
+            className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
+          >
+            Login Directory
+          </button>
+          <AddMedicineModal isOpen={isAddMedicineOpen} onClose={() => setIsAddMedicineOpen(false)} onSuccess={() => alert('Medicine added successfully')} />
+        </div>
       </div>
     );
   };
@@ -785,10 +933,15 @@ export default function App() {
           >
             e-AYUSH <span className="text-emerald-600 ml-1">Seva</span>
           </button>
-          {currentHospital && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
+          {session && currentHospital && session.role !== 'SUPER_ADMIN' && session.role !== 'STATE_ADMIN' && (
             <div className="hidden sm:flex ml-4 pl-4 border-l border-gray-200 items-center gap-2">
-              <Building2 size={16} className="text-emerald-600" />
-              <span className="text-sm font-bold text-slate-600 tracking-tight">{currentHospital.facility_name}</span>
+              <button 
+                onClick={() => setIsHospitalDetailsOpen(true)}
+                className="flex items-center gap-2 hover:bg-slate-50 p-2 rounded-lg transition-colors group"
+              >
+                <Building2 size={16} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-bold text-slate-600 tracking-tight text-left">{currentHospital.facility_name}</span>
+              </button>
             </div>
           )}
         </div>
@@ -806,12 +959,77 @@ export default function App() {
             <div className="flex items-center gap-4">
               {/* Notification Icon */}
               <div className="relative">
-                <button className="p-2.5 rounded-full bg-slate-50 text-slate-400 hover:text-emerald-600 transition-all">
-                  <Bell size={20} />
+                <button 
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className={`p-2.5 rounded-full bg-slate-50 transition-all ${hasNotifications ? 'text-emerald-600 animate-pulse' : 'text-slate-400 hover:text-emerald-600'}`}
+                >
+                  <Bell size={20} className={hasNotifications ? 'animate-bounce' : ''} />
                 </button>
                 {hasNotifications && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
                 )}
+
+                {/* Notifications Dropdown */}
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setIsNotificationsOpen(false)} 
+                      />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20"
+                      >
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+                          <h3 className="font-bold text-slate-900">Notifications</h3>
+                          {hasNotifications && (
+                            <button 
+                              onClick={handleMarkAllAsRead}
+                              className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                          {notifications.length > 0 ? (
+                            notifications.map(notification => (
+                              <div 
+                                key={notification.id} 
+                                onClick={() => handleNotificationClick(notification.id)}
+                                className={`p-4 border-b border-gray-50 cursor-pointer transition-colors ${notification.read ? 'bg-white hover:bg-slate-50' : 'bg-emerald-50/50 hover:bg-emerald-50'}`}
+                              >
+                                <div className="flex justify-between items-start mb-1">
+                                  <h4 className={`text-sm font-bold ${notification.read ? 'text-slate-700' : 'text-slate-900'}`}>
+                                    {notification.title}
+                                  </h4>
+                                  {!notification.read && (
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 leading-relaxed mb-2">
+                                  {notification.message}
+                                </p>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  {new Date(notification.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-8 text-center text-slate-400">
+                              <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                              <p className="text-sm font-medium">No notifications</p>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Profile Menu Trigger */}
@@ -912,7 +1130,15 @@ export default function App() {
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
         onUpdate={fetchHospitals}
+        onLogout={handleLogout}
         isAdmin={isAdmin}
+      />
+
+      <HospitalDetailsModal
+        hospital={currentHospital || null}
+        isOpen={isHospitalDetailsOpen}
+        onClose={() => setIsHospitalDetailsOpen(false)}
+        staffId={session?.id || ''}
       />
 
       <AnimatePresence mode="wait">
@@ -923,6 +1149,7 @@ export default function App() {
                 session={session} 
                 hospitalName={currentHospital?.facility_name} 
                 hospitalDetails={currentHospital}
+                hospitals={hospitals}
                 onOpenEParchi={() => setActiveTab('eparchi')} 
                 onEditHospital={() => {
                   setEditingHospital(currentHospital);
@@ -975,7 +1202,11 @@ export default function App() {
         )}
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="employees" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <EmployeeDirectory hospitals={hospitals} session={session} />
+            {selectedStaffId ? (
+              <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+            ) : (
+              <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
+            )}
           </motion.div>
         )}
         {activeTab === 'loginDirectory' && session?.role === 'SUPER_ADMIN' && (
@@ -1001,9 +1232,24 @@ export default function App() {
             <DistrictSupplyManager session={session} />
           </motion.div>
         )}
+        {activeTab === 'incharge' && session && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="incharge" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <InchargeManagement session={session} />
+          </motion.div>
+        )}
         {activeTab === 'pharmacy_dashboard' && session?.role === 'PHARMACY_MANAGER' && (
           <motion.div key="pharmacy_dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <PharmacyManagerDashboard session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'transfer_requests' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || (session?.role === 'DISTRICT_ADMIN' && isTransferEnabled)) && (
+          <motion.div key="transfer_requests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <TransferRequests session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'transfer_requests' && session?.role === 'DISTRICT_ADMIN' && !isTransferEnabled && (
+          <motion.div key="transfer_disabled" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-40 text-center">
+            <h2 className="text-2xl font-bold text-slate-900">Module disabled by State Admin</h2>
           </motion.div>
         )}
         {activeTab === 'profile' && renderProfile()}
@@ -1026,6 +1272,7 @@ export default function App() {
           active={activeTab} 
           setActive={setActiveTab} 
           role={session?.role || null} 
+          isTransferEnabled={isTransferEnabled}
         />
       )}
     </div>

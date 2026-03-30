@@ -194,7 +194,7 @@ export default function RatePage({ hospitals, userLocation, setActiveTab, calcul
                   >
                     <div className="absolute top-0 right-0 p-4">
                       <div className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">
-                        {h.distance.toFixed(1)}km
+                        {(Number(h.distance) || 0).toFixed(1)}km
                       </div>
                     </div>
                     <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">

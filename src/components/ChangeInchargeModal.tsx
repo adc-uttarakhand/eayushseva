@@ -27,13 +27,17 @@ export default function ChangeInchargeModal({ isOpen, onClose, onAssign, userRol
     setError(null);
     
     try {
+      console.log('Searching for:', searchQuery);
       const { data, error: searchError } = await supabase
         .from('staff')
         .select('*')
-        .or(`full_name.ilike.%${searchQuery}%,aadhaar_number.eq.${searchQuery},mobile_number.eq.${searchQuery},employee_id.eq.${searchQuery}`)
-        .in('role', ['Medical Officer', 'Chief Pharmacy Officer', 'Pharmacy Officer', 'Medical Superintendent Uttarkashi', 'Senior Medical Officer / ADAUO']);
+        .or(`full_name.ilike.%${searchQuery}%,mobile_number.ilike.%${searchQuery}%,employee_id.ilike.%${searchQuery}%`);
 
-      if (searchError) throw searchError;
+      if (searchError) {
+        console.error('Supabase search error details:', searchError);
+        throw searchError;
+      }
+      console.log('Search results:', data);
       setResults(data || []);
     } catch (err: any) {
       console.error('Search error:', err);
@@ -58,7 +62,7 @@ export default function ChangeInchargeModal({ isOpen, onClose, onAssign, userRol
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by Name, Aadhaar, Mobile, or Emp ID"
+              placeholder="Search by Name, Mobile, or Emp ID"
               className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-4 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
             <button type="button" onClick={handleSearch} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-emerald-600 text-white rounded-xl">

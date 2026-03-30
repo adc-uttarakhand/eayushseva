@@ -132,8 +132,8 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
   };
 
   const filteredLogins = logins.filter(login => {
-    const matchesSearch = login.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          login.username.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (login.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (login.username || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === 'All' || login.type === filterType;
     return matchesSearch && matchesFilter;
   });

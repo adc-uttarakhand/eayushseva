@@ -231,9 +231,9 @@ export default function PharmacyManagerDashboard({ session }: { session: any }) 
   };
 
   const smartSearch = (query: string, items: string[]) => {
-    const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
+    const normalizedQuery = (query || '').toLowerCase().replace(/\s+/g, '');
     return items.filter(item => {
-      const normalizedItem = item.toLowerCase().replace(/\s+/g, '');
+      const normalizedItem = (item || '').toLowerCase().replace(/\s+/g, '');
       return normalizedItem.includes(normalizedQuery);
     });
   };
@@ -655,7 +655,7 @@ export default function PharmacyManagerDashboard({ session }: { session: any }) 
       )}
 
       {showConfirmation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-white p-8 rounded-2xl w-96">
             <h2 className="text-xl font-bold mb-4">Confirm Dispatch</h2>
             <p className="mb-6">Are you sure you want to dispatch these medicines?</p>
