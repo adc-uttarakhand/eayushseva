@@ -18,10 +18,15 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
     const fileName = `${employee.full_name}_Service_Report.pdf`;
     
     // Header
-    doc.setFontSize(24);
+    doc.setFontSize(22);
     doc.setTextColor(15, 23, 42); // slate-900
     doc.setFont('helvetica', 'bold');
-    doc.text('Employee Service Report', 10, 20);
+    doc.text(employee.full_name.toUpperCase(), 10, 18);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(employee.role, 10, 24);
     
     // Draw line under header
     doc.setDrawColor(15, 23, 42);
@@ -246,7 +251,10 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
         </button>
 
         <div className="flex justify-between items-start mb-8 border-b-2 border-slate-800 pb-4">
-          <h1 className="text-3xl font-bold">Employee Service Report</h1>
+          <div>
+            <h1 className="text-3xl font-bold uppercase">{employee.full_name}</h1>
+            <p className="text-slate-500 font-medium">{employee.role}</p>
+          </div>
           <div className="flex gap-2">
             <div className="w-12 h-12 rounded-full bg-emerald-100 border-2 border-emerald-500 flex items-center justify-center font-bold text-emerald-800" title="District">
               {getDistrictAbbreviation(employee.present_district)}
