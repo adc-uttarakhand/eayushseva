@@ -16,16 +16,16 @@ export const HospitalSearchInput = ({
   isTextarea?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setQuery(value);
+    setQuery(value || '');
   }, [value]);
 
   const filteredHospitals = hospitals
     ? hospitals
-        .filter(h => h.facility_name.toLowerCase().includes(query.toLowerCase()))
+        .filter(h => (h.facility_name || '').toLowerCase().includes((query || '').toLowerCase()))
         .slice(0, 10)
     : [];
 
@@ -44,7 +44,7 @@ export const HospitalSearchInput = ({
       {isTextarea ? (
         <textarea
           rows={2}
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -57,7 +57,7 @@ export const HospitalSearchInput = ({
       ) : (
         <input
           type="text"
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -70,9 +70,9 @@ export const HospitalSearchInput = ({
       )}
       {isOpen && filteredHospitals.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredHospitals.map((h: any) => (
+          {filteredHospitals.map((h: any, index: number) => (
             <button
-              key={h.id}
+              key={h.id || index}
               type="button"
               className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-sm"
               onClick={() => {
@@ -106,16 +106,16 @@ export const OfficeSearchInput = ({
   isTextarea?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setQuery(value);
+    setQuery(value || '');
   }, [value]);
 
   const filteredOffices = offices
     ? offices
-        .filter(o => o.office_name.toLowerCase().includes(query.toLowerCase()))
+        .filter(o => (o.office_name || '').toLowerCase().includes((query || '').toLowerCase()))
         .slice(0, 10)
     : [];
 
@@ -134,7 +134,7 @@ export const OfficeSearchInput = ({
       {isTextarea ? (
         <textarea
           rows={2}
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -147,7 +147,7 @@ export const OfficeSearchInput = ({
       ) : (
         <input
           type="text"
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -160,9 +160,9 @@ export const OfficeSearchInput = ({
       )}
       {isOpen && filteredOffices.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredOffices.map((o: any) => (
+          {filteredOffices.map((o: any, index: number) => (
             <button
-              key={o.id}
+              key={o.id || index}
               type="button"
               className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-sm"
               onClick={() => {

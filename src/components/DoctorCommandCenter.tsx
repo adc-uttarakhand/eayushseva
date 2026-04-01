@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 
@@ -10,6 +10,7 @@ import HospitalProfile from './HospitalProfile';
 import InventoryManager from './InventoryManager';
 import MedicineDemandSystem from './MedicineDemandSystem';
 import HospitalSupplyPull from './HospitalSupplyPull';
+import RegistrationRequests from './RegistrationRequests';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -20,6 +21,7 @@ interface DoctorCommandCenterProps {
   onEditHospital?: () => void;
   onUpdateHospital?: () => void;
   hospitalDetails?: any;
+  onHospitalProfileDirtyChange?: (isDirty: boolean) => void;
 }
 
 const AVAILABLE_MODULES = [
@@ -58,15 +60,15 @@ const HospitalSearchInput = ({
   isTextarea?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setQuery(value);
+    setQuery(value || '');
   }, [value]);
 
   const filteredHospitals = (hospitals || [])
-    .filter(h => (h.facility_name || '').toLowerCase().includes(query.toLowerCase()))
+    .filter(h => (h.facility_name || '').toLowerCase().includes((query || '').toLowerCase()))
     .slice(0, 10);
 
   useEffect(() => {
@@ -84,7 +86,7 @@ const HospitalSearchInput = ({
       {isTextarea ? (
         <textarea
           rows={2}
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -97,7 +99,7 @@ const HospitalSearchInput = ({
       ) : (
         <input
           type="text"
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -146,15 +148,15 @@ const OfficeSearchInput = ({
   isTextarea?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setQuery(value);
+    setQuery(value || '');
   }, [value]);
 
   const filteredOffices = offices
-    .filter(o => (o.office_name || '').toLowerCase().includes(query.toLowerCase()))
+    .filter(o => (o.office_name || '').toLowerCase().includes((query || '').toLowerCase()))
     .slice(0, 10);
 
   useEffect(() => {
@@ -172,7 +174,7 @@ const OfficeSearchInput = ({
       {isTextarea ? (
         <textarea
           rows={2}
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -185,7 +187,7 @@ const OfficeSearchInput = ({
       ) : (
         <input
           type="text"
-          value={query}
+          value={query || ''}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -219,9 +221,28 @@ const OfficeSearchInput = ({
   );
 };
 
-export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], offices = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails }: DoctorCommandCenterProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback'>('dashboard');
+export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], offices = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback') => {
+    if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
+      setPendingTab(newTab);
+      setIsUnsavedChangesModalOpen(true);
+    } else if (isHospitalProfileDirty && activeTab === 'hospital_profile' && newTab !== 'hospital_profile') {
+      setPendingTab(newTab);
+      setShowUnsavedModal(true);
+    } else {
+      _setActiveTab(newTab);
+    }
+  };
   const [profileSubTab, setProfileSubTab] = useState<'basic' | 'service' | 'trainings'>('basic');
+  const [staffSubTab, setStaffSubTab] = useState<'list' | 'registration_requests'>('list');
+  const [isDirty, setIsDirty] = useState(false);
+  const [initialProfile, setInitialProfile] = useState<any>(null);
+  const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
+  const [isHospitalProfileDirty, setIsHospitalProfileDirty] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -290,8 +311,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     firstPostingPlace: '',
     homeDistrict: '',
     longLeaves: [{ id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
-    postings: [{ id: Date.now().toString(), postingType: 'Hospital', hospitalName: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
-    attachments: [{ id: Date.now().toString(), postingType: 'Hospital', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+    postings: [{ id: Date.now().toString(), hospitalName: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
+    attachments: [{ id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
   });
 
   // Staff State
@@ -314,10 +335,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     fullName: '',
     mobile: '',
     employeeId: '',
-    aadhaarNumber: '',
-    role: 'Pharmacist',
-    password: '',
-    firstPostingPlace: ''
+    role: 'Pharmacist'
   });
   const [selectedModules, setSelectedModules] = useState<string[]>(['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
@@ -350,6 +368,23 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     };
     fetchModuleStatus();
   }, []);
+
+  useEffect(() => {
+    if (initialProfile) {
+      setIsDirty(JSON.stringify(profile) !== JSON.stringify(initialProfile));
+    }
+  }, [profile, initialProfile]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -404,7 +439,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         .eq('staff_id', session.id)
         .maybeSingle();
 
-      setProfile({
+      const newProfile = {
         fullName: staffData?.full_name || session?.name || '',
         designation: staffData?.role || staffData?.designation || '',
         empId: staffData?.employee_id || '',
@@ -430,13 +465,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         qualification: docData?.highest_qualification || '',
         clinicalExperienceSince: docData?.clinical_experience_since || '',
         keywords: docData?.keywords || '',
-        trainings: staffData?.trainings && staffData.trainings.length > 0 ? staffData.trainings : [{ id: Date.now().toString(), title: '', year: '' }],
+        trainings: staffData?.trainings && staffData.trainings.length > 0 
+          ? staffData.trainings.map((t: any) => ({
+              ...t,
+              title: t.title || '',
+              year: t.year || ''
+            }))
+          : [{ id: Date.now().toString(), title: '', year: '' }],
         dateOfFirstAppointment: formatDateForUI(staffData?.date_of_first_appointment || ''),
         dateOfFirstJoiningDepartment: formatDateForUI(staffData?.first_joining_date || ''),
+        firstPostingPlace: staffData?.first_posting_place || '',
         homeDistrict: staffData?.home_district || '',
         longLeaves: staffData?.long_leaves && staffData.long_leaves.length > 0 
           ? staffData.long_leaves.map((l: any) => ({
               ...l,
+              leaveType: l.leaveType || '',
+              totalDays: l.totalDays || 0,
               fromDate: formatDateForUI(l.fromDate),
               toDate: formatDateForUI(l.toDate)
             }))
@@ -465,6 +509,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
               return {
                 ...a,
+                hospital_id: a.hospital_id || '',
                 hospital: latestHospital ? latestHospital.facility_name : a.hospital,
                 status: latestHospital ? (latestHospital.status || 'Sugam') : (a.status || 'Sugam'),
                 above7000: latestHospital ? (latestHospital.above_7000_feet || 'No') : (a.above7000 || 'No'),
@@ -473,8 +518,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 days: days > 0 ? days : 0
               };
             })
-          : [{ id: Date.now().toString(), hospital: '', from: '', to: '', status: 'Sugam', days: 0 }]
-      });
+          : [{ id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+      };
+      setProfile(newProfile);
+      setInitialProfile(newProfile);
+      setIsDirty(false);
 
       // Fetch reviews
       const { data: reviewData } = await supabase
@@ -563,6 +611,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }
     
     return new Date(d);
+  };
+
+  const formatDate = (date: Date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   const formatDaysToYMD = (totalDays: number) => {
@@ -737,8 +793,52 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
 
+  const validatePostings = () => {
+    const sortedPostings = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+    
+    // 1. No Overlap
+    for (let i = 0; i < sortedPostings.length - 1; i++) {
+      const current = sortedPostings[i];
+      const next = sortedPostings[i+1];
+      if (parseDateStr(current.fromDate) <= parseDateStr(next.toDate)) {
+        alert('Overlapping dates found in Posting History.');
+        return false;
+      }
+    }
+
+    // 2. Department Start Limit
+    const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
+    if (!isNaN(deptStart.getTime())) {
+      for (const p of profile.postings) {
+        if (parseDateStr(p.fromDate) < deptStart) {
+          alert('Posting date cannot be earlier than Date of 1st Joining in Dept.');
+          return false;
+        }
+      }
+    }
+
+    // 3. Closing the Loop
+    if (sortedPostings.length > 0) {
+      const lastPosting = sortedPostings[sortedPostings.length - 1];
+      if (parseDateStr(lastPosting.fromDate).getTime() !== deptStart.getTime()) {
+        alert('Service history is incomplete. It must start from your first joining date.');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validatePostings()) return;
+
+    // Mandatory Field Validation
+    if (!profile.dob || !profile.dateOfFirstJoiningDepartment || !profile.homeDistrict) {
+      alert('Please fill DOB, Joining Date, and Home District before saving.');
+      return;
+    }
 
     // Validation for Permanent Employees
     if (profile.employmentType === 'Permanent') {
@@ -814,12 +914,21 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         role: profile.designation,
         date_of_first_appointment: formatDateForDB(profile.dateOfFirstAppointment),
         first_joining_date: formatDateForDB(profile.dateOfFirstJoiningDepartment),
-        home_district: profile.homeDistrict,
+        first_posting_place: profile.firstPostingPlace || '',
+        home_district: profile.homeDistrict || null,
         bcp_registration_no: profile.bcpRegistrationNo,
         long_leaves: sanitizedLongLeaves,
         trainings: profile.trainings,
         postings: sanitizedPostings,
-        attachments: sanitizedAttachments
+        attachments: sanitizedAttachments,
+        long_leaves_count: serviceDays.totalLeaves,
+        attachment_sugam_days: serviceDays.attachmentSugam,
+        attachment_durgam_days: serviceDays.attachmentDurgam,
+        attachment_durgam_above_7000_days: serviceDays.attachmentDurgamAbove7000,
+        total_sugam_days: serviceDays.totalSugam,
+        total_durgam_below_7000_days: serviceDays.totalDurgam,
+        total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
+        last_edited_on: new Date().toISOString()
       }, { onConflict: 'id' });
 
       if (staffError) {
@@ -831,7 +940,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         staff_id: session.id, // Conflict target
         specialization: profile.specialization,
         highest_qualification: profile.qualification,
-        clinical_experience_since: profile.clinicalExperienceSince,
+        clinical_experience_since: profile.clinicalExperienceSince || null,
         keywords: profile.keywords
       }, { onConflict: 'staff_id' });
 
@@ -839,7 +948,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         throw new Error(`Doctor Profiles Table Error: ${docError.message}`);
       }
 
-      alert('Profile saved successfully!');
+      setIsDirty(false);
+      setInitialProfile(profile);
+      setIsSaveSuccessModalOpen(true);
+      setTimeout(() => setIsSaveSuccessModalOpen(false), 3000);
     } catch (err: any) {
       console.error('Exception saving profile:', err);
       alert(`Failed to save: ${err.message}`);
@@ -915,10 +1027,36 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   };
 
   const addPosting = () => {
-    setProfile(prev => ({
-      ...prev,
-      postings: [...prev.postings, { id: Date.now().toString(), postingType: 'Hospital', hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }]
-    }));
+    setProfile(prev => {
+      const newPosting = { 
+        id: Date.now().toString(), 
+        hospitalName: '', 
+        hospital_id: '', 
+        fromDate: '', 
+        toDate: '', 
+        status: 'Sugam', 
+        above7000: 'No', 
+        days: 0 
+      };
+
+      // If there are existing postings, auto-fill the new posting's To Date
+      if (prev.postings.length > 0) {
+        const lastPosting = prev.postings[prev.postings.length - 1];
+        if (lastPosting.fromDate) {
+          const fromDate = parseDateStr(lastPosting.fromDate);
+          if (!isNaN(fromDate.getTime())) {
+            const toDate = new Date(fromDate);
+            toDate.setDate(toDate.getDate() - 1);
+            newPosting.toDate = `${toDate.getDate().toString().padStart(2, '0')}-${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][toDate.getMonth()]}-${toDate.getFullYear()}`;
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        postings: [...prev.postings, newPosting]
+      };
+    });
   };
 
   const removePosting = (id: string) => {
@@ -932,27 +1070,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     setProfile(prev => {
       let newPostings = prev.postings.map(p => p.id === id ? { ...p, [field]: value } : p);
       
-      // Auto-fetch hospital/office details if name or type changes
-      if (field === 'hospitalName' || field === 'postingType') {
+      // Auto-fetch hospital details if name changes
+      if (field === 'hospitalName') {
         newPostings = newPostings.map(p => {
           if (p.id === id) {
-            if (p.postingType === 'Office') {
-              const o = offices.find(o => o.office_name === p.hospitalName);
-              return {
-                ...p,
-                hospital_id: o ? o.office_id : '',
-                status: o ? (o.status || 'Sugam') : p.status,
-                above7000: 'No'
-              };
-            } else {
-              const h = hospitals.find(h => h.facility_name === p.hospitalName);
-              return { 
-                ...p, 
-                hospital_id: h ? h.hospital_id : '',
-                status: h ? (h.status || 'Sugam') : p.status, 
-                above7000: h ? (h.region_indicator === 'Above 7000' ? 'Yes' : 'No') : p.above7000
-              };
-            }
+            const h = hospitals.find(h => h.facility_name === p.hospitalName);
+            return { 
+              ...p, 
+              hospital_id: h ? h.hospital_id : '',
+              status: h ? (h.status || 'Sugam') : p.status, 
+              above7000: h ? (h.above_7000_feet || 'No') : p.above7000
+            };
           }
           return p;
         });
@@ -974,14 +1102,48 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         }
         return p;
       });
-      return { ...prev, postings: updatedPostings };
+
+      // Recalculate To Dates
+      const sorted = [...updatedPostings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+      
+      const recalculatedPostings = updatedPostings.map(p => {
+        const index = sorted.findIndex(s => s.id === p.id);
+        let toDate = '';
+        if (index === 0) {
+          // 1 day before currentPostingJoiningDate
+           const start = parseDateStr(prev.currentPostingJoiningDate);
+           if (!isNaN(start.getTime())) {
+              const d = new Date(start);
+              d.setDate(d.getDate() - 1);
+              toDate = formatDate(d);
+           }
+        } else {
+          // 1 day before sorted[index-1].fromDate
+          const prevPosting = sorted[index-1];
+          if (!prevPosting.fromDate) {
+              toDate = 'Pending';
+          } else {
+              const start = parseDateStr(prevPosting.fromDate);
+              if (!isNaN(start.getTime())) {
+                  const d = new Date(start);
+                  d.setDate(d.getDate() - 1);
+                  toDate = formatDate(d);
+              } else {
+                  toDate = 'Pending';
+              }
+          }
+        }
+        return { ...p, toDate: toDate || 'Pending' };
+      });
+
+      return { ...prev, postings: recalculatedPostings };
     });
   };
 
   const addAttachment = () => {
     setProfile(prev => ({
       ...prev,
-      attachments: [...prev.attachments, { id: Date.now().toString(), postingType: 'Hospital', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+      attachments: [...prev.attachments, { id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
     }));
   };
 
@@ -996,25 +1158,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     setProfile(prev => {
       let newAttachments = prev.attachments.map(a => a.id === id ? { ...a, [field]: value } : a);
       
-      // Auto-fetch hospital/office details if name or type changes
-      if (field === 'hospital' || field === 'postingType') {
+      // Auto-fetch hospital details if name changes
+      if (field === 'hospital') {
         newAttachments = newAttachments.map(a => {
           if (a.id === id) {
-            if (a.postingType === 'Office') {
-              const o = offices.find(o => o.office_name === a.hospital);
-              return {
-                ...a,
-                status: o ? (o.status || 'Sugam') : a.status,
-                above7000: 'No'
-              };
-            } else {
-              const h = hospitals.find(h => h.facility_name === a.hospital);
-              return { 
-                ...a, 
-                status: h ? (h.status || 'Sugam') : a.status, 
-                above7000: h ? ((h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No') : a.above7000
-              };
-            }
+            const h = hospitals.find(h => h.facility_name === a.hospital);
+            return { 
+              ...a, 
+              hospital_id: h ? h.hospital_id : '',
+              status: h ? (h.status || 'Sugam') : a.status, 
+              above7000: h ? ((h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No') : a.above7000
+            };
           }
           return a;
         });
@@ -1043,14 +1197,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const handleOpenEditStaff = (staff: any) => {
     setEditingStaffId(staff.id);
     setStaffForm({ 
-      fullName: staff.full_name || staff.name, 
-      mobile: staff.mobile_number || staff.mobile, 
+      fullName: staff.full_name || staff.name || '', 
+      mobile: staff.mobile_number || staff.mobile || '', 
       employeeId: staff.employee_id || '', 
       aadhaarNumber: staff.aadhaar_number || '',
-      role: staff.role, 
+      role: staff.role || 'Pharmacist', 
       password: '',
-      firstPostingPlace: staff.first_posting_place || '',
-      firstPostingType: staff.first_posting_type || 'Hospital'
+      firstPostingPlace: staff.first_posting_place || ''
     });
     setSelectedModules(staff.assigned_modules || ['profile']);
     setIsStaffModalOpen(true);
@@ -1073,29 +1226,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       return;
     }
 
-    if (!staffForm.employeeId && !staffForm.aadhaarNumber) {
-      alert('Kripya Aadhaar Number ya Employee ID mein se kam se kam ek bharein');
+    if (!staffForm.employeeId) {
+      alert('Kripya Employee ID bharein');
       return;
     }
 
     if (!staffForm.role) {
       alert('Role must be assigned! / भूमिका सौंपी जानी चाहिए!');
       return;
-    }
-
-    // Check for duplicates
-    if (staffForm.aadhaarNumber) {
-      const { data: existingAadhaar } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('aadhaar_number', staffForm.aadhaarNumber)
-        .neq('id', editingStaffId || -1)
-        .maybeSingle();
-      
-      if (existingAadhaar) {
-        alert('Aadhaar Number already exists');
-        return;
-      }
     }
 
     if (staffForm.employeeId) {
@@ -1117,12 +1255,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       full_name: staffForm.fullName,
       mobile_number: staffForm.mobile.trim(),
       employee_id: staffForm.employeeId.trim(),
-      aadhaar_number: staffForm.aadhaarNumber,
       role: staffForm.role,
       assigned_modules: selectedModules,
-      login_password: staffForm.password || 'ayush@123',
-      is_active: true,
-      first_posting_place: staffForm.firstPostingPlace
+      login_password: 'ayush@123',
+      is_active: true
     };
 
     if (editingStaffId) {
@@ -1132,10 +1268,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         return;
       }
     } else {
-      // For new employees, if first posting place is blank, use current hospital name
-      if (!payload.first_posting_place && hospitalName) {
-        payload.first_posting_place = hospitalName;
-      }
       const { error } = await supabase.from('staff').insert([payload]);
       if (error) {
         alert('Addition failed: ' + error.message);
@@ -1310,10 +1442,18 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </div>
           </div>
           {hospitalName && (
-            <p className="text-emerald-600 font-medium mt-1 flex items-center gap-2">
-              <Building2 size={16} />
-              {hospitalName}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-emerald-600 font-medium flex items-center gap-2">
+                <Building2 size={16} />
+                {hospitalName}
+              </p>
+              {hospitalDetails?.is_verified && (
+                <div className="flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                  <CheckCircle size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Verified</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
         <div className="flex flex-wrap gap-2 bg-white p-1.5 rounded-2xl shadow-sm w-fit border border-gray-100">
@@ -1615,9 +1755,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Full Name</label>
                   <input 
+                    disabled
                     value={profile.fullName} 
                     onChange={e => setProfile({...profile, fullName: e.target.value})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
                   />
                 </div>
 
@@ -1626,7 +1767,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <select 
                     value={profile.designation} 
                     onChange={e => setProfile({...profile, designation: e.target.value})} 
-                    disabled={!(isIncharge || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')}
+                    disabled
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Role</option>
@@ -1642,10 +1783,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Login Password</label>
                   <div className="relative">
                     <input 
+                      disabled
                       type={showPassword ? "text" : "password"}
                       value={profile.password} 
                       onChange={e => setProfile({...profile, password: e.target.value})} 
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
                     />
                     <button 
                       type="button"
@@ -1659,19 +1801,21 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
                   <input 
+                    disabled
                     value={profile.empId} 
                     onChange={e => setProfile({...profile, empId: e.target.value})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
                   <input 
+                    disabled
                     value={profile.aadhaarNumber} 
                     onChange={e => setProfile({...profile, aadhaarNumber: e.target.value})} 
                     placeholder="12-digit Aadhaar"
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -1774,17 +1918,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Birth</label>
-                  <input 
-                    type="text"
-                    placeholder="DD-MMM-YYYY"
-                    value={profile.dob} 
-                    onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
-                </div>
-
-                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Blood Group</label>
                   <select 
                     value={profile.bloodGroup} 
@@ -1869,63 +2002,28 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Type</label>
-                      <select 
-                        value={profile.firstPostingType} 
-                        onChange={e => setProfile({...profile, firstPostingType: e.target.value as 'Hospital' | 'Office'})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option value="Hospital">Hospital</option>
-                        <option value="Office">Office</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
-                      {profile.firstPostingType === 'Office' ? (
-                        <OfficeSearchInput
-                          value={profile.firstPostingPlace}
-                          onChange={val => setProfile({...profile, firstPostingPlace: val})}
-                          offices={offices}
-                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
-                        />
-                      ) : (
-                        <HospitalSearchInput
-                          value={profile.firstPostingPlace}
-                          onChange={val => setProfile({...profile, firstPostingPlace: val})}
-                          hospitals={hospitals}
-                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
-                        />
-                      )}
+                      <HospitalSearchInput
+                        value={profile.firstPostingPlace}
+                        onChange={val => setProfile({...profile, firstPostingPlace: val})}
+                        hospitals={hospitals}
+                        className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                      />
                       {profile.firstPostingPlace && (
                         <div className="flex gap-4 ml-4 mt-1">
                           {(() => {
-                            if (profile.firstPostingType === 'Office') {
-                              const o = offices.find(o => o.office_name === profile.firstPostingPlace);
-                              if (!o) return null;
-                              return (
-                                <>
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {o.status || 'Sugam'}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-slate-400">
-                                    District: <span className="text-slate-600">{o.district || 'N/A'}</span>
-                                  </span>
-                                </>
-                              );
-                            } else {
-                              const h = hospitals.find(h => h.facility_name === profile.firstPostingPlace);
-                              if (!h) return null;
-                              return (
-                                <>
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {h.status || 'Sugam'}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-slate-400">
-                                    Above 7000 ft: <span className="text-slate-600">{(h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
-                                  </span>
-                                </>
-                              );
-                            }
+                            const h = hospitals.find(h => h.facility_name === profile.firstPostingPlace);
+                            if (!h) return null;
+                            return (
+                              <>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  {h.status || 'Sugam'}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  Above 7000 ft: <span className="text-slate-600">{(h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
+                                </span>
+                              </>
+                            );
                           })()}
                         </div>
                       )}
@@ -1992,6 +2090,16 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         ))}
                       </select>
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Birth</label>
+                      <input 
+                        type="text"
+                        placeholder="DD-MMM-YYYY"
+                        value={profile.dob} 
+                        onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
+                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2000,96 +2108,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
               </h2>
               <div className="space-y-4">
-                {profile.postings.map((posting, index) => (
-                  <div key={posting.id} className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${index === 0 ? 'border-emerald-200 bg-emerald-50/20' : 'border-gray-100 bg-slate-50'}`}>
-                    <div className="space-y-1 md:col-span-5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
-                        {index === 0 ? 'First Posting Place (Auto Fetched)' : 'Subsequent Posting'}
-                      </label>
-                      {index === 0 ? (
-                        <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
-                          {posting.hospitalName}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <select 
-                            value={posting.postingType} 
-                            onChange={e => updatePosting(posting.id, 'postingType', e.target.value)} 
-                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                          >
-                            <option value="Hospital">Hospital</option>
-                            <option value="Office">Office</option>
-                          </select>
-                          {posting.postingType === 'Office' ? (
-                            <OfficeSearchInput
-                              isTextarea
-                              value={posting.hospitalName}
-                              onChange={val => updatePosting(posting.id, 'hospitalName', val)}
-                              offices={offices}
-                              placeholder="Type office name..."
-                            />
-                          ) : (
-                            <HospitalSearchInput
-                              isTextarea
-                              value={posting.hospitalName}
-                              onChange={val => updatePosting(posting.id, 'hospitalName', val)}
-                              hospitals={hospitals}
-                              placeholder="Type hospital name..."
-                            />
-                          )}
-                        </div>
-                      )}
-                      <div className="flex gap-3 ml-2 mt-1">
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {posting.status || 'Sugam'}
-                        </span>
-                        {posting.postingType === 'Hospital' && (
-                          <span className="text-[9px] font-bold text-slate-400">
-                            Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={posting.fromDate} 
-                        onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
-                        className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${index === 0 ? 'bg-slate-100 cursor-not-allowed' : ''}`} 
-                        readOnly={index === 0}
-                      />
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={posting.toDate} 
-                        onChange={e => updatePosting(posting.id, 'toDate', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
-                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                        <div className="text-lg">{posting.days || 0}</div>
-                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(posting.days || 0)}</div>
-                      </div>
-                    </div>
-                    <div className="md:col-span-1 flex justify-center pt-6">
-                      <button 
-                        type="button"
-                        onClick={() => removePosting(posting.id)}
-                        className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all ${index === 0 ? 'hidden' : ''}`}
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
                 {/* Current Posting Row (Auto-added format) */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
                   <div className="space-y-1 md:col-span-6">
@@ -2129,8 +2147,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                         return (
                           <>
-                            <div className="text-lg">{days} Days</div>
-                            <div className="text-[10px] text-emerald-500">{formatDaysToYMD(days)}</div>
+                            <div className="text-lg">{days} days</div>
                           </>
                         );
                       })()}
@@ -2138,13 +2155,126 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </div>
                 </div>
 
-                <button 
-                  type="button"
-                  onClick={addPosting}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
-                >
-                  <Plus size={16} /> Add Another Posting
-                </button>
+                {/* Past Postings (Reverse Chronological) */}
+                {(() => {
+                  const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                  return sorted.map((posting, index) => {
+                    const nextPosting = index < sorted.length - 1 ? sorted[index + 1] : null;
+                    const gap = nextPosting ? (parseDateStr(posting.fromDate).getTime() - parseDateStr(nextPosting.toDate).getTime()) / (1000 * 60 * 60 * 24) - 1 : 0;
+                    
+                    return (
+                      <div key={posting.id} className={`space-y-2`}>
+                        {gap > 0 && (
+                          <div className="text-red-500 text-xs font-bold text-center bg-red-50 py-1 rounded-lg border border-red-200">
+                            Gap detected: {gap} days
+                          </div>
+                        )}
+                        <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${gap > 0 ? 'border-red-300 bg-red-50/20' : 'border-gray-100 bg-slate-50'}`}>
+                          <div className="space-y-1 md:col-span-5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
+                              Subsequent Posting
+                            </label>
+                            <div className="space-y-2">
+                              <HospitalSearchInput
+                                isTextarea
+                                value={posting.hospitalName}
+                                onChange={val => updatePosting(posting.id, 'hospitalName', val)}
+                                hospitals={hospitals}
+                                placeholder="Type hospital name..."
+                              />
+                            </div>
+                            <div className="flex gap-3 ml-2 mt-1">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {posting.status || 'Sugam'}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400">
+                                Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
+                              </span>
+                            </div>
+                          </div>
+                        {(() => {
+                          const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                          const lastPosting = sorted[sorted.length - 1];
+                          const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
+                          const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
+                          const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
+                          const isInvalidDate = posting.fromDate && !isNaN(parseDateStr(posting.fromDate).getTime()) && parseDateStr(posting.fromDate).getTime() < deptStart.getTime();
+
+                          return (
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
+                              <input 
+                                type="text"
+                                placeholder="DD-MMM-YYYY"
+                                value={posting.fromDate} 
+                                onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
+                                className={`w-full bg-white border ${isInvalidDate ? 'border-red-500' : 'border-gray-200'} rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} 
+                              />
+                              {isInvalidDate && (
+                                <div className="text-red-500 text-[10px] mt-1">
+                                  Service history cannot start before your Department Joining Date ({profile.dateOfFirstJoiningDepartment})
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
+                            <input 
+                              type="text"
+                              placeholder="Pending"
+                              value={posting.toDate} 
+                              readOnly
+                              className="w-full bg-slate-50 border border-gray-200 rounded-xl py-2 px-3 text-slate-500 font-bold" 
+                            />
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                            <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                              <div className="text-lg">{posting.days || 0} days</div>
+                            </div>
+                          </div>
+                          <div className="md:col-span-1 flex justify-center pt-6">
+                            <button 
+                              type="button"
+                              onClick={() => removePosting(posting.id)}
+                              className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all`}
+                            >
+                              <X size={20} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+
+                {(() => {
+                  const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                  const lastPosting = sorted[sorted.length - 1];
+                  const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
+                  const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
+                  const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
+
+                  return (
+                    <>
+                      {isComplete ? (
+                        <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm px-4 py-2">
+                          <CheckCircle size={16} /> Service History Complete
+                        </div>
+                      ) : (
+                        <button 
+                          type="button"
+                          onClick={addPosting}
+                          disabled={isDisabled}
+                          className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <Plus size={16} /> Add Another Posting
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -2187,8 +2317,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Total Days</label>
                       <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                        <div className="text-lg">{leave.totalDays || 0}</div>
-                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(leave.totalDays || 0)}</div>
+                        <div className="text-lg">{leave.totalDays || 0} days</div>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -2213,10 +2342,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 {/* Total Leaves Duration Display */}
                 <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
                   <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration ({'>'}30 days)</span>
-                  <div className="text-2xl font-black text-slate-700">
-                    <div>{serviceDays.totalLeaves} Days</div>
-                    <div className="text-sm text-slate-400">{formatDaysToYMD(serviceDays.totalLeaves)}</div>
-                  </div>
+                  <div className="text-2xl font-black text-slate-700">{serviceDays.totalLeaves} days</div>
                 </div>
               </div>
             </div>
@@ -2232,23 +2358,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <div className="space-y-1 md:col-span-5">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Place</label>
                       <div className="space-y-2">
-                        <select 
-                          value={att.postingType} 
-                          onChange={e => updateAttachment(att.id, 'postingType', e.target.value)} 
-                          className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                        >
-                          <option value="Hospital">Hospital</option>
-                          <option value="Office">Office</option>
-                        </select>
-                        {att.postingType === 'Office' ? (
-                          <OfficeSearchInput
-                            isTextarea
-                            value={att.hospital}
-                            onChange={val => updateAttachment(att.id, 'hospital', val)}
-                            offices={offices}
-                            placeholder="Search office..."
-                          />
-                        ) : (
+
                           <HospitalSearchInput
                             isTextarea
                             value={att.hospital}
@@ -2256,17 +2366,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             hospitals={hospitals}
                             placeholder="Search hospital..."
                           />
-                        )}
                       </div>
                       <div className="flex gap-3 ml-2 mt-1">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${att.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {att.status || 'Sugam'}
                         </span>
-                        {att.postingType === 'Hospital' && (
                           <span className="text-[9px] font-bold text-slate-400">
                             Above 7000 ft: <span className="text-slate-600">{att.above7000 || 'No'}</span>
                           </span>
-                        )}
                       </div>
                     </div>
                     <div className="space-y-1 md:col-span-2">
@@ -2292,8 +2399,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <div className="space-y-1 md:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
                       <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                        <div className="text-lg">{att.days || 0}</div>
-                        <div className="text-[10px] text-slate-400">{formatDaysToYMD(att.days || 0)}</div>
+                        <div className="text-lg">{att.days || 0} days</div>
                       </div>
                     </div>
                     <div className="md:col-span-1 flex justify-center pt-6">
@@ -2319,24 +2425,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Total Sugam Attachment Days</p>
-                    <div className="text-2xl font-black text-emerald-700">
-                      <div>{serviceDays.attachmentSugam}</div>
-                      <div className="text-sm text-emerald-500">{formatDaysToYMD(serviceDays.attachmentSugam)}</div>
-                    </div>
+                    <div className="text-2xl font-black text-emerald-700">{serviceDays.attachmentSugam} days</div>
                   </div>
                   <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">Total Durgam (Below 7000ft) Attachment Days</p>
-                    <div className="text-2xl font-black text-amber-700">
-                      <div>{serviceDays.attachmentDurgam}</div>
-                      <div className="text-sm text-amber-500">{formatDaysToYMD(serviceDays.attachmentDurgam)}</div>
-                    </div>
+                    <div className="text-2xl font-black text-amber-700">{serviceDays.attachmentDurgam} days</div>
                   </div>
                   <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-center">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-1">Total Durgam (Above 7000 ft: Yes) Attachment Days</p>
-                    <div className="text-2xl font-black text-red-700">
-                      <div>{serviceDays.attachmentDurgamAbove7000}</div>
-                      <div className="text-sm text-red-500">{formatDaysToYMD(serviceDays.attachmentDurgamAbove7000)}</div>
-                    </div>
+                    <div className="text-2xl font-black text-red-700">{serviceDays.attachmentDurgamAbove7000} days</div>
                   </div>
                 </div>
               </div>
@@ -2559,6 +2656,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               hospitalDetails={hospitalDetails} 
               onUpdate={() => onUpdateHospital?.()} 
               session={session}
+              onDirtyChange={(dirty) => {
+                setIsHospitalProfileDirty(dirty);
+                onHospitalProfileDirtyChange?.(dirty);
+              }}
             />
 
             {/* Hospital Feedback Section */}
@@ -2631,70 +2732,96 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <p className="text-sm text-slate-500 mt-1">{isIncharge ? 'Manage roles and access for your facility.' : 'View staff associated with your facility.'}</p>
               </div>
               {isIncharge && (
-                <button 
-                  onClick={handleOpenAddStaff}
-                  className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
-                >
-                  <Plus size={16} /> Add New Staff
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setStaffSubTab('list')}
+                    className={`px-4 py-2 rounded-xl font-bold text-sm ${staffSubTab === 'list' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}
+                  >
+                    Staff List
+                  </button>
+                  <button 
+                    onClick={() => setStaffSubTab('registration_requests')}
+                    className={`px-4 py-2 rounded-xl font-bold text-sm ${staffSubTab === 'registration_requests' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}
+                  >
+                    Registration Requests
+                  </button>
+                  <button 
+                    onClick={handleOpenAddStaff}
+                    className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
+                  >
+                    <Plus size={16} /> Add New Staff
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Staff Member</th>
-                    <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Role</th>
-                    <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Mobile</th>
-                    {isIncharge && (
-                      <>
-                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 text-right">Active Status</th>
-                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 text-right">Actions</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {staffList.map(staff => (
-                    <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                          <UserCircle2 size={24} />
-                        </div>
-                        <span className="font-bold text-slate-900">{staff.name}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${staff.roleColor}`}>
-                          {staff.role}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-sm font-medium text-slate-600">{staff.mobile}</td>
+            {staffSubTab === 'list' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Staff Member</th>
+                      <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Role</th>
+                      <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Mobile</th>
                       {isIncharge && (
                         <>
-                          <td className="py-4 px-4 text-right">
-                            <button
-                              onClick={() => toggleStaffStatus(staff.id, staff.isActive)}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shadow-inner ${staff.isActive ? 'bg-emerald-500' : 'bg-slate-200'}`}
-                            >
-                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${staff.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
-                          </td>
-                          <td className="py-4 px-4 text-right">
-                            <button 
-                              onClick={() => handleOpenEditStaff(staff)}
-                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                          </td>
+                          <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 text-right">Active Status</th>
+                          <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 text-right">Actions</th>
                         </>
                       )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {staffList.map(staff => (
+                      <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                              <UserCircle2 size={24} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900">{staff.name}</span>
+                              <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">ID: {staff.employee_id || '-'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${staff.roleColor}`}>
+                            {staff.role}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-sm font-medium text-slate-600">{staff.mobile}</td>
+                        {isIncharge && (
+                          <>
+                            <td className="py-4 px-4 text-right">
+                              <button
+                                onClick={() => toggleStaffStatus(staff.id, staff.isActive)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shadow-inner ${staff.isActive ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${staff.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                              </button>
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              <button 
+                                onClick={() => handleOpenEditStaff(staff)}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <>
+                {console.log('RegistrationRequests session prop:', session)}
+                <RegistrationRequests session={session} />
+              </>
+            )}
           </div>
         )}
 
@@ -2801,54 +2928,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Type</label>
-                      <select 
-                        value={staffForm.firstPostingType} 
-                        onChange={e => setStaffForm({...staffForm, firstPostingType: e.target.value as 'Hospital' | 'Office'})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option value="Hospital">Hospital</option>
-                        <option value="Office">Office</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
-                      {staffForm.firstPostingType === 'Office' ? (
-                        <OfficeSearchInput
-                          value={staffForm.firstPostingPlace}
-                          onChange={val => setStaffForm({...staffForm, firstPostingPlace: val})}
-                          offices={offices}
-                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
-                        />
-                      ) : (
-                        <HospitalSearchInput
-                          value={staffForm.firstPostingPlace}
-                          onChange={val => setStaffForm({...staffForm, firstPostingPlace: val})}
-                          hospitals={hospitals}
-                          className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
-                      <input 
-                        value={staffForm.aadhaarNumber} 
-                        onChange={e => setStaffForm({...staffForm, aadhaarNumber: e.target.value})} 
-                        placeholder="12-digit Aadhaar"
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Password</label>
-                      <input 
-                        type="password"
-                        placeholder={editingStaffId ? "Leave blank to keep current" : "Default: ayush@123"}
-                        value={staffForm.password} 
-                        onChange={e => setStaffForm({...staffForm, password: e.target.value})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
+                    {/* Password field removed */}
                   </div>
                 </div>
 
@@ -2986,7 +3066,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <button 
                       onClick={() => {
                         setEditingStaffId(null);
-                        setStaffForm({ fullName: '', mobile: '', employeeId: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '', firstPostingType: 'Hospital' });
+                        setStaffForm({ fullName: '', mobile: '', employeeId: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '' });
                         setSelectedModules(['profile']);
                         setIsStaffModalOpen(true);
                         setIsStaffSearchOpen(false);
@@ -3088,6 +3168,83 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   className="w-full bg-slate-50 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all"
                 >
                   No, Go Back
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {isUnsavedChangesModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm">
+              <h2 className="text-xl font-bold mb-4">Unsaved Changes</h2>
+              <p className="mb-6">You have unsaved changes in your Profile. Please save before switching.</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setIsUnsavedChangesModalOpen(false)}
+                  className="flex-1 bg-slate-100 py-2 rounded-xl font-bold"
+                >
+                  Go Back
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsUnsavedChangesModalOpen(false);
+                    setIsDirty(false);
+                    if (pendingTab) _setActiveTab(pendingTab as any);
+                  }}
+                  className="flex-1 bg-red-600 text-white py-2 rounded-xl font-bold"
+                >
+                  Discard Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSaveSuccessModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm text-center">
+              <CheckCircle className="text-emerald-500 mx-auto mb-4" size={48} />
+              <h2 className="text-xl font-bold mb-2">Profile Saved Successfully!</h2>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Unsaved Changes Modal */}
+      <AnimatePresence>
+        {showUnsavedModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-gray-100"
+            >
+              <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
+                <Shield size={32} />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Want to Save Profile Before Leaving?</h3>
+              <p className="text-slate-500 mb-8">You have unsaved changes in the hospital profile. What would you like to do?</p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowUnsavedModal(false);
+                    setPendingTab(null);
+                  }}
+                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+                >
+                  Yes, Go back
+                </button>
+                <button
+                  onClick={() => {
+                    setIsHospitalProfileDirty(false);
+                    setShowUnsavedModal(false);
+                    if (pendingTab) _setActiveTab(pendingTab as any);
+                    setPendingTab(null);
+                  }}
+                  className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-[0.98]"
+                >
+                  No, discard changes
                 </button>
               </div>
             </motion.div>

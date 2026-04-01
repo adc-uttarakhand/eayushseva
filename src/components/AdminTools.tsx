@@ -16,6 +16,7 @@ import {
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
+import ConfirmationModal from './ConfirmationModal';
 import { UserSession } from './LoginModal';
 import { supabase } from '../lib/supabase';
 
@@ -28,6 +29,8 @@ interface AdminToolsProps {
 export default function AdminTools({ session, setActiveTab, onAddMedicine }: AdminToolsProps) {
   const [isTransferEnabled, setIsTransferEnabled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingToggleState, setPendingToggleState] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchTransferStatus();
@@ -49,22 +52,29 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
     setLoading(false);
   };
 
-  const toggleTransferModule = async () => {
+  const toggleTransferModule = () => {
     const newState = !isTransferEnabled;
-    if (window.confirm(`Are you sure you want to ${newState ? 'enable' : 'disable'} the transfer module for all districts?`)) {
-      setLoading(true);
-      const { error } = await supabase
-        .from('global_settings')
-        .update({ is_active: newState })
-        .eq('setting_key', 'transfer_module_enabled');
-      
-      if (!error) {
-        setIsTransferEnabled(newState);
-      } else {
-        alert('Error updating transfer module status: ' + error.message);
-      }
-      setLoading(false);
+    setPendingToggleState(newState);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmToggle = async () => {
+    if (pendingToggleState === null) return;
+    
+    setLoading(true);
+    const { error } = await supabase
+      .from('global_settings')
+      .update({ is_active: pendingToggleState })
+      .eq('setting_key', 'transfer_module_enabled');
+    
+    if (!error) {
+      setIsTransferEnabled(pendingToggleState);
+    } else {
+      alert('Error updating transfer module status: ' + error.message);
     }
+    setLoading(false);
+    setIsConfirmModalOpen(false);
+    setPendingToggleState(null);
   };
 
   if (!session) return null;
@@ -135,6 +145,13 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmToggle}
+        title="Transfer Module Control"
+        message={`Are you sure you want to ${pendingToggleState ? 'enable' : 'disable'} the transfer module for all districts?`}
+      />
       <div className="max-w-7xl mx-auto">
         <div className="mb-12">
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Admin <span className="text-emerald-600">Management</span></h1>

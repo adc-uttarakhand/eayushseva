@@ -21,7 +21,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
     full_name: '',
     mobile_number: '',
     employee_id: '',
-    bcp_registration_no: '',
     role: '',
     posting_place_id: ''
   });
@@ -62,7 +61,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
         full_name: '',
         mobile_number: '',
         employee_id: '',
-        bcp_registration_no: '',
         role: '',
         posting_place_id: ''
       });
@@ -137,7 +135,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
         full_name: formData.full_name,
         mobile_number: formData.mobile_number.trim(),
         employee_id: formData.employee_id.trim(),
-        bcp_registration_no: formData.bcp_registration_no.trim() || null,
         role: formData.role,
         hospital_id: formData.posting_place_id,
         office_id: null,
@@ -220,17 +217,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                 </div>
               </div>
               <p className="text-xs text-slate-500 -mt-4">Please provide either Mobile Number or Employee ID.</p>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">BCP Registration Number</label>
-                <input
-                  type="text"
-                  value={formData.bcp_registration_no}
-                  onChange={e => setFormData({ ...formData, bcp_registration_no: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  placeholder="Enter BCP registration number (optional)"
-                />
-              </div>
 
               <div className="relative" ref={roleDropdownRef}>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Role *</label>

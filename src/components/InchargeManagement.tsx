@@ -167,6 +167,11 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
           </div>
         ) : (
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-gray-100">
+              <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                Incharges: {filteredHospitals.filter(h => h.incharge_name).length} / {filteredHospitals.length} Hospitals
+              </button>
+            </div>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 bg-slate-50/50">

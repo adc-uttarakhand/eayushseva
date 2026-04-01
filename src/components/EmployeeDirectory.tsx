@@ -182,11 +182,15 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
           </div>
         ) : (
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-gray-100">
+              <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                Total Employees: {filteredStaff.length}
+              </button>
+            </div>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 bg-slate-50/50">
                   <th className="py-4 px-6 font-bold text-slate-900">Name</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Emp ID</th>
                   <th className="py-4 px-6 font-bold text-slate-900">Role</th>
                   <th className="py-4 px-6 font-bold text-slate-900">Hospital</th>
                   <th className="py-4 px-6 font-bold text-slate-900">District</th>
@@ -199,22 +203,28 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                   const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
                   return (
                       <tr key={s.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors cursor-pointer" onClick={() => onStaffClick(s.id)}>
-                      <td className="py-4 px-6 font-bold text-slate-900 flex items-center gap-3">
-                        {s.photograph_url ? (
-                          <img src={s.photograph_url} alt={s.full_name} className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                            <User size={14} />
+                      <td className="py-4 px-6 font-bold text-slate-900">
+                        <div className="flex items-center gap-3">
+                          {s.photograph_url ? (
+                            <img src={s.photograph_url} alt={s.full_name} className="w-8 h-8 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <User size={14} />
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <div className="flex items-center">
+                              {s.full_name}
+                              {s.is_verified && (
+                                <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">
+                                  Verified
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">ID: {s.employee_id || '-'}</span>
                           </div>
-                        )}
-                        {s.full_name}
-                        {s.is_verified && (
-                          <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">
-                            Verified
-                          </span>
-                        )}
+                        </div>
                       </td>
-                      <td className="py-4 px-6 text-slate-600 font-medium">{s.employee_id || '-'}</td>
                       <td className="py-4 px-6 text-slate-600 font-medium">{s.role}</td>
                       <td className="py-4 px-6 text-slate-600">{hospital?.facility_name || 'N/A'}</td>
                       <td className="py-4 px-6 text-slate-600">{hospital?.district || 'N/A'}</td>

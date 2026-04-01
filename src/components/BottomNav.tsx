@@ -1,7 +1,7 @@
-import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck } from 'lucide-react';
+import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'transfer_requests';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory';
 
 interface BottomNavProps {
   active: TabId;
@@ -22,7 +22,9 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled }
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'supply_upload' as TabId, label: 'State Supply', icon: Truck }] : []),
     ...(role === 'DISTRICT_ADMIN' ? [{ id: 'district_supply' as TabId, label: 'District Supply', icon: Truck }] : []),
-    ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'transfer_requests' as TabId, label: 'Transfers', icon: ClipboardList }] : []),
+    ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
+    ...(isTransferEnabled ? [{ id: 'transfer_module' as TabId, label: 'Transfers', icon: ArrowUpDown }] : []),
+    { id: 'registrations' as TabId, label: 'Registrations', icon: ShieldCheck },
     { id: 'tools' as TabId, label: 'Tools', icon: Wrench },
     { id: 'profile' as TabId, label: 'Profile', icon: User },
   ];

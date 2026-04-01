@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Loader2, Building2, Calendar, FileText, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import RegistrationRequests from './RegistrationRequests';
 
 interface TransferRequest {
   id: string;
@@ -28,6 +29,7 @@ interface TransferRequest {
 }
 
 export default function TransferRequests({ session }: { session: any }) {
+  const [activeTab, setActiveTab] = useState<'transfer' | 'registration'>('transfer');
   const [requests, setRequests] = useState<TransferRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -206,99 +208,110 @@ export default function TransferRequests({ session }: { session: any }) {
     <div className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto pb-40">
       <div className="mb-12">
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight">
-          Transfer <span className="text-emerald-600">Requests</span>
+          Requests
         </h1>
-        <p className="text-slate-500 mt-2">Manage staff hospital transfer requests.</p>
+        <div className="flex gap-4 mt-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('transfer')}
+            className={`pb-2 font-bold text-sm uppercase tracking-widest transition-all ${activeTab === 'transfer' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Transfer Requests
+          </button>
+        </div>
       </div>
 
-      {requests.length === 0 ? (
-        <div className="text-center py-20 bg-slate-50 rounded-[3rem] border border-dashed border-gray-200">
-          <FileText size={48} className="mx-auto text-slate-300 mb-4" />
-          <h3 className="text-xl font-bold text-slate-900">No Pending Requests</h3>
-          <p className="text-slate-500 mt-2">There are currently no hospital transfer requests to review.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {requests.map((req) => (
-            <div key={req.id} className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center">
-              <div className="flex-1 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600">
-                      <User size={20} />
+      {activeTab === 'transfer' ? (
+        requests.length === 0 ? (
+          <div className="text-center py-20 bg-slate-50 rounded-[3rem] border border-dashed border-gray-200">
+            <FileText size={48} className="mx-auto text-slate-300 mb-4" />
+            <h3 className="text-xl font-bold text-slate-900">No Pending Requests</h3>
+            <p className="text-slate-500 mt-2">There are currently no hospital transfer requests to review.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {requests.map((req) => (
+              <div key={req.id} className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600">
+                        <User size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900">{req.staff?.full_name || 'Unknown Staff'}</h3>
+                        <p className="text-xs text-slate-500">{req.staff?.role} • {req.staff?.employee_id}</p>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                      req.status === 'Pending Approval' ? 'bg-amber-100 text-amber-700' :
+                      req.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {req.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">From</p>
+                      <p className="font-medium text-slate-900 text-sm flex items-center gap-1">
+                        <Building2 size={14} className="text-slate-400" />
+                        {req.current_hospital?.facility_name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-slate-500 ml-5">{req.current_hospital?.district}</p>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900">{req.staff?.full_name || 'Unknown Staff'}</h3>
-                      <p className="text-xs text-slate-500">{req.staff?.role} • {req.staff?.employee_id}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">To</p>
+                      <p className="font-medium text-emerald-700 text-sm flex items-center gap-1">
+                        <Building2 size={14} className="text-emerald-500" />
+                        {req.new_hospital?.facility_name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-emerald-600/70 ml-5">{req.new_hospital?.district}</p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
-                    req.status === 'Pending Approval' ? 'bg-amber-100 text-amber-700' :
-                    req.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {req.status}
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">From</p>
-                    <p className="font-medium text-slate-900 text-sm flex items-center gap-1">
-                      <Building2 size={14} className="text-slate-400" />
-                      {req.current_hospital?.facility_name || 'Unknown'}
-                    </p>
-                    <p className="text-xs text-slate-500 ml-5">{req.current_hospital?.district}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">To</p>
-                    <p className="font-medium text-emerald-700 text-sm flex items-center gap-1">
-                      <Building2 size={14} className="text-emerald-500" />
-                      {req.new_hospital?.facility_name || 'Unknown'}
-                    </p>
-                    <p className="text-xs text-emerald-600/70 ml-5">{req.new_hospital?.district}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
+                        <Calendar size={12} /> Date of Joining
+                      </p>
+                      <p className="text-sm font-medium text-slate-900">{new Date(req.date_of_joining).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
+                        <FileText size={12} /> Reason
+                      </p>
+                      <p className="text-sm text-slate-600 line-clamp-2">{req.reason}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
-                      <Calendar size={12} /> Date of Joining
-                    </p>
-                    <p className="text-sm font-medium text-slate-900">{new Date(req.date_of_joining).toLocaleDateString()}</p>
+                {req.status === 'Pending Approval' && (
+                  <div className="flex md:flex-col gap-3 w-full md:w-auto">
+                    <button
+                      onClick={() => handleApprove(req)}
+                      disabled={processingId === req.id}
+                      className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {processingId === req.id ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleReject(req.id)}
+                      disabled={processingId === req.id}
+                      className="flex-1 md:flex-none bg-red-50 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {processingId === req.id ? <Loader2 className="animate-spin" size={18} /> : <X size={18} />}
+                      Reject
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
-                      <FileText size={12} /> Reason
-                    </p>
-                    <p className="text-sm text-slate-600 line-clamp-2">{req.reason}</p>
-                  </div>
-                </div>
+                )}
               </div>
-
-              {req.status === 'Pending Approval' && (
-                <div className="flex md:flex-col gap-3 w-full md:w-auto">
-                  <button
-                    onClick={() => handleApprove(req)}
-                    disabled={processingId === req.id}
-                    className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {processingId === req.id ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleReject(req.id)}
-                    disabled={processingId === req.id}
-                    className="flex-1 md:flex-none bg-red-50 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {processingId === req.id ? <Loader2 className="animate-spin" size={18} /> : <X size={18} />}
-                    Reject
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
+      ) : (
+        <RegistrationRequests session={session} />
       )}
     </div>
   );

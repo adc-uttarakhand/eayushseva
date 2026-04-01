@@ -27,6 +27,10 @@ interface Hospital {
   password?: string;
   altitude?: number;
   above_7000_feet?: string;
+  is_verified?: boolean;
+  last_edited_on?: string;
+  verified_at?: string;
+  verified_by?: string;
 }
 
 interface EditHospitalModalProps {
@@ -101,6 +105,10 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
         operational_status: formData.operational_status,
         altitude: formData.altitude,
         above_7000_feet: formData.above_7000_feet,
+        is_verified: false,
+        last_edited_on: new Date().toISOString(),
+        verified_at: null,
+        verified_by: null,
       };
 
       // Only update password if a new one is provided

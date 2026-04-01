@@ -8,6 +8,7 @@ interface HospitalProfileProps {
   hospitalDetails: any;
   onUpdate: () => void;
   session: any;
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 const SPECIAL_SERVICES = [
@@ -31,7 +32,7 @@ const CENTRES_OF_EXCELLENCE = [
   'Gyanecological Disorders'
 ];
 
-export default function HospitalProfile({ hospitalDetails, onUpdate, session }: HospitalProfileProps) {
+export default function HospitalProfile({ hospitalDetails, onUpdate, session, onDirtyChange }: HospitalProfileProps) {
   const [formData, setFormData] = useState({
     type: '',
     taluka: '',
@@ -69,7 +70,44 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
   const [showLocationConfirm, setShowLocationConfirm] = useState(false);
   const [fetchingAltitude, setFetchingAltitude] = useState(false);
   const [isChangeInchargeOpen, setIsChangeInchargeOpen] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (hospitalDetails && formData) {
+      const isCurrentlyDirty = 
+        formData.email !== (hospitalDetails.email || '') ||
+        formData.hospital_password !== (hospitalDetails.hospital_password || '') ||
+        JSON.stringify(formData.special_services) !== JSON.stringify(hospitalDetails.special_services || []) ||
+        formData.centre_of_excellence !== (hospitalDetails.centre_of_excellence || '') ||
+        formData.supraja_centre !== (hospitalDetails.supraja_centre || false) ||
+        formData.panchakarma_centre !== (hospitalDetails.panchakarma_centre || false) ||
+        formData.latitude !== (hospitalDetails.latitude?.toString() || '') ||
+        formData.longitude !== (hospitalDetails.longitude?.toString() || '') ||
+        formData.photo_url !== (hospitalDetails.photo_url || '') ||
+        formData.facility_name !== (hospitalDetails.facility_name || '') ||
+        formData.pincode !== (hospitalDetails.pincode || '') ||
+        formData.block !== (hospitalDetails.block || '') ||
+        formData.region_indicator !== (hospitalDetails.region_indicator || '') ||
+        formData.operational_status !== (hospitalDetails.operational_status || '') ||
+        formData.status !== (hospitalDetails.status || '') ||
+        formData.type !== (hospitalDetails.type || '') ||
+        formData.taluka !== (hospitalDetails.taluka || '') ||
+        formData.ipd_services !== (hospitalDetails.ipd_services || '') ||
+        formData.mobile !== (hospitalDetails.mobile || '') ||
+        formData.location !== (hospitalDetails.location || '') ||
+        formData.building_status !== (hospitalDetails.building_status || '') ||
+        formData.no_of_rooms !== (hospitalDetails.no_of_rooms?.toString() || '') ||
+        formData.total_area !== (hospitalDetails.total_area_sqft?.toString() || '') ||
+        formData.construction_year !== (hospitalDetails.construction_year?.toString() || '') ||
+        formData.no_of_beds !== (hospitalDetails.no_of_beds?.toString() || '') ||
+        formData.altitude !== (hospitalDetails.altitude?.toString() || '') ||
+        formData.above_7000_feet !== (hospitalDetails.above_7000_feet || '');
+
+      setIsDirty(isCurrentlyDirty);
+      onDirtyChange?.(isCurrentlyDirty);
+    }
+  }, [formData, hospitalDetails, onDirtyChange]);
 
   useEffect(() => {
     if (hospitalDetails) {
@@ -117,7 +155,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
 
         const { data: staffData } = await supabase
           .from('staff')
-          .select('full_name, role, mobile_number')
+          .select('id, full_name, role, mobile_number')
           .eq('hospital_id', hospitalDetails.hospital_id);
         setStaff(staffData || []);
       };
@@ -227,8 +265,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent, isVerifying: boolean = false) => {
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       const isAdmin = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role);
@@ -260,11 +298,15 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         above_7000_feet: formData.above_7000_feet || 'No'
       };
 
-      if (isAdmin) {
+      if (isVerifying && isAdmin) {
         updateData.is_verified = true;
-        updateData.last_edited_on = new Date().toISOString();
         updateData.verified_by = session?.name || session?.id || 'Admin';
         updateData.verified_at = new Date().toISOString();
+      } else {
+        updateData.is_verified = false;
+        updateData.last_edited_on = new Date().toISOString();
+        updateData.verified_at = null;
+        updateData.verified_by = null;
       }
 
       if (formData.construction_year && !/^\d{4}$/.test(formData.construction_year)) {
@@ -537,10 +579,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">SR NO</label>
-            <p className="font-bold text-slate-900">{hospitalDetails.sr_no}</p>
-          </div>
-          <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Type</label>
             <p className="font-bold text-slate-900">{hospitalDetails.type || 'N/A'}</p>
           </div>
@@ -614,11 +652,11 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Terrain Status</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Status</label>
             <select 
               value={formData.status}
               onChange={e => setFormData({...formData, status: e.target.value})}
-              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              className="font-bold text-emerald-900 w-full bg-emerald-50 rounded-lg p-1 border border-emerald-200"
               disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
             >
               <option value="Sugam">Sugam</option>
@@ -727,23 +765,23 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Latitude</label>
+          <div className="space-y-1 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-blue-700 ml-4">Latitude</label>
             <input 
               type="text"
               value={formData.latitude}
               onChange={e => setFormData({...formData, latitude: e.target.value})}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full bg-white border border-blue-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-blue-900 font-bold"
               placeholder="e.g. 28.6139"
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Longitude</label>
+          <div className="space-y-1 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-blue-700 ml-4">Longitude</label>
             <input 
               type="text"
               value={formData.longitude}
               onChange={e => setFormData({...formData, longitude: e.target.value})}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full bg-white border border-blue-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-blue-900 font-bold"
               placeholder="e.g. 77.2090"
             />
           </div>
@@ -762,12 +800,12 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
               disabled={!['HOSPITAL', 'DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Above 7000 ft</label>
+          <div className="space-y-1 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 ml-4">Above 7000 ft</label>
             <select
               value={formData.above_7000_feet || 'No'}
               onChange={e => setFormData({...formData, above_7000_feet: e.target.value})}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+              className="w-full bg-white border border-emerald-200 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none text-emerald-900 font-bold"
               disabled={!['HOSPITAL', 'DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
             >
               <option value="Yes">Yes</option>
@@ -895,8 +933,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
                 </tr>
               </thead>
               <tbody>
-                {staff.map((employee, index) => (
-                  <tr key={index} className="border-t border-gray-100">
+                {staff.map((employee) => (
+                  <tr key={employee.id} className="border-t border-gray-100">
                     <td className="py-3 font-bold text-slate-900">{employee.full_name}</td>
                     <td className="py-3 font-bold text-slate-900">{employee.role}</td>
                     <td className="py-3 font-bold text-slate-900">{employee.mobile_number}</td>
@@ -917,27 +955,42 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session }: 
               Last edited on: {new Date(hospitalDetails.last_edited_on).toLocaleString()}
             </div>
           )}
-          {hospitalDetails.verified_at && (
+          {hospitalDetails.is_verified && hospitalDetails.verified_at && (
             <div className="text-sm text-emerald-600 font-bold">
               Last Verified on: {new Date(hospitalDetails.verified_at).toLocaleString()}
             </div>
           )}
         </div>
-        <button 
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : (
+        <div className="flex flex-col gap-3 w-full md:w-auto">
+          {['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role) ? (
             <>
-              {['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role) ? (
-                <><CheckCircle2 size={20} /> Verify Profile</>
-              ) : (
-                <><Save size={20} /> Save Profile</>
-              )}
+              <button 
+                type="button"
+                onClick={(e) => handleSave(undefined, false)}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 bg-slate-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-700 transition-all disabled:opacity-50 w-full"
+              >
+                {saving ? 'Saving...' : <><Save size={20} /> Save Profile</>}
+              </button>
+              <button 
+                type="button"
+                onClick={(e) => handleSave(undefined, true)}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 w-full"
+              >
+                {saving ? 'Verifying...' : <><CheckCircle2 size={20} /> Verify Profile</>}
+              </button>
             </>
+          ) : (
+            <button 
+              type="submit"
+              disabled={saving}
+              className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 w-full"
+            >
+              {saving ? 'Saving...' : <><Save size={20} /> Save Profile</>}
+            </button>
           )}
-        </button>
+        </div>
       </div>
     </form>
     </>

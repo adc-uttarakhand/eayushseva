@@ -53,8 +53,8 @@ export default function StaffDistributionSummary() {
         <Users className="text-emerald-600" /> Staff Distribution Summary
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {summary.map((item, index) => (
-          <div key={index} className={`p-4 rounded-2xl border ${item.active < item.sanctioned ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-gray-100'}`}>
+        {summary.map((item) => (
+          <div key={item.role} className={`p-4 rounded-2xl border ${item.active < item.sanctioned ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-gray-100'}`}>
             <h3 className="font-bold text-slate-900">{item.role}</h3>
             <div className="flex justify-between mt-2">
               <span>Sanctioned: {item.sanctioned}</span>

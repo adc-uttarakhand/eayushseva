@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
 import HospitalProfile from './HospitalProfile';
 import EmployeeDirectory from './EmployeeDirectory';
-import EmployeeDetailsPage from './EmployeeDetailsPage';
+import ServiceRecordTab from './ServiceRecordTab';
 import InchargeManagement from './InchargeManagement';
 import AddHospitalModal from './AddHospitalModal';
 import * as XLSX from 'xlsx';
@@ -39,6 +39,7 @@ interface Hospital {
   supraja_centre?: boolean;
   panchakarma_centre?: boolean;
   is_verified?: boolean;
+  above_7000ft?: boolean;
   last_edited_on?: string;
   verified_by?: string;
   verified_at?: string;
@@ -341,13 +342,18 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
               </div>
             ) : (
               <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-gray-100">
+                  <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                    Total Hospitals: {filteredHospitals.length}
+                  </button>
+                </div>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100 bg-slate-50/50">
                       <th className="py-4 px-6 font-bold text-slate-900">Facility Name</th>
                       <th className="py-4 px-6 font-bold text-slate-900">District</th>
                       <th className="py-4 px-6 font-bold text-slate-900">Type</th>
-                      <th className="py-4 px-6 font-bold text-slate-900">System</th>
+                      <th className="py-4 px-6 font-bold text-slate-900">Above 7000ft</th>
                       <th className="py-4 px-6 font-bold text-slate-900">Status</th>
                     </tr>
                   </thead>
@@ -371,8 +377,13 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
                               )}
                               <span>{h.facility_name}</span>
                             </div>
+                            {h.is_verified && (
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest ml-6">
+                                Verified
+                              </span>
+                            )}
                             {!!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false' && (
-                              <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                              <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-widest rounded-full ml-6">
                                 CoE: {h.centre_of_excellence === 'True' ? 'Yes' : h.centre_of_excellence}
                               </span>
                             )}
@@ -380,7 +391,7 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
                         </td>
                         <td className="py-4 px-6 text-slate-600">{h.district}</td>
                         <td className="py-4 px-6 text-slate-600">{h.type}</td>
-                        <td className="py-4 px-6 text-slate-600">{h.system}</td>
+                        <td className="py-4 px-6 text-slate-600">{h.above_7000ft ? 'Yes' : 'No'}</td>
                         <td className="py-4 px-6">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
                             {h.status || 'N/A'}
@@ -407,7 +418,7 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
 
         {activeTab === 'employees' && session && (
           selectedStaffId ? (
-            <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+            <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
           ) : (
             <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
           )

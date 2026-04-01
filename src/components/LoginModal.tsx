@@ -2,6 +2,7 @@ import { X, Lock, User, ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import RegistrationPage from './RegistrationPage';
 
 export interface UserSession {
   role: 'SUPER_ADMIN' | 'HOSPITAL' | 'DOCTOR' | 'DISTRICT_ADMIN' | 'STATE_ADMIN' | 'STAFF' | 'DISTRICT_MEDICINE_INCHARGE' | 'PHARMACY_MANAGER';
@@ -27,6 +28,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
 
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -364,6 +366,14 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                   <ShieldCheck size={14} />
                   <span>Secure access for authorized personnel only</span>
                 </div>
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setIsRegistrationOpen(true)}
+                    className="text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
+                  >
+                    Register
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -375,6 +385,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
           </motion.div>
         </div>
       )}
+      {isRegistrationOpen && <RegistrationPage onClose={() => setIsRegistrationOpen(false)} />}
     </AnimatePresence>
   );
 }
+

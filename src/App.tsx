@@ -17,7 +17,8 @@ import PatientList from './components/PatientList';
 import DoctorCommandCenter from './components/DoctorCommandCenter';
 import RatePage from './components/RatePage';
 import EmployeeDirectory from './components/EmployeeDirectory';
-import EmployeeDetailsPage from './components/EmployeeDetailsPage';
+import RegistrationRequests from './components/RegistrationRequests';
+import ServiceRecordTab from './components/ServiceRecordTab';
 import HospitalDirectory from './components/HospitalDirectory';
 import MedicineDemandSystem from './components/MedicineDemandSystem';
 import StateSupplyDashboard from './components/StateSupplyDashboard';
@@ -27,6 +28,7 @@ import LoginDirectory from './components/LoginDirectory';
 import InchargeManagement from './components/InchargeManagement';
 import HospitalDetailsModal from './components/HospitalDetailsModal';
 import TransferRequests from './components/TransferRequests';
+import TransferModule from './components/TransferModule';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
@@ -71,8 +73,21 @@ interface Hospital {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [activeTab, _setActiveTab] = useState<TabId>('dashboard');
+  const [isHospitalProfileDirty, setIsHospitalProfileDirty] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  const setActiveTab = (newTab: TabId) => {
+    if (activeTab === 'dashboard' && isHospitalProfileDirty && newTab !== 'dashboard') {
+      setPendingTab(newTab);
+      setShowUnsavedModal(true);
+      return;
+    }
+    _setActiveTab(newTab);
+  };
   const [hospitalSubTab, setHospitalSubTab] = useState<'directory' | 'employees' | 'incharge'>('directory');
+  const [requestsSubTab, setRequestsSubTab] = useState<'transfer_requests'>('transfer_requests');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -825,7 +840,7 @@ export default function App() {
       )}
       {hospitalSubTab === 'employees' && (
         selectedStaffId ? (
-          <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+          <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
         ) : (
           <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
         )
@@ -1156,6 +1171,7 @@ export default function App() {
                   setIsEditOpen(true);
                 }}
                 onUpdateHospital={fetchHospitals}
+                onHospitalProfileDirtyChange={setIsHospitalProfileDirty}
               />
             </motion.div>
           ) : (
@@ -1203,7 +1219,7 @@ export default function App() {
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="employees" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {selectedStaffId ? (
-              <EmployeeDetailsPage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} session={session} hospitals={hospitals} />
+              <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
             ) : (
               <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
             )}
@@ -1242,14 +1258,47 @@ export default function App() {
             <PharmacyManagerDashboard session={session} />
           </motion.div>
         )}
-        {activeTab === 'transfer_requests' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || (session?.role === 'DISTRICT_ADMIN' && isTransferEnabled)) && (
-          <motion.div key="transfer_requests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <TransferRequests session={session} />
+        {activeTab === 'transfer_module' && isTransferEnabled && (
+          <motion.div key="transfer_module" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <TransferModule session={session} />
           </motion.div>
         )}
-        {activeTab === 'transfer_requests' && session?.role === 'DISTRICT_ADMIN' && !isTransferEnabled && (
+        {activeTab === 'transfer_module' && !isTransferEnabled && (
           <motion.div key="transfer_disabled" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-40 text-center">
             <h2 className="text-2xl font-bold text-slate-900">Module disabled by State Admin</h2>
+          </motion.div>
+        )}
+        {activeTab === 'registrations' && (
+          <motion.div 
+            key="registrations" 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 20 }}
+            className="pt-8 px-4 sm:px-8 max-w-7xl mx-auto"
+          >
+            <RegistrationRequests session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'requests' && (
+          <motion.div 
+            key="requests" 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 20 }}
+            className="pt-8 px-4 sm:px-8 max-w-7xl mx-auto"
+          >
+            {requestsSubTab === 'transfer_requests' && (
+              (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || (session?.role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? (
+                <TransferRequests session={session} />
+              ) : (
+                <div className="pt-20 text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Module disabled by State Admin</h2>
+                </div>
+              )
+            )}
+            {requestsSubTab === 'registration_requests' && (
+              <RegistrationRequests session={session} />
+            )}
           </motion.div>
         )}
         {activeTab === 'profile' && renderProfile()}
@@ -1275,6 +1324,48 @@ export default function App() {
           isTransferEnabled={isTransferEnabled}
         />
       )}
+      {/* Unsaved Changes Modal */}
+      <AnimatePresence>
+        {showUnsavedModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-gray-100"
+            >
+              <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
+                <Building2 size={32} />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Want to Save Profile Before Leaving?</h3>
+              <p className="text-slate-500 mb-8">You have unsaved changes in the hospital profile. What would you like to do?</p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowUnsavedModal(false);
+                    setPendingTab(null);
+                  }}
+                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+                >
+                  Yes, Go back
+                </button>
+                <button
+                  onClick={() => {
+                    setIsHospitalProfileDirty(false);
+                    setShowUnsavedModal(false);
+                    if (pendingTab) _setActiveTab(pendingTab as any);
+                    setPendingTab(null);
+                  }}
+                  className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-[0.98]"
+                >
+                  No, discard changes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
