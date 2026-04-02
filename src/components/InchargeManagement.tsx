@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Building2, User, Edit2, Trash2, Loader2, ShieldCheck, MapPin } from 'lucide-react';
+import { Search, Building2, User, Edit2, Trash2, Loader2, ShieldCheck, MapPin, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
 import ChangeInchargeModal from './ChangeInchargeModal';
+import * as XLSX from 'xlsx';
 
 interface Hospital {
   hospital_id: string;
@@ -11,6 +12,7 @@ interface Hospital {
   district: string;
   incharge_name: string;
   incharge_staff_id?: string;
+  mobile?: string;
 }
 
 interface InchargeManagementProps {
@@ -30,7 +32,7 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
 
   const fetchHospitals = async () => {
     setLoading(true);
-    let query = supabase.from('hospitals').select('hospital_id, facility_name, district, incharge_name, incharge_staff_id');
+    let query = supabase.from('hospitals').select('hospital_id, facility_name, district, incharge_name, incharge_staff_id, mobile');
     
     if (session.access_districts && !session.access_districts.includes('All')) {
       query = query.in('district', session.access_districts);
@@ -121,13 +123,41 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
 
   const districts = Array.from(new Set(hospitals.map(h => h.district))).sort();
   const [selectedDistrict, setSelectedDistrict] = useState('All');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Hospital; direction: 'asc' | 'desc' } | null>(null);
+
+  const requestSort = (key: keyof Hospital) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const filteredHospitals = hospitals.filter(h => 
     (selectedDistrict === 'All' || h.district === selectedDistrict) &&
     ((h.facility_name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
     (h.district || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
     (h.incharge_name || '').toLowerCase().includes((searchQuery || '').toLowerCase()))
-  );
+  ).sort((a, b) => {
+    if (!sortConfig) return 0;
+    const aValue = a[sortConfig.key] || '';
+    const bValue = b[sortConfig.key] || '';
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredHospitals.map(h => ({
+      'Hospital': h.facility_name,
+      'District': h.district,
+      'Incharge': h.incharge_name || 'No incharge assigned',
+      'Mobile Number': h.mobile || 'N/A'
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Incharges');
+    XLSX.writeFile(workbook, 'Incharges_List.xlsx');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
@@ -139,6 +169,13 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+            <button 
+              onClick={exportToExcel}
+              className="flex items-center justify-center gap-2 bg-white border border-gray-100 text-slate-700 py-4 px-6 rounded-2xl font-bold hover:bg-slate-50 transition-all shadow-sm"
+            >
+              <Download size={20} />
+              Export Excel
+            </button>
             <select 
               value={selectedDistrict}
               onChange={(e) => setSelectedDistrict(e.target.value)}
@@ -175,9 +212,10 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 bg-slate-50/50">
-                  <th className="py-4 px-6 font-bold text-slate-900">Hospital</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">District</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Incharge</th>
+                  <th className="py-4 px-6 font-bold text-slate-900 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('facility_name')}>Hospital</th>
+                  <th className="py-4 px-6 font-bold text-slate-900 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('district')}>District</th>
+                  <th className="py-4 px-6 font-bold text-slate-900 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('incharge_name')}>Incharge</th>
+                  <th className="py-4 px-6 font-bold text-slate-900 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('mobile')}>Mobile Number</th>
                   <th className="py-4 px-6 font-bold text-slate-900 text-center">Actions</th>
                 </tr>
               </thead>
@@ -195,6 +233,9 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
                       ) : (
                         <span className="text-slate-400 italic">No incharge assigned</span>
                       )}
+                    </td>
+                    <td className="py-4 px-6 text-slate-600 font-mono">
+                      {h.mobile || <span className="text-slate-400 italic">N/A</span>}
                     </td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">

@@ -25,14 +25,13 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled }
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
     ...(isTransferEnabled ? [{ id: 'transfer_module' as TabId, label: 'Transfers', icon: ArrowUpDown }] : []),
     { id: 'registrations' as TabId, label: 'Registrations', icon: ShieldCheck },
-    { id: 'tools' as TabId, label: 'Tools', icon: Wrench },
+    ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'tools' as TabId, label: 'Tools', icon: Wrench }] : []),
     { id: 'profile' as TabId, label: 'Profile', icon: User },
   ];
 
   const medicineInchargeTabs = [
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
     { id: 'district_supply' as TabId, label: 'Supply', icon: Truck },
-    { id: 'tools' as TabId, label: 'Tools', icon: Wrench },
     { id: 'profile' as TabId, label: 'Profile', icon: User },
   ];
 

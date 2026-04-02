@@ -58,7 +58,7 @@ interface HospitalDirectoryProps {
 export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'hospitals' | 'employees' | 'incharges'>('hospitals');
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'incharges' | 'employees'>('hospitals');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     district: 'All',
@@ -243,7 +243,7 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           
           {/* Tabs with Glass Effect */}
           <div className="flex items-center gap-2 p-1 bg-white/50 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm">
-            {(['hospitals', 'employees', 'incharges'] as const).map((tab) => (
+            {(['hospitals', 'incharges', 'employees'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -416,16 +416,16 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
           </>
         )}
 
+        {activeTab === 'incharges' && session && (
+          <InchargeManagement session={session} />
+        )}
+
         {activeTab === 'employees' && session && (
           selectedStaffId ? (
             <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
           ) : (
             <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
           )
-        )}
-
-        {activeTab === 'incharges' && session && (
-          <InchargeManagement session={session} />
         )}
       </div>
 

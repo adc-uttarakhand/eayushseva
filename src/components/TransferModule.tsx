@@ -285,6 +285,8 @@ export default function TransferModule({ session }: TransferModuleProps) {
     setHospitals(hospitals.map(h => h.hospital_id === hospital_id ? { ...h, is_verified: true, verified_at: now } : h));
   };
 
+  const canEdit = session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN';
+
   return (
     <div className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto">
       <h1 className="text-4xl font-bold mb-8">Transfer Module</h1>
@@ -352,21 +354,25 @@ export default function TransferModule({ session }: TransferModuleProps) {
                       <div className="flex bg-slate-100 rounded-full p-1 w-32">
                         <button 
                           onClick={() => {
+                            if (!canEdit) return;
                             const newStatus = 'Sugam';
                             supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
                               setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
                             });
                           }}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Sugam' ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'}`}
+                          disabled={!canEdit}
+                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Sugam' ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                         >Sugam</button>
                         <button 
                           onClick={() => {
+                            if (!canEdit) return;
                             const newStatus = 'Durgam';
                             supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
                               setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
                             });
                           }}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Durgam' ? 'bg-white shadow-sm text-amber-700' : 'text-slate-400'}`}
+                          disabled={!canEdit}
+                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Durgam' ? 'bg-white shadow-sm text-amber-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                         >Durgam</button>
                       </div>
                     </td>
@@ -374,6 +380,7 @@ export default function TransferModule({ session }: TransferModuleProps) {
                       <div className="flex bg-slate-100 rounded-full p-1 w-24">
                         <button 
                           onClick={() => {
+                            if (!canEdit) return;
                             const newValue = true;
                             supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
                               if (!error) {
@@ -381,10 +388,12 @@ export default function TransferModule({ session }: TransferModuleProps) {
                               }
                             });
                           }}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet === true ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'}`}
+                          disabled={!canEdit}
+                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet === true ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                         >Yes</button>
                         <button 
                           onClick={() => {
+                            if (!canEdit) return;
                             const newValue = false;
                             supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
                               if (!error) {
@@ -392,7 +401,8 @@ export default function TransferModule({ session }: TransferModuleProps) {
                               }
                             });
                           }}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet !== true ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400'}`}
+                          disabled={!canEdit}
+                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet !== true ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                         >No</button>
                       </div>
                     </td>
@@ -468,6 +478,7 @@ export default function TransferModule({ session }: TransferModuleProps) {
                     <th className="py-4 px-6">Total Sugam Days</th>
                     <th className="py-4 px-6">Total Durgam (Below 7000 Feet) Days</th>
                     <th className="py-4 px-6">Total Durgam (Above 7000 Feet) Days</th>
+                    <th className="py-4 px-6">Last Edited On</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -494,6 +505,7 @@ export default function TransferModule({ session }: TransferModuleProps) {
                           <td className="py-4 px-6">{e.total_sugam_days}</td>
                           <td className="py-4 px-6">{e.total_durgam_below_7000_days}</td>
                           <td className="py-4 px-6">{e.total_durgam_above_7000_days}</td>
+                          <td className="py-4 px-6">{formatDate(e.last_edited_on)}</td>
                         </tr>
                       ))}
                 </tbody>

@@ -1755,10 +1755,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Full Name</label>
                   <input 
-                    disabled
                     value={profile.fullName} 
                     onChange={e => setProfile({...profile, fullName: e.target.value})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                   />
                 </div>
 
@@ -1783,11 +1782,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Login Password</label>
                   <div className="relative">
                     <input 
-                      disabled
                       type={showPassword ? "text" : "password"}
                       value={profile.password} 
                       onChange={e => setProfile({...profile, password: e.target.value})} 
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                     />
                     <button 
                       type="button"
@@ -1801,21 +1799,19 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
                   <input 
-                    disabled
                     value={profile.empId} 
                     onChange={e => setProfile({...profile, empId: e.target.value})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
                   <input 
-                    disabled
                     value={profile.aadhaarNumber} 
                     onChange={e => setProfile({...profile, aadhaarNumber: e.target.value})} 
                     placeholder="12-digit Aadhaar"
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed" 
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -1992,7 +1988,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of 1st Joining in Dept</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of 1st Joining in Dept</label>
                       <input 
                         type="text"
                         placeholder="DD-MMM-YYYY"
@@ -2002,12 +1998,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">First Posting Place</label>
                       <HospitalSearchInput
                         value={profile.firstPostingPlace}
                         onChange={val => setProfile({...profile, firstPostingPlace: val})}
                         hospitals={hospitals}
-                        className="bg-slate-50 border-gray-100 rounded-2xl py-3 px-4"
+                        className="w-full bg-slate-50 border-gray-100 rounded-2xl py-3 px-4 h-20"
+                        isTextarea={true}
                       />
                       {profile.firstPostingPlace && (
                         <div className="flex gap-4 ml-4 mt-1">
@@ -2056,7 +2053,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Joining at Present Posting</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of Joining at Present Posting</label>
                       <input 
                         type="text"
                         placeholder="DD-MMM-YYYY"
@@ -2066,7 +2063,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employment Type</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Employment Type</label>
                       <select 
                         value={profile.employmentType} 
                         onChange={e => setProfile({...profile, employmentType: e.target.value as any})} 
@@ -2078,7 +2075,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Home District</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Home District</label>
                       <select 
                         value={profile.homeDistrict} 
                         onChange={e => setProfile({...profile, homeDistrict: e.target.value})} 
@@ -2091,7 +2088,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Birth</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of Birth</label>
                       <input 
                         type="text"
                         placeholder="DD-MMM-YYYY"

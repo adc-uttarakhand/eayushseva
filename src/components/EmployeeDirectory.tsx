@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase, Plus } from 'lucide-react';
+import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase, Plus, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
 import AddEmployeeModal from './AddEmployeeModal';
+import * as XLSX from 'xlsx';
 
 interface Staff {
   id: string;
@@ -123,6 +124,23 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     return hasAccess && matchesSearch && matchesDistrict && matchesRole;
   });
 
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredStaff.map(s => {
+      const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
+      return {
+        'Name': s.full_name,
+        'Role': s.role,
+        'Hospital': hospital?.facility_name || 'N/A',
+        'District': hospital?.district || 'N/A',
+        'Mobile': s.mobile_number,
+        'Verification Status': s.is_verified ? 'Verified' : 'Not verified'
+      };
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Employees');
+    XLSX.writeFile(workbook, 'Employee_Directory.xlsx');
+  };
+
   const canAddEmployee = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role || '');
 
   return (
@@ -135,6 +153,13 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
           </div>
           
           <div className="flex flex-wrap gap-4 w-full md:w-auto items-center">
+            <button 
+              onClick={exportToExcel}
+              className="flex items-center justify-center gap-2 bg-white border border-gray-100 text-slate-700 py-3 px-6 rounded-2xl font-bold hover:bg-slate-50 transition-all shadow-sm"
+            >
+              <Download size={20} />
+              Export Excel
+            </button>
             {canAddEmployee && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
