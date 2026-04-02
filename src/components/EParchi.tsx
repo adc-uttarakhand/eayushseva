@@ -57,9 +57,10 @@ interface EParchiProps {
   hospitalType?: string;
   regionIndicator?: string;
   session?: any;
+  activeSubTab?: 'registration' | 'queue' | 'dispensing';
 }
 
-export default function EParchi({ hospitalId, hospitalName, district, hospitalType, regionIndicator, session }: EParchiProps) {
+export default function EParchi({ hospitalId, hospitalName, district, hospitalType, regionIndicator, session, activeSubTab = 'registration' }: EParchiProps) {
   const userRole = session?.role;
   const staffRole = session?.staffRole;
   const isHospital = userRole === 'HOSPITAL';
@@ -77,6 +78,12 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [activeTab, setActiveTab] = useState<'registration' | 'queue' | 'dispensing'>(
     canRegister ? 'registration' : (canViewQueue || canConsult ? 'queue' : 'dispensing')
   );
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setActiveTab(activeSubTab);
+    }
+  }, [activeSubTab]);
   const [isNew, setIsNew] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [diseaseMaster, setDiseaseMaster] = useState<any[]>([]);
@@ -895,33 +902,6 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
           <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
           <span className="uppercase tracking-widest text-xs font-bold">{district || 'Uttarakhand'}</span>
         </div>
-      </div>
-
-      <div className="flex gap-4 mb-8 print:hidden">
-        {canRegister && (
-          <button 
-            onClick={() => { setActiveTab('registration'); setSelectedPatient(null); }} 
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'registration' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
-          >
-            Registration
-          </button>
-        )}
-        {(canViewQueue || canConsult) && (
-          <button 
-            onClick={() => { setActiveTab('queue'); setSelectedPatient(null); }} 
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'queue' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
-          >
-            Consultation Queue
-          </button>
-        )}
-        {canDispense && (
-          <button 
-            onClick={() => { setActiveTab('dispensing'); setSelectedPatient(null); }} 
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'dispensing' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-600 hover:bg-neutral-50'}`}
-          >
-            Pharmacy Dispensing
-          </button>
-        )}
       </div>
 
       {activeTab === 'registration' && (

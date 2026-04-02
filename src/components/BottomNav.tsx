@@ -44,8 +44,8 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled }
   const tabs = isPublic ? publicTabs : (role === 'DISTRICT_MEDICINE_INCHARGE' ? medicineInchargeTabs : (role === 'PHARMACY_MANAGER' ? pharmacyTabs : adminTabs));
 
   return (
-    <div className="fixed bottom-8 left-0 right-0 z-50 px-4 pointer-events-none">
-      <div className="max-w-fit mx-auto bg-white/40 backdrop-blur-3xl border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-full p-2 flex justify-center items-center pointer-events-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-lg">
+      <div className="flex overflow-x-auto items-center p-2 gap-2 scrollbar-hide">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = active === tab.id;
@@ -53,12 +53,12 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled }
             <button
               key={tab.id}
               onClick={() => setActive(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-full transition-all duration-300 relative group ${
-                isActive ? 'text-emerald-900 bg-white/60 shadow-sm' : 'text-slate-600 hover:text-emerald-800 hover:bg-white/30'
+              className={`flex items-center gap-2 px-5 py-3 rounded-full transition-all duration-300 whitespace-nowrap ${
+                isActive ? 'text-emerald-900 bg-emerald-100' : 'text-slate-600 hover:text-emerald-800'
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className="transition-transform duration-300 group-hover:scale-110" />
-              <span className={`text-xs font-bold uppercase tracking-widest transition-all duration-300 overflow-hidden ${isActive ? 'opacity-100 max-w-[100px]' : 'opacity-0 max-w-0'}`}>
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="text-xs font-bold uppercase tracking-widest">
                 {tab.label}
               </span>
             </button>

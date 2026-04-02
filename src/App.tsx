@@ -941,27 +941,27 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white pb-32">
       <nav className="sticky top-0 left-0 right-0 z-[60] px-4 sm:px-8 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
           <button 
             onClick={() => setActiveTab('dashboard')}
-            className="text-lg font-bold tracking-tighter text-slate-900 hover:opacity-80 transition-opacity cursor-pointer flex items-center"
+            className="text-lg font-bold tracking-tighter text-slate-900 hover:opacity-80 transition-opacity cursor-pointer flex items-center shrink-0"
           >
             e-AYUSH <span className="text-emerald-600 ml-1">Seva</span>
           </button>
           {session && currentHospital && session.role !== 'SUPER_ADMIN' && session.role !== 'STATE_ADMIN' && (
-            <div className="hidden sm:flex ml-4 pl-4 border-l border-gray-200 items-center gap-2">
+            <div className="flex pl-2 sm:pl-4 border-l border-gray-200 items-center gap-2 min-w-0">
               <button 
                 onClick={() => setIsHospitalDetailsOpen(true)}
-                className="flex items-center gap-2 hover:bg-slate-50 p-2 rounded-lg transition-colors group"
+                className="flex items-center gap-1.5 sm:gap-2 hover:bg-slate-50 p-1.5 sm:p-2 rounded-lg transition-colors group min-w-0"
               >
-                <Building2 size={16} className="text-emerald-600 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-bold text-slate-600 tracking-tight text-left">{currentHospital.facility_name}</span>
+                <Building2 size={14} className="text-emerald-600 group-hover:scale-110 transition-transform shrink-0 sm:w-4 sm:h-4" />
+                <span className="text-[10px] sm:text-sm font-bold text-slate-600 tracking-tight text-left truncate">{currentHospital.facility_name}</span>
               </button>
             </div>
           )}
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {!session ? (
             <button 
               onClick={() => setIsLoginOpen(true)}

@@ -162,7 +162,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-3xl shadow-xl overflow-hidden flex flex-col md:max-h-[90vh]"
         >
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50">
             <h2 className="text-2xl font-bold text-slate-900">Add Employee</h2>

@@ -907,7 +907,7 @@ export default function MedicineDemandSystem({ session }: MedicineDemandSystemPr
           </div>
         )}
 
-        <div className="flex border-b border-gray-100 mb-6 mt-8">
+        <div className="flex border-b border-gray-100 mb-6 mt-8 sticky top-16 bg-white z-20 overflow-x-auto pb-1">
           {[
             { id: 'current', label: 'Current Demands' },
             { id: 'previous', label: 'Previous Demands' }
@@ -915,7 +915,7 @@ export default function MedicineDemandSystem({ session }: MedicineDemandSystemPr
             <button
               key={tab.id}
               onClick={() => setHospitalTab(tab.id as any)}
-              className={`px-6 py-4 text-sm font-bold transition-all relative ${
+              className={`px-6 py-4 text-sm font-bold transition-all relative whitespace-nowrap ${
                 hospitalTab === tab.id ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
               }`}
             >

@@ -144,7 +144,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
   const canAddEmployee = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role || '');
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
+    <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>
@@ -206,13 +206,15 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
             <p className="text-slate-400 font-medium">Fetching staff records...</p>
           </div>
         ) : (
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-gray-100">
-              <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
-                Total Employees: {filteredStaff.length}
-              </button>
+          <>
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm mb-4">
+              <div className="p-4 border-b border-gray-100">
+                <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                  Total Employees: {filteredStaff.length}
+                </button>
+              </div>
             </div>
-            <table className="w-full text-left border-collapse">
+            <table className="hidden md:table w-full text-left border-collapse bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-slate-50/50">
                   <th className="py-4 px-6 font-bold text-slate-900">Name</th>
@@ -262,7 +264,39 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                 })}
               </tbody>
             </table>
-          </div>
+
+            <div className="md:hidden space-y-4">
+              {filteredStaff.map(s => {
+                const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
+                return (
+                  <div key={s.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm" onClick={() => onStaffClick(s.id)}>
+                    <div className="flex items-center gap-3">
+                      {s.photograph_url ? (
+                        <img src={s.photograph_url} alt={s.full_name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                          <User size={20} />
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-bold text-slate-900">{s.full_name}</div>
+                        <div className="text-xs text-slate-500">ID: {s.employee_id || '-'}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-sm text-slate-600">Role: {s.role}</div>
+                    <div className="text-sm text-slate-600">Hospital: {hospital?.facility_name || 'N/A'}</div>
+                    <div className="text-sm text-slate-600">District: {hospital?.district || 'N/A'}</div>
+                    <div className="text-sm text-slate-600">Mobile: {s.mobile_number}</div>
+                    {s.is_verified && (
+                      <div className="mt-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full inline-block">
+                        Verified
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {filteredStaff.length === 0 && !loading && (

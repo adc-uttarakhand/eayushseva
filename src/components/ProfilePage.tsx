@@ -174,8 +174,8 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto px-4 py-12 pb-40"
     >
-      <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-gray-100 overflow-hidden">
-        <div className="bg-slate-900 p-12 text-white relative overflow-hidden">
+      <div className="bg-white rounded-2xl md:rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-gray-100 overflow-hidden">
+        <div className="bg-slate-900 p-4 md:p-8 text-white relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
@@ -190,7 +190,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
         </div>
 
-        <form onSubmit={handleSave} className="p-12">
+        <form onSubmit={handleSave} className="p-4 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div className="flex items-center gap-3 mb-2">
