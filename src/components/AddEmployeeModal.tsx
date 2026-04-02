@@ -137,7 +137,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
         employee_id: formData.employee_id.trim(),
         role: formData.role,
         hospital_id: formData.posting_place_id,
-        office_id: null,
         first_posting_place: postingPlaceName,
         login_password: 'ayush@123',
         is_active: true
