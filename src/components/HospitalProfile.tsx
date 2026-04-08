@@ -75,6 +75,12 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (incharge && incharge.mobile_number) {
+      setFormData(prev => ({ ...prev, mobile: incharge.mobile_number }));
+    }
+  }, [incharge]);
+
+  useEffect(() => {
     if (hospitalDetails && formData) {
       const isCurrentlyDirty = 
         formData.email !== (hospitalDetails.email || '') ||
@@ -651,9 +657,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Mobile</label>
             <input 
               value={formData.mobile}
-              onChange={e => setFormData({...formData, mobile: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!canEdit}
+              disabled={true}
             />
           </div>
           <div>

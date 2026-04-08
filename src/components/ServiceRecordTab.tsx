@@ -35,6 +35,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
   const [uploading, setUploading] = useState(false);
   const [overlapError, setOverlapError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+  const [roles, setRoles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const calculateDays = (fromDate: string, toDate: string) => {
@@ -136,6 +137,10 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
       const { data: hospitalsData } = await supabase.from('hospitals').select('*');
       if (hospitalsData) setHospitals(hospitalsData);
 
+      // Fetch roles
+      const { data: rolesData } = await supabase.from('roles').select('role_name');
+      if (rolesData) setRoles(rolesData.map((r: any) => r.role_name));
+
       // Fetch staff details
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
@@ -173,7 +178,6 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           empId: staffData.employee_id || '',
           mobile: staffData.mobile_number || '',
           password: staffData.login_password || '',
-          aadhaarNumber: staffData.aadhaar_number || '',
           fatherName: staffData.father_name || '',
           photograph: staffData.photograph_url || '',
           email: staffData.email_id || '',
@@ -378,12 +382,33 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
     setSaving(true);
     try {
       if (activeSubTab === 'basic') {
+        // Check if employee_id is already taken by another staff member
+        if (profile.empId && profile.empId !== rawStaffData.employee_id) {
+          const { data: existingStaff, error: checkError } = await supabase
+            .from('staff')
+            .select('id')
+            .eq('employee_id', profile.empId)
+            .neq('id', targetStaffId)
+            .maybeSingle();
+          
+          if (checkError) throw checkError;
+          if (existingStaff) {
+            throw new Error(`Employee ID ${profile.empId} is already in use by another staff member.`);
+          }
+        }
+
+        if (!profile.homeDistrict) {
+          setToast({ show: true, message: 'Please select Home District', type: 'error' });
+          setTimeout(() => setToast({ show: false, message: '', type: 'error' }), 3000);
+          setSaving(false);
+          return;
+        }
+
         const { error: staffError } = await supabase.from('staff').update({
           full_name: profile.fullName,
           mobile_number: profile.mobile,
-          employee_id: profile.empId,
+          employee_id: profile.empId || null,
           login_password: profile.password,
-          aadhaar_number: profile.aadhaarNumber,
           father_name: profile.fatherName,
           photograph_url: profile.photograph,
           email_id: profile.email,
@@ -876,12 +901,17 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
 
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Role / Designation</label>
-              <input 
-                readOnly={!isAdminMode}
+              <select 
+                disabled={!isAdminMode}
                 value={profile.designation} 
                 onChange={e => updateProfile({ designation: e.target.value })} 
                 className={`w-full bg-slate-50 border rounded-2xl py-3 px-4 focus:outline-none ${isAdminMode ? 'border-emerald-500' : 'border-gray-100'}`} 
-              />
+              >
+                <option value="">Select Role</option>
+                {roles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-1">
@@ -1242,29 +1272,37 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
         <div className="space-y-4">
           {/* Present Posting (Top Row) */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-500 bg-emerald-50 p-4 rounded-2xl">
-            <div className="space-y-1 md:col-span-5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting (Place)</label>
-              <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-800 font-bold">
-                {hospitalDetails?.facility_name || 'Not Assigned'}
-                <div className="flex gap-2 mt-1">
-                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">{hospitalDetails?.status || 'N/A'}</span>
-                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">Above 7000ft: {hospitalDetails?.above_7000_feet === 'Yes' ? 'Yes' : 'No'}</span>
-                </div>
+            <div className="space-y-1 md:col-span-6">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place</label>
+              <HospitalSearchInput
+                isTextarea
+                value={profile.presentHospital || ''}
+                onChange={(val: string) => updateProfile({ presentHospital: val })}
+                hospitals={hospitals}
+                placeholder="Type hospital name..."
+              />
+              <div className="flex gap-2 mt-1 ml-4">
+                <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">{profile.presentPostingType || 'N/A'}</span>
+                <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">Above 7000ft: {profile.presentPostingAbove7000 || 'No'}</span>
               </div>
             </div>
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
-              <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-800 font-bold">
-                {formatDateForUI(profile.currentPostingJoiningDate)}
-              </div>
+              <input 
+                type="text"
+                placeholder="DD-MMM-YYYY"
+                value={profile.currentPostingJoiningDate || ''}
+                onChange={e => updateProfile({ currentPostingJoiningDate: maskDate(e.target.value) })}
+                className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
             </div>
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
-              <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-800 font-bold">
+              <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-800 font-bold italic">
                 Present
               </div>
             </div>
-            <div className="space-y-1 md:col-span-3">
+            <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Duration (Days)</label>
               <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-800 font-bold">
                 {calculateDays(profile.currentPostingJoiningDate, new Date().toISOString().split('T')[0])}
@@ -1659,9 +1697,11 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
       )}
 
       {toast.show && (
-        <div className={`fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl animate-in slide-in-from-bottom-4 fade-in duration-300 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'} text-white`}>
-          {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
-          <p className="font-bold">{toast.message}</p>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4`}>
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl animate-in fade-in zoom-in duration-300 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'} text-white`}>
+            {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+            <p className="font-bold">{toast.message}</p>
+          </div>
         </div>
       )}
     </div>

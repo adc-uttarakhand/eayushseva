@@ -8,7 +8,8 @@ export interface UserSession {
   role: 'SUPER_ADMIN' | 'HOSPITAL' | 'DOCTOR' | 'DISTRICT_ADMIN' | 'STATE_ADMIN' | 'STAFF' | 'DISTRICT_MEDICINE_INCHARGE' | 'PHARMACY_MANAGER';
   id: string; // For STAFF, this is their staff ID. For HOSPITAL, this is hospital_id.
   hospitalId?: string; // For STAFF, this is the hospital they belong to.
-  selectedHospitalId?: string; // The hospital the staff has currently 'Logged into'.
+  activeHospitalId?: string; // The hospital the staff has currently 'Logged into'.
+  activeModules?: string[]; // Modules for the active hospital.
   name?: string;
   modules?: string[];
   staffRole?: string;
@@ -104,11 +105,25 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         const staffIds = staffDataList.map(s => s.id);
         
         // 1. Direct links in staff table
-        const directLinks = staffDataList.map(s => ({
-          staffId: s.id,
-          hospitalId: s.hospital_id,
-          staffRecord: s
-        })).filter(l => l.hospitalId);
+        const directLinks = staffDataList.map(s => {
+          const links = [{
+            staffId: s.id,
+            hospitalId: s.hospital_id,
+            staffRecord: s
+          }];
+          
+          // Add secondary hospitals
+          if (s.secondary_hospitals && Array.isArray(s.secondary_hospitals)) {
+            s.secondary_hospitals.forEach((h: any) => {
+              links.push({
+                staffId: s.id,
+                hospitalId: h.hospital_id,
+                staffRecord: s
+              });
+            });
+          }
+          return links;
+        }).flat().filter(l => l.hospitalId);
 
         // 2. Incharge links in hospitals table
         const { data: inchargeHospitals } = await supabase
@@ -206,11 +221,22 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     }
 
     let isIncharge = false;
-    if (staffData.hospital_id) {
+    let activeModules = staffData.assigned_modules || [];
+    
+    // Check if selected hospital is secondary
+    if (staffData.hospital_id !== staffData.selectedHospitalId) {
+      const secondaryHospitals = staffData.secondary_hospitals || [];
+      const secondary = secondaryHospitals.find((h: any) => h.hospital_id === staffData.selectedHospitalId);
+      if (secondary) {
+        activeModules = secondary.modules || [];
+      }
+    }
+
+    if (staffData.selectedHospitalId) {
       const { data: hospitalData } = await supabase
         .from('hospitals')
         .select('incharge_staff_id')
-        .eq('hospital_id', staffData.hospital_id)
+        .eq('hospital_id', staffData.selectedHospitalId)
         .maybeSingle();
       
       if (hospitalData && hospitalData.incharge_staff_id?.toString() === staffData.id.toString()) {
@@ -222,7 +248,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       role: 'STAFF',
       id: staffData.id.toString(),
       hospitalId: staffData.hospital_id,
-      selectedHospitalId: staffData.hospital_id,
+      activeHospitalId: staffData.selectedHospitalId,
+      activeModules: activeModules,
       name: staffData.full_name,
       modules: staffData.assigned_modules || [],
       staffRole: staffData.role,

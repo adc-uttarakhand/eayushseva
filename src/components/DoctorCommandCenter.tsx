@@ -343,7 +343,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   });
   const [isMobileRegistered, setIsMobileRegistered] = useState(false);
   const [isCheckingMobile, setIsCheckingMobile] = useState(false);
-  const [selectedModules, setSelectedModules] = useState<string[]>(['profile']);
+  const [selectedModules, setSelectedModules] = useState<string[]>(session.activeModules || ['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
 
   useEffect(() => {
@@ -860,18 +860,23 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validatePostings()) return;
+    // Only validate if we are in the relevant tab
+    if (profileSubTab === 'service') {
+      if (!validatePostings()) return;
 
-    // Mandatory Field Validation
-    if (!profile.dob || !profile.dateOfFirstJoiningDepartment || !profile.homeDistrict) {
-      alert('Please fill DOB, Joining Date, and Home District before saving.');
-      return;
+      // Validation for Permanent Employees
+      if (profile.employmentType === 'Permanent') {
+        if (!profile.dateOfFirstJoiningDepartment || !profile.firstPostingPlace) {
+          alert('Please fill "Date of 1st Joining in Dept" and "First Posting Place" in Service Record Details.\nकृपया सेवा रिकॉर्ड विवरण में "विभाग में प्रथम कार्यभार ग्रहण करने की तिथि" और "प्रथम तैनाती स्थल" भरें।');
+          return;
+        }
+      }
     }
 
-    // Validation for Permanent Employees
-    if (profile.employmentType === 'Permanent') {
-      if (!profile.dateOfFirstJoiningDepartment || !profile.firstPostingPlace) {
-        alert('Please fill "Date of 1st Joining in Dept" and "First Posting Place" in Service Record Details.\nकृपया सेवा रिकॉर्ड विवरण में "विभाग में प्रथम कार्यभार ग्रहण करने की तिथि" और "प्रथम तैनाती स्थल" भरें।');
+    if (profileSubTab === 'basic') {
+      // Mandatory Field Validation
+      if (!profile.dob || !profile.dateOfFirstJoiningDepartment || !profile.homeDistrict) {
+        alert('Please fill DOB, Joining Date, and Home District before saving.');
         return;
       }
     }
@@ -924,7 +929,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         id: session.id, // Primary Key
         full_name: profile.fullName,
         mobile_number: profile.mobile,
-        employee_id: profile.empId,
+        employee_id: profile.empId || null,
         login_password: profile.password,
         aadhaar_number: profile.aadhaarNumber,
         father_name: profile.fatherName,
@@ -1283,7 +1288,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }
 
     const payload: any = {
-      hospital_id: session.hospitalId,
+      hospital_id: session.activeHospitalId || session.hospitalId,
       full_name: staffForm.fullName,
       mobile_number: staffForm.mobile.trim(),
       role: staffForm.role,
@@ -1860,8 +1865,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <select 
                     value={profile.designation} 
                     onChange={e => setProfile({...profile, designation: e.target.value})} 
-                    disabled
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <option value="">Select Role</option>
                     {roles.map(role => (
@@ -2190,29 +2194,35 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
                       </h2>
                   <div className="space-y-4">
-                    {/* Current Posting Row (Auto-added format) */}
+                    {/* Current Posting Row (Editable) */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
                       <div className="space-y-1 md:col-span-6">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place (Auto)</label>
-                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
-                          {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
-                        </div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place</label>
+                        <HospitalSearchInput
+                          isTextarea
+                          value={profile.presentHospital || ''}
+                          onChange={val => setProfile({...profile, presentHospital: val})}
+                          hospitals={hospitals}
+                          placeholder="Type hospital name..."
+                        />
                         <div className="flex gap-3 ml-2 mt-1">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitalDetails?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {hospitalDetails?.status || 'Sugam'}
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${profile.presentPostingType === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {profile.presentPostingType || 'Sugam'}
                           </span>
-                          {hospitalDetails?.facility_name && (
-                            <span className="text-[9px] font-bold text-slate-400">
-                              Above 7000 ft: <span className="text-slate-600">{(hospitalDetails?.region_indicator === 'Above 7000' || hospitalDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
-                            </span>
-                          )}
+                          <span className="text-[9px] font-bold text-slate-400">
+                            Above 7000 ft: <span className="text-slate-600">{profile.presentPostingAbove7000 || 'No'}</span>
+                          </span>
                         </div>
                       </div>
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
-                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600">
-                          {profile.currentPostingJoiningDate || '---'}
-                        </div>
+                        <input 
+                          type="text"
+                          placeholder="DD-MMM-YYYY"
+                          value={profile.currentPostingJoiningDate || ''}
+                          onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})}
+                          className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
                       </div>
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
@@ -2228,9 +2238,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             if (isNaN(start.getTime())) return '---';
                             const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                             return (
-                              <>
-                                <div className="text-lg">{days} days</div>
-                              </>
+                              <div className="text-lg">{days > 0 ? days : 0} days</div>
                             );
                           })()}
                         </div>

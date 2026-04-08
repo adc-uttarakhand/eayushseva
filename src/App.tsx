@@ -1193,7 +1193,7 @@ export default function App() {
         {activeTab === 'eparchi' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="eparchi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <EParchi 
-              hospitalId={session.selectedHospitalId || session.hospitalId || session.id} 
+              hospitalId={session.activeHospitalId || session.hospitalId || session.id} 
               hospitalName={currentHospital?.facility_name}
               district={currentHospital?.district}
               hospitalType={currentHospital?.type}
@@ -1208,7 +1208,7 @@ export default function App() {
         )}
         {activeTab === 'patients' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="patients" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <PatientList hospitalId={session.selectedHospitalId || session.hospitalId || session.id} />
+            <PatientList hospitalId={session.activeHospitalId || session.hospitalId || session.id} />
           </motion.div>
         )}
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
