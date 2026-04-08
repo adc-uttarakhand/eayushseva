@@ -173,9 +173,10 @@ export default function HospitalSupplyPull({ hospitalId, district }: HospitalSup
           </div>
 
           <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-slate-50/50">
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Medicine & Order</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Manufacturer</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Dispatch Date</th>
@@ -249,6 +250,7 @@ export default function HospitalSupplyPull({ hospitalId, district }: HospitalSup
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </motion.section>
       </AnimatePresence>

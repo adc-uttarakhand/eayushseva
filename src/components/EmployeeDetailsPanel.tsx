@@ -68,7 +68,6 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
       startY: 40,
       body: [
         ['Full Name:', employee.full_name, 'Role:', employee.role],
-        ['Employee ID:', employee.employee_id, 'DOB:', formatDate(employee.dob)],
         ['Home District:', employee.home_district, 'Mobile:', employee.mobile_number || 'N/A'],
         ['Present Hospital:', employee.present_hospital, 'Present District:', employee.present_district],
         ['Present Status:', employee.present_posting_status, 'Joining Date:', formatDate(employee.current_posting_joining_date)],
@@ -269,7 +268,6 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
           <div className="grid grid-cols-2 gap-4 text-sm">
             <p><strong>Full Name:</strong> {employee.full_name}</p>
             <p><strong>Role:</strong> {employee.role}</p>
-            <p><strong>Employee ID:</strong> {employee.employee_id}</p>
             <p><strong>DOB:</strong> {formatDate(employee.dob)}</p>
             <p><strong>Home District:</strong> {employee.home_district}</p>
             <p><strong>Present Hospital:</strong> {employee.present_hospital}</p>

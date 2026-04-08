@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Calendar, Shield, Plus, X, Loader2, Save, CheckCircle, User, Camera, UserCircle2, Upload, Eye, EyeOff, GraduationCap, Activity, Printer } from 'lucide-react';
+import { Building2, MapPin, Calendar, Shield, Plus, X, Loader2, Save, CheckCircle, User, Camera, UserCircle2, Upload, Eye, EyeOff, GraduationCap, Activity, Printer, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { HospitalSearchInput } from './SearchInputs';
 import imageCompression from 'browser-image-compression';
@@ -34,6 +34,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
   const [showPassword, setShowPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [overlapError, setOverlapError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const calculateDays = (fromDate: string, toDate: string) => {
@@ -374,95 +375,102 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
   };
 
   const handleSaveProfile = async () => {
-    if (profile.employmentType === 'Permanent') {
-      if (!profile.dateOfFirstJoiningDepartment || !profile.firstPostingPlace) {
-        alert('Please fill "Date of 1st Joining in Dept" and "First Posting Place" in Service Record Details.');
-        return;
-      }
-    }
-
     setSaving(true);
     try {
-      const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
-
-      const sanitizedPostings = profile.postings.map((p: any) => ({
-        ...p,
-        fromDate: formatDateForDB(p.fromDate),
-        toDate: formatDateForDB(p.toDate)
-      }));
-
-      const sanitizedAttachments = profile.attachments.map((a: any) => ({
-        ...a,
-        from: formatDateForDB(a.from),
-        to: formatDateForDB(a.to)
-      }));
-
-      const sanitizedLongLeaves = profile.longLeaves.map((l: any) => ({
-        ...l,
-        fromDate: formatDateForDB(l.fromDate),
-        toDate: formatDateForDB(l.toDate)
-      }));
-
-      const { error: staffError } = await supabase.from('staff').upsert({
-        id: targetStaffId,
-        full_name: profile.fullName,
-        mobile_number: profile.mobile,
-        employee_id: profile.empId,
-        login_password: profile.password,
-        aadhaar_number: profile.aadhaarNumber,
-        father_name: profile.fatherName,
-        photograph_url: profile.photograph,
-        email_id: profile.email,
-        employment_class: profile.employmentClass,
-        employment_type: profile.employmentType,
-        gender: profile.gender,
-        dob: formatDateForDB(profile.dob),
-        current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
-        present_district: profile.presentDistrict,
-        blood_group: profile.bloodGroup,
-        permanent_address: profile.permanentAddress,
-        current_residential_address: profile.currentResidentialAddress,
-        role: profile.designation,
-        date_of_first_appointment: formatDateForDB(profile.dateOfFirstAppointment),
-        first_joining_date: formatDateForDB(profile.dateOfFirstJoiningDepartment),
-        first_posting_place: profile.firstPostingPlace || '',
-        home_district: profile.homeDistrict,
-        bcp_registration_no: profile.bcpRegistrationNo,
-        long_leaves: sanitizedLongLeaves,
-        trainings: profile.trainings,
-        postings: sanitizedPostings,
-        attachments: sanitizedAttachments,
-        long_leaves_count: serviceDays.totalLeaves,
-        attachment_sugam_days: serviceDays.attachmentSugam,
-        attachment_durgam_days: serviceDays.attachmentDurgam,
-        attachment_durgam_above_7000_days: serviceDays.attachmentDurgamAbove7000,
-        total_sugam_days: serviceDays.totalSugam,
-        total_durgam_below_7000_days: serviceDays.totalDurgam,
-        total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
-        last_edited_on: new Date().toISOString(),
-        is_verified: false,
-        last_verified_on: null,
-        verified_by_admin: null
-      }, { onConflict: 'id' });
-
-      if (staffError) throw staffError;
-
-      const { error: docError } = await supabase.from('doctor_profiles').upsert({
-        staff_id: targetStaffId,
-        specialization: profile.specialization,
-        highest_qualification: profile.qualification,
-        clinical_experience_since: profile.clinicalExperienceSince ? parseInt(profile.clinicalExperienceSince) : null,
-        keywords: profile.keywords
-      }, { onConflict: 'staff_id' });
-
-      if (docError) throw docError;
-
+      if (activeSubTab === 'basic') {
+        const { error: staffError } = await supabase.from('staff').update({
+          full_name: profile.fullName,
+          mobile_number: profile.mobile,
+          employee_id: profile.empId,
+          login_password: profile.password,
+          aadhaar_number: profile.aadhaarNumber,
+          father_name: profile.fatherName,
+          photograph_url: profile.photograph,
+          email_id: profile.email,
+          employment_class: profile.employmentClass,
+          employment_type: profile.employmentType,
+          gender: profile.gender,
+          dob: formatDateForDB(profile.dob),
+          present_district: profile.presentDistrict,
+          blood_group: profile.bloodGroup,
+          permanent_address: profile.permanentAddress,
+          current_residential_address: profile.currentResidentialAddress,
+          role: profile.designation,
+          home_district: profile.homeDistrict,
+          bcp_registration_no: profile.bcpRegistrationNo,
+          last_edited_on: new Date().toISOString(),
+        }).eq('id', targetStaffId);
+        
+        if (staffError) throw staffError;
+        
+        const { error: docError } = await supabase.from('doctor_profiles').upsert({
+          staff_id: targetStaffId,
+          specialization: profile.specialization,
+          highest_qualification: profile.qualification,
+          clinical_experience_since: profile.clinicalExperienceSince ? parseInt(profile.clinicalExperienceSince) : null,
+          keywords: profile.keywords
+        }, { onConflict: 'staff_id' });
+        
+        if (docError) throw docError;
+      } else if (activeSubTab === 'service') {
+        if (profile.employmentType === 'Permanent') {
+          if (!profile.dateOfFirstJoiningDepartment || !profile.firstPostingPlace) {
+            alert('Please fill "Date of 1st Joining in Dept" and "First Posting Place" in Service Record Details.');
+            setSaving(false);
+            return;
+          }
+        }
+        
+        const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
+        
+        const sanitizedPostings = profile.postings.map((p: any) => ({
+          ...p,
+          fromDate: formatDateForDB(p.fromDate),
+          toDate: formatDateForDB(p.toDate)
+        }));
+        
+        const sanitizedAttachments = profile.attachments.map((a: any) => ({
+          ...a,
+          from: formatDateForDB(a.from),
+          to: formatDateForDB(a.to)
+        }));
+        
+        const sanitizedLongLeaves = profile.longLeaves.map((l: any) => ({
+          ...l,
+          fromDate: formatDateForDB(l.fromDate),
+          toDate: formatDateForDB(l.toDate)
+        }));
+        
+        const { error: staffError } = await supabase.from('staff').update({
+          current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
+          date_of_first_appointment: formatDateForDB(profile.dateOfFirstAppointment),
+          first_joining_date: formatDateForDB(profile.dateOfFirstJoiningDepartment),
+          first_posting_place: profile.firstPostingPlace || '',
+          long_leaves: sanitizedLongLeaves,
+          trainings: profile.trainings,
+          postings: sanitizedPostings,
+          attachments: sanitizedAttachments,
+          long_leaves_count: serviceDays.totalLeaves,
+          attachment_sugam_days: serviceDays.attachmentSugam,
+          attachment_durgam_days: serviceDays.attachmentDurgam,
+          attachment_durgam_above_7000_days: serviceDays.attachmentDurgamAbove7000,
+          total_sugam_days: serviceDays.totalSugam,
+          total_durgam_below_7000_days: serviceDays.totalDurgam,
+          total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
+          last_edited_on: new Date().toISOString(),
+        }).eq('id', targetStaffId);
+        
+        if (staffError) throw staffError;
+      }
+      
       setHasUnsavedChanges(false);
-      alert('Profile saved successfully!');
-      fetchData(); // Refresh to show updated verification status
+      setToast({ show: true, message: 'Profile Save Successfully', type: 'success' });
+      setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+      fetchData();
     } catch (err: any) {
       console.error('Error saving profile:', err);
-      alert(`Failed to save: ${err.message}`);
+      setToast({ show: true, message: `Failed to save: ${err.message}`, type: 'error' });
+      setTimeout(() => setToast({ show: false, message: '', type: 'error' }), 3000);
     } finally {
       setSaving(false);
     }
@@ -789,12 +797,14 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
         >
           Basic Info
         </button>
-        <button 
-          onClick={() => setActiveSubTab('service')}
-          className={`pb-3 font-bold text-sm ${activeSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
-        >
-          Service Record
-        </button>
+        {profile.employmentType === 'Permanent' && (
+          <button 
+            onClick={() => setActiveSubTab('service')}
+            className={`pb-3 font-bold text-sm ${activeSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Service Record
+          </button>
+        )}
       </div>
 
       {overlapError && (
@@ -857,20 +867,20 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Full Name</label>
               <input 
-                readOnly
+                readOnly={!isAdminMode}
                 value={profile.fullName} 
                 onChange={e => updateProfile({ fullName: e.target.value })} 
-                className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
+                className={`w-full bg-slate-50 border rounded-2xl py-3 px-4 focus:outline-none ${isAdminMode ? 'border-emerald-500' : 'border-gray-100'}`} 
               />
             </div>
 
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Role / Designation</label>
               <input 
-                readOnly
+                readOnly={!isAdminMode}
                 value={profile.designation} 
                 onChange={e => updateProfile({ designation: e.target.value })} 
-                className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
+                className={`w-full bg-slate-50 border rounded-2xl py-3 px-4 focus:outline-none ${isAdminMode ? 'border-emerald-500' : 'border-gray-100'}`} 
               />
             </div>
 
@@ -896,9 +906,10 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
               <input 
-                value={profile.empId} 
+                value={profile.employmentType === 'Permanent' ? profile.empId : ''} 
                 onChange={e => updateProfile({ empId: e.target.value })} 
-                className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                readOnly={profile.employmentType !== 'Permanent'}
+                className={`w-full bg-slate-50 border rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.employmentType !== 'Permanent' ? 'border-gray-100 text-slate-400' : 'border-emerald-500'}`} 
               />
             </div>
 
@@ -944,21 +955,21 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Mobile</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Mobile</label>
               <input 
                 value={profile.mobile} 
                 onChange={e => updateProfile({ mobile: e.target.value })} 
-                className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                className="w-full bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Gender</label>
               <select 
-                disabled
+                disabled={!isAdminMode}
                 value={profile.gender} 
                 onChange={e => updateProfile({ gender: e.target.value })} 
-                className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none"
+                className={`w-full bg-slate-50 border rounded-2xl py-3 px-4 focus:outline-none ${isAdminMode ? 'border-emerald-500' : 'border-gray-100'}`}
               >
                 <option>Male</option>
                 <option>Female</option>
@@ -977,6 +988,55 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
                 <option value="">Select</option>
                 <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
                 <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of Birth</label>
+              <input 
+                type="text"
+                placeholder="DD-MMM-YYYY"
+                value={profile.dob} 
+                onChange={e => updateProfile({ dob: maskDate(e.target.value) })} 
+                className="w-full bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Home District</label>
+              <select 
+                value={profile.homeDistrict} 
+                onChange={e => updateProfile({ homeDistrict: e.target.value })} 
+                className="w-full bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="">Select District</option>
+                {[
+                  "Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", 
+                  "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", 
+                  "Rudraprayag", "Tehri Garhwal", "Udham Singh Nagar", "Uttarkashi",
+                  "Outside Uttarakhand"
+                ].map(district => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Employment Type</label>
+              <select 
+                value={profile.employmentType} 
+                onChange={e => {
+                  const newType = e.target.value;
+                  updateProfile({ employmentType: newType });
+                  if (newType !== 'Permanent' && activeSubTab === 'service') {
+                    setActiveSubTab('basic');
+                  }
+                }} 
+                className="w-full bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="Permanent">Permanent</option>
+                <option value="Contractual">Contractual</option>
+                <option value="Outsourced">Outsourced</option>
               </select>
             </div>
 
@@ -1113,7 +1173,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
         </div>
       )}
 
-      {activeSubTab === 'service' && (
+      {activeSubTab === 'service' && profile.employmentType === 'Permanent' && (
         <>
           {/* Service Details */}
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mb-6">
@@ -1121,34 +1181,6 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
               <Calendar className="text-emerald-600" size={20} /> Service Details
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Birth</label>
-                <input 
-                  type="text"
-                  placeholder="DD-MMM-YYYY"
-                  value={profile.dob} 
-                  onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
-                  className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Home District</label>
-                <select 
-                  value={profile.homeDistrict} 
-                  onChange={e => setProfile({...profile, homeDistrict: e.target.value})} 
-                  className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="">Select District</option>
-                  {[
-                    "Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", 
-                    "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", 
-                    "Rudraprayag", "Tehri Garhwal", "Udham Singh Nagar", "Uttarkashi",
-                    "Outside Uttarakhand"
-                  ].map(district => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-              </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting Place</label>
                 <div className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-3 px-4 text-slate-800 font-medium">
@@ -1176,18 +1208,6 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
                   onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})} 
                   className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 text-emerald-600 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employment Type</label>
-                <select 
-                  value={profile.employmentType} 
-                  onChange={e => setProfile({...profile, employmentType: e.target.value})} 
-                  className="w-full bg-slate-50 border border-emerald-500 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="Permanent">Permanent</option>
-                  <option value="Contractual">Contractual</option>
-                  <option value="Outsourced">Outsourced</option>
-                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of First Joining</label>
@@ -1527,6 +1547,34 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
     </>
   )}
 
+      {/* Unsaved Changes Banner */}
+      {hasUnsavedChanges && (
+        <div className="fixed bottom-0 left-0 right-0 bg-amber-50 border-t border-amber-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 flex justify-center items-center animate-in slide-in-from-bottom-full duration-300">
+          <div className="flex items-center justify-between w-full max-w-7xl px-4">
+            <div className="flex items-center gap-3 text-amber-800">
+              <AlertTriangle size={20} />
+              <span className="font-bold">You have unsaved changes. Please save or discard them.</span>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => fetchData()}
+                className="px-6 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-all"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="px-6 py-2 text-sm font-bold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-all shadow-lg shadow-emerald-100"
+              >
+                {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Unsaved Changes Modal */}
       {showUnsavedModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
@@ -1608,6 +1656,13 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           employee={rawStaffData} 
           onClose={() => setShowPrintPanel(false)} 
         />
+      )}
+
+      {toast.show && (
+        <div className={`fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl animate-in slide-in-from-bottom-4 fade-in duration-300 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'} text-white`}>
+          {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+          <p className="font-bold">{toast.message}</p>
+        </div>
       )}
     </div>
   );

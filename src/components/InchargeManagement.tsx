@@ -160,7 +160,7 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 md:px-8">
+    <div className="min-h-screen bg-slate-50/50 pt-8 pb-40 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>

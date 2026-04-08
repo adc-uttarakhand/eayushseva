@@ -55,10 +55,16 @@ interface HospitalDirectoryProps {
   session?: UserSession | null;
 }
 
-export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
+export default function HospitalDirectory({ session, activeSubTab = 'hospitals' }: HospitalDirectoryProps & { activeSubTab?: 'hospitals' | 'employees' | 'incharges' }) {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'hospitals' | 'incharges' | 'employees'>('hospitals');
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setActiveTab(activeSubTab);
+    }
+  }, [activeSubTab]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     district: 'All',
@@ -237,26 +243,14 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
           <div>
+        {activeTab === 'hospitals' && (
+          <>
             <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Hospital <span className="text-emerald-600">Directory</span></h1>
             <p className="text-slate-500 mt-2 font-medium">State-wide registry of all AYUSH healthcare facilities.</p>
+          </>
+        )}
           </div>
           
-          {/* Tabs with Glass Effect */}
-          <div className="flex items-center gap-2 p-1 bg-white/50 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm">
-            {(['hospitals', 'incharges', 'employees'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 rounded-xl font-bold capitalize transition-all ${
-                  activeTab === tab 
-                    ? 'bg-white text-emerald-600 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
         </div>
 
         {activeTab === 'hospitals' && (
@@ -347,60 +341,86 @@ export default function HospitalDirectory({ session }: HospitalDirectoryProps) {
                     Total Hospitals: {filteredHospitals.length}
                   </button>
                 </div>
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-slate-50/50">
-                      <th className="py-4 px-6 font-bold text-slate-900">Facility Name</th>
-                      <th className="py-4 px-6 font-bold text-slate-900">District</th>
-                      <th className="py-4 px-6 font-bold text-slate-900">Type</th>
-                      <th className="py-4 px-6 font-bold text-slate-900">Above 7000ft</th>
-                      <th className="py-4 px-6 font-bold text-slate-900">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredHospitals.map(h => (
-                      <tr 
-                        key={h.sr_no} 
-                        className="border-b border-gray-100 hover:bg-emerald-50/50 cursor-pointer transition-colors"
-                        onClick={() => {
-                          setSelectedHospital(h);
-                          setIsDossierOpen(true);
-                        }}
-                      >
-                        <td className="py-4 px-6 font-bold text-slate-900">
-                          <div className="flex flex-col gap-1 items-start">
-                            <div className="flex items-center gap-2">
-                              {h.is_verified ? (
-                                <CheckCircle2 size={16} className="text-emerald-500" title="Verified" />
-                              ) : (
-                                <HelpCircle size={16} className="text-slate-400" title="Not Verified" />
-                              )}
-                              <span>{h.facility_name}</span>
-                            </div>
-                            {h.is_verified && (
-                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest ml-6">
-                                Verified
-                              </span>
-                            )}
-                            {!!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false' && (
-                              <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-widest rounded-full ml-6">
-                                CoE: {h.centre_of_excellence === 'True' ? 'Yes' : h.centre_of_excellence}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-slate-600">{h.district}</td>
-                        <td className="py-4 px-6 text-slate-600">{h.type}</td>
-                        <td className="py-4 px-6 text-slate-600">{h.above_7000ft ? 'Yes' : 'No'}</td>
-                        <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
-                            {h.status || 'N/A'}
-                          </span>
-                        </td>
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-slate-50/50">
+                        <th className="py-4 px-6 font-bold text-slate-900">Facility Name</th>
+                        <th className="py-4 px-6 font-bold text-slate-900">District</th>
+                        <th className="py-4 px-6 font-bold text-slate-900">Type</th>
+                        <th className="py-4 px-6 font-bold text-slate-900">Above 7000ft</th>
+                        <th className="py-4 px-6 font-bold text-slate-900">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredHospitals.map(h => (
+                        <tr 
+                          key={h.sr_no} 
+                          className="border-b border-gray-100 hover:bg-emerald-50/50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setSelectedHospital(h);
+                            setIsDossierOpen(true);
+                          }}
+                        >
+                          <td className="py-4 px-6 font-bold text-slate-900">
+                            <div className="flex flex-col gap-1 items-start">
+                              <div className="flex items-center gap-2">
+                                {h.is_verified ? (
+                                  <CheckCircle2 size={16} className="text-emerald-500" title="Verified" />
+                                ) : (
+                                  <HelpCircle size={16} className="text-slate-400" title="Not Verified" />
+                                )}
+                                <span>{h.facility_name}</span>
+                              </div>
+                              {h.is_verified && (
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest ml-6">
+                                  Verified
+                                </span>
+                              )}
+                              {!!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false' && (
+                                <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-widest rounded-full ml-6">
+                                  CoE: {h.centre_of_excellence === 'True' ? 'Yes' : h.centre_of_excellence}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-slate-600">{h.district}</td>
+                          <td className="py-4 px-6 text-slate-600">{h.type}</td>
+                          <td className="py-4 px-6 text-slate-600">{h.above_7000ft ? 'Yes' : 'No'}</td>
+                          <td className="py-4 px-6">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
+                              {h.status || 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile Card View */}
+                <div className="md:hidden p-4 space-y-4">
+                  {filteredHospitals.map(h => (
+                    <div 
+                      key={h.sr_no} 
+                      className="bg-slate-50 p-4 rounded-2xl border border-gray-100 cursor-pointer hover:bg-emerald-50/50 transition-colors"
+                      onClick={() => {
+                        setSelectedHospital(h);
+                        setIsDossierOpen(true);
+                      }}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-bold text-slate-900">{h.facility_name}</div>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
+                          {h.status || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600 mb-1">District: {h.district}</div>
+                      <div className="text-xs text-slate-600 mb-1">Type: {h.type}</div>
+                      <div className="text-xs text-slate-600">Above 7000ft: {h.above_7000ft ? 'Yes' : 'No'}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

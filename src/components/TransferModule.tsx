@@ -1,21 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Hospital } from '../types/hospital';
-import { Search, Loader2, ToggleLeft, ToggleRight, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Search, Loader2, ToggleLeft, ToggleRight, CheckCircle, ArrowLeft, Download } from 'lucide-react';
 import { UserSession } from './LoginModal';
 import EmployeeDetailsPanel from './EmployeeDetailsPanel';
+import * as XLSX from 'xlsx';
 
 interface TransferModuleProps {
   session: UserSession;
 }
 
-export default function TransferModule({ session }: TransferModuleProps) {
+export default function TransferModule({ session, activeSubTab = 'hospitals' }: { session: UserSession; activeSubTab?: 'hospitals' | 'employees' }) {
   const [activeTab, setActiveTab] = useState<'hospitals' | 'employees'>('hospitals');
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setActiveTab(activeSubTab);
+    }
+  }, [activeSubTab]);
   const [hospitals, setHospitals] = useState<(Hospital & { staff_count: number })[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [districtFilter, setDistrictFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [employmentTypeFilter, setEmploymentTypeFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
 
@@ -285,27 +293,45 @@ export default function TransferModule({ session }: TransferModuleProps) {
     setHospitals(hospitals.map(h => h.hospital_id === hospital_id ? { ...h, is_verified: true, verified_at: now } : h));
   };
 
+  const exportEmployeesToExcel = () => {
+    const filteredEmployees = employees.filter(e => 
+      (districtFilter === 'All' || e.present_district === districtFilter) &&
+      (roleFilter === 'All' || e.role === roleFilter) &&
+      (employmentTypeFilter === 'All' || e.employment_type === employmentTypeFilter) &&
+      (searchQuery === '' || (e.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const worksheet = XLSX.utils.json_to_sheet(filteredEmployees.map(e => ({
+      'Full Name': e.full_name,
+      'Role': e.role,
+      'Employment Type': e.employment_type || 'N/A',
+      'Present Posting Hospital': e.present_hospital,
+      'District': e.present_district,
+      'Present Posting (Sugam / Durgam)': e.present_posting_status,
+      'Date of Birth': formatDate(e.dob),
+      'Home District': e.home_district,
+      'Date of 1st Joining': formatDate(e.first_joining_date),
+      'Total Long Leaves': e.long_leaves_count,
+      'Total Sugam Attachment Days': e.attachment_sugam_days,
+      'Total Durgam (Below 7000ft) attachment days': e.attachment_durgam_days,
+      'Total Durgam (Above 7000ft) attachment days': e.attachment_durgam_above_7000_days,
+      'Total Sugam Days': e.total_sugam_days,
+      'Total Durgam (Below 7000 Feet) Days': e.total_durgam_below_7000_days,
+      'Total Durgam (Above 7000 Feet) Days': e.total_durgam_above_7000_days,
+      'Last Edited On': formatDate(e.last_edited_on)
+    })));
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Employees_Transfer_Module');
+    XLSX.writeFile(workbook, 'Employees_Transfer_Module.xlsx');
+  };
+
   const canEdit = session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN';
 
   return (
     <div className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto">
       <h1 className="text-4xl font-bold mb-8">Transfer Module</h1>
       
-      <div className="flex gap-4 mb-8">
-        <button 
-          onClick={() => setActiveTab('hospitals')}
-          className={`px-6 py-2 rounded-xl font-bold ${activeTab === 'hospitals' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}
-        >
-          Hospitals
-        </button>
-        <button 
-          onClick={() => setActiveTab('employees')}
-          className={`px-6 py-2 rounded-xl font-bold ${activeTab === 'employees' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}
-        >
-          Employees
-        </button>
-      </div>
-
       {activeTab === 'hospitals' && (
         <div>
           <div className="flex gap-4 mb-4">
@@ -332,100 +358,124 @@ export default function TransferModule({ session }: TransferModuleProps) {
           {loading ? (
             <Loader2 className="animate-spin text-emerald-600" />
           ) : (
-            <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="py-4 px-6">Facility Name</th>
-                  <th className="py-4 px-6">District</th>
-                  <th className="py-4 px-6">Status</th>
-                  <th className="py-4 px-6">Above 7000 feet</th>
-                  <th className="py-4 px-6">Verify</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="py-4 px-6">Facility Name</th>
+                      <th className="py-4 px-6">District</th>
+                      <th className="py-4 px-6">Status</th>
+                      <th className="py-4 px-6">Above 7000 feet</th>
+                      <th className="py-4 px-6">Verify</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHospitals.map((h, index) => (
+                      <tr key={h.hospital_id || index} className="border-b border-gray-100">
+                        <td className="py-4 px-6">
+                          <div className="font-bold">{h.facility_name}</div>
+                          <div className="text-xs font-bold text-slate-500">{h.type} | Staff: {h.staff_count}</div>
+                        </td>
+                        <td className="py-4 px-6">{h.district}</td>
+                        <td className="py-4 px-6">
+                          <div className="flex bg-slate-100 rounded-full p-1 w-32">
+                            <button 
+                              onClick={() => {
+                                if (!canEdit) return;
+                                const newStatus = 'Sugam';
+                                supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
+                                  setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
+                                });
+                              }}
+                              disabled={!canEdit}
+                              className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Sugam' ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                            >Sugam</button>
+                            <button 
+                              onClick={() => {
+                                if (!canEdit) return;
+                                const newStatus = 'Durgam';
+                                supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
+                                  setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
+                                });
+                              }}
+                              disabled={!canEdit}
+                              className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Durgam' ? 'bg-white shadow-sm text-amber-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                            >Durgam</button>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex bg-slate-100 rounded-full p-1 w-24">
+                            <button 
+                              onClick={() => {
+                                if (!canEdit) return;
+                                const newValue = true;
+                                supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
+                                  if (!error) {
+                                    setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, above_7000_feet: newValue } : hospital));
+                                  }
+                                });
+                              }}
+                              disabled={!canEdit}
+                              className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet === true ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                            >Yes</button>
+                            <button 
+                              onClick={() => {
+                                if (!canEdit) return;
+                                const newValue = false;
+                                supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
+                                  if (!error) {
+                                    setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, above_7000_feet: newValue } : hospital));
+                                  }
+                                });
+                              }}
+                              disabled={!canEdit}
+                              className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet !== true ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                            >No</button>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <button 
+                            onClick={() => verifyHospital(h.hospital_id)}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${h.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}
+                          >
+                            {h.is_verified ? <CheckCircle size={16} /> : 'Verify'}
+                          </button>
+                          {h.verified_at && <div className="text-[10px] text-slate-400 mt-1">{new Date(h.verified_at).toLocaleDateString()}</div>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card View */}
+              <div className="md:hidden p-4 space-y-4">
                 {filteredHospitals.map((h, index) => (
-                  <tr key={h.hospital_id || index} className="border-b border-gray-100">
-                    <td className="py-4 px-6">
-                      <div className="font-bold">{h.facility_name}</div>
-                      <div className="text-xs font-bold text-slate-500">{h.type} | Staff: {h.staff_count}</div>
-                    </td>
-                    <td className="py-4 px-6">{h.district}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex bg-slate-100 rounded-full p-1 w-32">
-                        <button 
-                          onClick={() => {
-                            if (!canEdit) return;
-                            const newStatus = 'Sugam';
-                            supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
-                              setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
-                            });
-                          }}
-                          disabled={!canEdit}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Sugam' ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                        >Sugam</button>
-                        <button 
-                          onClick={() => {
-                            if (!canEdit) return;
-                            const newStatus = 'Durgam';
-                            supabase.from('hospitals').update({ status: newStatus }).eq('hospital_id', h.hospital_id).then(() => {
-                              setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, status: newStatus } : hospital));
-                            });
-                          }}
-                          disabled={!canEdit}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.status === 'Durgam' ? 'bg-white shadow-sm text-amber-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                        >Durgam</button>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex bg-slate-100 rounded-full p-1 w-24">
-                        <button 
-                          onClick={() => {
-                            if (!canEdit) return;
-                            const newValue = true;
-                            supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
-                              if (!error) {
-                                setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, above_7000_feet: newValue } : hospital));
-                              }
-                            });
-                          }}
-                          disabled={!canEdit}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet === true ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                        >Yes</button>
-                        <button 
-                          onClick={() => {
-                            if (!canEdit) return;
-                            const newValue = false;
-                            supabase.from('hospitals').update({ above_7000_feet: newValue }).eq('hospital_id', h.hospital_id).then(({ error }) => {
-                              if (!error) {
-                                setHospitals(hospitals.map(hospital => hospital.hospital_id === h.hospital_id ? { ...hospital, above_7000_feet: newValue } : hospital));
-                              }
-                            });
-                          }}
-                          disabled={!canEdit}
-                          className={`flex-1 text-[10px] font-bold py-1 rounded-full transition-all ${h.above_7000_feet !== true ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400'} ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                        >No</button>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <button 
-                        onClick={() => verifyHospital(h.hospital_id)}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${h.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}
-                      >
-                        {h.is_verified ? <CheckCircle size={16} /> : 'Verify'}
-                      </button>
-                      {h.verified_at && <div className="text-[10px] text-slate-400 mt-1">{new Date(h.verified_at).toLocaleDateString()}</div>}
-                    </td>
-                  </tr>
+                  <div key={h.hospital_id || index} className="bg-slate-50 p-4 rounded-2xl border border-gray-100">
+                    <div className="font-bold text-slate-900 mb-1">{h.facility_name}</div>
+                    <div className="text-xs font-bold text-slate-500 mb-2">{h.type} | Staff: {h.staff_count}</div>
+                    <div className="text-xs text-slate-600 mb-1">District: {h.district}</div>
+                    <div className="text-xs text-slate-600 mb-1">Status: {h.status || 'N/A'}</div>
+                    <div className="text-xs text-slate-600">Above 7000ft: {h.above_7000_feet ? 'Yes' : 'No'}</div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {activeTab === 'employees' && (
         <div>
-          <div className="flex gap-4 mb-4">
+          <div className="flex flex-wrap gap-4 mb-4 items-center">
+            <button 
+              onClick={exportEmployeesToExcel}
+              className="flex items-center justify-center gap-2 bg-white border border-gray-100 text-slate-700 py-2 px-4 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm"
+            >
+              <Download size={18} />
+              Export Excel
+            </button>
             <select 
               value={districtFilter}
               onChange={(e) => setDistrictFilter(e.target.value)}
@@ -442,7 +492,17 @@ export default function TransferModule({ session }: TransferModuleProps) {
               <option value="All">All Roles</option>
               {Array.from(new Set(employees.map(e => e.role).filter(Boolean))).sort().map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <div className="relative flex-1">
+            <select 
+              value={employmentTypeFilter}
+              onChange={(e) => setEmploymentTypeFilter(e.target.value)}
+              className="bg-white border border-gray-100 rounded-xl py-2 px-3 font-bold text-slate-600"
+            >
+              <option value="All">All Employment Types</option>
+              <option value="Permanent">Permanent</option>
+              <option value="Contractual">Contractual</option>
+              <option value="Outsourced">Outsourced</option>
+            </select>
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="text"
@@ -459,57 +519,82 @@ export default function TransferModule({ session }: TransferModuleProps) {
           ) : selectedEmployee ? (
             <EmployeeDetailsPanel employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs">
-                    <th className="py-4 px-6">Full Name</th>
-                    <th className="py-4 px-6">Role</th>
-                    <th className="py-4 px-6">Present Posting Hospital</th>
-                    <th className="py-4 px-6">District</th>
-                    <th className="py-4 px-6">Present Posting (Sugam / Durgam)</th>
-                    <th className="py-4 px-6">Date of Birth</th>
-                    <th className="py-4 px-6">Home District</th>
-                    <th className="py-4 px-6">Date of 1st Joining</th>
-                    <th className="py-4 px-6">Total Long Leaves</th>
-                    <th className="py-4 px-6">Total Sugam Attachment Days</th>
-                    <th className="py-4 px-6">Total Durgam (Below 7000ft) attachment days</th>
-                    <th className="py-4 px-6">Total Durgam (Above 7000ft) attachment days</th>
-                    <th className="py-4 px-6">Total Sugam Days</th>
-                    <th className="py-4 px-6">Total Durgam (Below 7000 Feet) Days</th>
-                    <th className="py-4 px-6">Total Durgam (Above 7000 Feet) Days</th>
-                    <th className="py-4 px-6">Last Edited On</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees
-                    .filter(e => 
-                      (districtFilter === 'All' || e.present_district === districtFilter) &&
-                      (roleFilter === 'All' || e.role === roleFilter) &&
-                      (searchQuery === '' || (e.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
-                    )
-                    .map((e, index) => (
-                        <tr key={e.id || index} onClick={() => setSelectedEmployee(e)} className="border-b border-gray-100 text-xs cursor-pointer hover:bg-gray-50">
-                          <td className="py-4 px-6 font-bold">{e.full_name}</td>
-                          <td className="py-4 px-6">{e.role}</td>
-                          <td className="py-4 px-6">{e.present_hospital}</td>
-                          <td className="py-4 px-6">{e.present_district}</td>
-                          <td className="py-4 px-6">{e.present_posting_status}</td>
-                          <td className="py-4 px-6">{formatDate(e.dob)}</td>
-                          <td className="py-4 px-6">{e.home_district}</td>
-                          <td className="py-4 px-6">{formatDate(e.first_joining_date)}</td>
-                          <td className="py-4 px-6">{e.long_leaves_count}</td>
-                          <td className="py-4 px-6">{e.attachment_sugam_days}</td>
-                          <td className="py-4 px-6">{e.attachment_durgam_days}</td>
-                          <td className="py-4 px-6">{e.attachment_durgam_above_7000_days}</td>
-                          <td className="py-4 px-6">{e.total_sugam_days}</td>
-                          <td className="py-4 px-6">{e.total_durgam_below_7000_days}</td>
-                          <td className="py-4 px-6">{e.total_durgam_above_7000_days}</td>
-                          <td className="py-4 px-6">{formatDate(e.last_edited_on)}</td>
-                        </tr>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs">
+                      <th className="py-4 px-6">Full Name</th>
+                      <th className="py-4 px-6">Role</th>
+                      <th className="py-4 px-6">Employment Type</th>
+                      <th className="py-4 px-6">Present Posting Hospital</th>
+                      <th className="py-4 px-6">District</th>
+                      <th className="py-4 px-6">Present Posting (Sugam / Durgam)</th>
+                      <th className="py-4 px-6">Date of Birth</th>
+                      <th className="py-4 px-6">Home District</th>
+                      <th className="py-4 px-6">Date of 1st Joining</th>
+                      <th className="py-4 px-6">Total Long Leaves</th>
+                      <th className="py-4 px-6">Total Sugam Attachment Days</th>
+                      <th className="py-4 px-6">Total Durgam (Below 7000ft) attachment days</th>
+                      <th className="py-4 px-6">Total Durgam (Above 7000ft) attachment days</th>
+                      <th className="py-4 px-6">Total Sugam Days</th>
+                      <th className="py-4 px-6">Total Durgam (Below 7000 Feet) Days</th>
+                      <th className="py-4 px-6">Total Durgam (Above 7000 Feet) Days</th>
+                      <th className="py-4 px-6">Last Edited On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees
+                      .filter(e => 
+                        (districtFilter === 'All' || e.present_district === districtFilter) &&
+                        (roleFilter === 'All' || e.role === roleFilter) &&
+                        (employmentTypeFilter === 'All' || e.employment_type === employmentTypeFilter) &&
+                        (searchQuery === '' || (e.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                      )
+                      .map((e, index) => (
+                          <tr key={e.id || index} onClick={() => setSelectedEmployee(e)} className="border-b border-gray-100 text-xs cursor-pointer hover:bg-gray-50">
+                            <td className="py-4 px-6 font-bold">{e.full_name}</td>
+                            <td className="py-4 px-6">{e.role}</td>
+                            <td className="py-4 px-6">{e.employment_type || 'N/A'}</td>
+                            <td className="py-4 px-6">{e.present_hospital}</td>
+                            <td className="py-4 px-6">{e.present_district}</td>
+                            <td className="py-4 px-6">{e.present_posting_status}</td>
+                            <td className="py-4 px-6">{formatDate(e.dob)}</td>
+                            <td className="py-4 px-6">{e.home_district}</td>
+                            <td className="py-4 px-6">{formatDate(e.first_joining_date)}</td>
+                            <td className="py-4 px-6">{e.long_leaves_count}</td>
+                            <td className="py-4 px-6">{e.attachment_sugam_days}</td>
+                            <td className="py-4 px-6">{e.attachment_durgam_days}</td>
+                            <td className="py-4 px-6">{e.attachment_durgam_above_7000_days}</td>
+                            <td className="py-4 px-6">{e.total_sugam_days}</td>
+                            <td className="py-4 px-6">{e.total_durgam_below_7000_days}</td>
+                            <td className="py-4 px-6">{e.total_durgam_above_7000_days}</td>
+                            <td className="py-4 px-6">{formatDate(e.last_edited_on)}</td>
+                          </tr>
                       ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card View */}
+              <div className="md:hidden p-4 space-y-4">
+                {employees
+                  .filter(e => 
+                    (districtFilter === 'All' || e.present_district === districtFilter) &&
+                    (roleFilter === 'All' || e.role === roleFilter) &&
+                    (employmentTypeFilter === 'All' || e.employment_type === employmentTypeFilter) &&
+                    (searchQuery === '' || (e.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                  )
+                  .map((e, index) => (
+                    <div key={e.id || index} onClick={() => setSelectedEmployee(e)} className="bg-slate-50 p-4 rounded-2xl border border-gray-100">
+                      <div className="font-bold text-slate-900 mb-1">{e.full_name}</div>
+                      <div className="text-xs font-bold text-slate-500 mb-2">{e.role}</div>
+                      <div className="text-xs text-slate-600 mb-1">Hospital: {e.present_hospital}</div>
+                      <div className="text-xs text-slate-600 mb-1">District: {e.present_district}</div>
+                      <div className="text-xs text-slate-600">Status: {e.present_posting_status}</div>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
         </div>

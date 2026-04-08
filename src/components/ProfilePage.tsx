@@ -202,12 +202,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Full Name</label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="text"
                       value={formData.name}
                       onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
                     />
                   </div>
                 </div>
@@ -215,12 +214,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Email Address</label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="email"
                       value={formData.email}
                       onChange={e => setFormData({...formData, email: e.target.value})}
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
                     />
                   </div>
                 </div>
@@ -228,12 +226,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Mobile Number</label>
                   <div className="relative">
-                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="tel"
                       value={formData.mobile}
                       onChange={e => setFormData({...formData, mobile: e.target.value})}
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
                     />
                   </div>
                 </div>
@@ -250,12 +247,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">User ID</label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="text"
                       readOnly
                       value={formData.userId}
-                      className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none font-bold text-slate-500 cursor-not-allowed"
+                      className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3.5 px-4 focus:outline-none font-bold text-slate-500 cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -263,12 +259,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Change Password</label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={e => setFormData({...formData, password: e.target.value})}
-                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                      className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3.5 px-4 pr-12 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium"
                     />
                     <button 
                       type="button"
@@ -283,12 +278,11 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">System / Access</label>
                   <div className="relative">
-                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="text"
                       readOnly
                       value={formData.system}
-                      className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none font-bold text-slate-500 cursor-not-allowed"
+                      className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3.5 px-4 focus:outline-none font-bold text-slate-500 cursor-not-allowed"
                     />
                   </div>
                 </div>

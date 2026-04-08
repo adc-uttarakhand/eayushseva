@@ -109,8 +109,9 @@ export default function DailyConsumption({ hospitalId }: DailyConsumptionProps) 
           <History size={16} /> Recent Dispensing History
         </h3>
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse whitespace-nowrap">
+              <thead>
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Time</th>
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Medicine</th>
@@ -139,6 +140,7 @@ export default function DailyConsumption({ hospitalId }: DailyConsumptionProps) 
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

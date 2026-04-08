@@ -9,25 +9,29 @@ interface Medicine {
   bulk_quantity: number;
   conversion_value: number;
   retail_unit_type: string;
-  current_loose_quantity?: number;
+  hospital_indent?: { remaining_loose_quantity: number; unit_type: string }[];
+  medicine_inventory?: { quantity: number }[];
 }
 
 interface PrescriptionRow {
   id: string;
   medicine_id: string;
   medicine_name: string;
-  dosage: number;
-  frequency: string;
-  days: number;
   unit: string;
-  total_quantity: number;
-  status: 'In Stock' | 'Request Pharmacist to Issue Bulk Unit' | 'Out of Stock' | 'Checking...';
+  loose_quantity: number;
+  available_quantity: number;
+  status: 'In Stock' | 'In Inventory/Indent Required' | 'Out of Stock' | 'Checking...';
+  warning?: string;
+  dispensed?: boolean;
 }
 
 interface PrescriptionTableProps {
   hospitalId: string;
+  patientId?: string;
+  patientName?: string;
   onPrescriptionChange: (prescription: PrescriptionRow[]) => void;
   initialPrescription?: string; // For backward compatibility or loading existing
+  onNavigateToIndent?: () => void;
 }
 
 const FREQUENCY_OPTIONS = [
@@ -39,7 +43,7 @@ const FREQUENCY_OPTIONS = [
   { label: 'SOS (As needed)', value: 1 },
 ];
 
-export default function PrescriptionTable({ hospitalId, onPrescriptionChange, initialPrescription }: PrescriptionTableProps) {
+export default function PrescriptionTable({ hospitalId, patientId, patientName, onPrescriptionChange, initialPrescription, onNavigateToIndent }: PrescriptionTableProps) {
   const [rows, setRows] = useState<PrescriptionRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Medicine[]>([]);
@@ -57,27 +61,26 @@ export default function PrescriptionTable({ hospitalId, onPrescriptionChange, in
     }
     setIsSearching(true);
     try {
-      // Fetch from medicine_inventory and join with daily_indent
       const { data, error } = await supabase
-        .from('medicine_inventory')
+        .from('medicine_master')
         .select(`
           *,
-          daily_indent (
-            current_loose_quantity
-          )
+          hospital_indent!inner(remaining_loose_quantity, unit_type),
+          medicine_inventory(quantity)
         `)
-        .eq('hospital_id', hospitalId)
+        .eq('hospital_indent.hospital_id', hospitalId)
         .ilike('medicine_name', `%${query}%`)
-        .limit(5);
+        .limit(10);
 
       if (error) throw error;
+
+      // Filter: Only show medicines with quantity > 0 in hospital_indent
+      const filteredResults = (data || []).filter(m => 
+        (m.hospital_indent?.[0]?.remaining_loose_quantity || 0) > 0 ||
+        (m.medicine_inventory?.[0]?.quantity || 0) > 0
+      );
       
-      const formattedResults = data.map((m: any) => ({
-        ...m,
-        current_loose_quantity: m.daily_indent?.[0]?.current_loose_quantity || 0
-      }));
-      
-      setSearchResults(formattedResults);
+      setSearchResults(filteredResults);
     } catch (err) {
       console.error('Search error:', err);
     } finally {
@@ -85,80 +88,160 @@ export default function PrescriptionTable({ hospitalId, onPrescriptionChange, in
     }
   };
 
-  const addRow = (medicine: Medicine) => {
+  const addRow = async (medicine: Medicine) => {
+    let warning: string | undefined;
+    if (patientId) {
+      const { data, error } = await supabase
+        .from('daily_consumption')
+        .select('created_at')
+        .eq('patient_id', patientId)
+        .eq('medicine_id', medicine.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data) {
+        const lastDate = new Date(data.created_at);
+        const diff = Math.floor((new Date().getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diff <= 15) {
+          warning = `Warning: Received ${diff} days ago`;
+        }
+      }
+    }
+
     const newRow: PrescriptionRow = {
       id: Math.random().toString(36).substr(2, 9),
       medicine_id: medicine.id,
       medicine_name: medicine.medicine_name,
-      dosage: 1,
-      frequency: 'OD (Once a day)',
-      days: 5,
-      unit: medicine.retail_unit_type,
-      total_quantity: 5,
-      status: 'Checking...'
+      unit: medicine.hospital_indent?.[0]?.unit_type || medicine.retail_unit_type,
+      loose_quantity: 0,
+      available_quantity: medicine.hospital_indent?.[0]?.remaining_loose_quantity || 0,
+      status: 'Checking...',
+      warning
     };
     
     const updatedRows = [...rows, newRow];
     setRows(updatedRows);
-    checkStock(medicine.id, 5, updatedRows.length - 1);
     setSearchQuery('');
     setSearchResults([]);
     setActiveRowIndex(null);
+  };
+
+  const dispenseMedicine = async (row: PrescriptionRow, index: number) => {
+    try {
+      // 1. Fetch batches from hospital_indent for this medicine
+      const { data: batches, error: indentError } = await supabase
+        .from('hospital_indent')
+        .select('*')
+        .eq('medicine_id', row.medicine_id)
+        .eq('hospital_id', hospitalId)
+        .gt('remaining_loose_quantity', 0)
+        .order('expiry_date', { ascending: true });
+
+      if (indentError) throw indentError;
+      if (!batches || batches.length === 0) {
+        alert('Insufficient stock in Dispensary.');
+        return;
+      }
+
+      const totalAvailable = batches.reduce((sum, b) => sum + Number(b.remaining_loose_quantity), 0);
+      if (totalAvailable < row.loose_quantity) {
+        alert(`Insufficient stock. Available: ${totalAvailable}`);
+        return;
+      }
+
+      let remainingToDispense = row.loose_quantity;
+      
+      for (const batch of batches) {
+        if (remainingToDispense <= 0) break;
+        
+        const batchQty = Number(batch.remaining_loose_quantity);
+        const dispenseFromBatch = Math.min(remainingToDispense, batchQty);
+        
+        // 2. Record Daily Consumption
+        const { error: consError } = await supabase
+          .from('daily_consumption')
+          .insert([{
+            hospital_id: hospitalId,
+            patient_id: patientId,
+            patient_name: patientName,
+            medicine_id: batch.medicine_id,
+            medicine_name: batch.medicine_name,
+            batch_number: batch.batch_number,
+            unit_type: batch.unit_type,
+            quantity_dispensed: dispenseFromBatch,
+            dispensed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+          }]);
+
+        if (consError) throw consError;
+
+        // 3. Update Indent Stock
+        const { error: updateIndentError } = await supabase
+          .from('hospital_indent')
+          .update({ remaining_loose_quantity: batchQty - dispenseFromBatch })
+          .eq('id', batch.id);
+
+        if (updateIndentError) throw updateIndentError;
+        
+        remainingToDispense -= dispenseFromBatch;
+      }
+
+      setRows(prev => {
+        const newRows = [...prev];
+        newRows[index].dispensed = true;
+        return newRows;
+      });
+    } catch (err) {
+      console.error('Dispense error:', err);
+      alert('Error processing dispensing.');
+    }
   };
 
   const removeRow = (id: string) => {
     setRows(rows.filter(r => r.id !== id));
   };
 
-  const updateRow = (index: number, field: keyof PrescriptionRow, value: any) => {
-    const updatedRows = [...rows];
-    const row = { ...updatedRows[index], [field]: value };
-    
-    // Recalculate total quantity
-    if (field === 'dosage' || field === 'frequency' || field === 'days') {
-      const freqValue = FREQUENCY_OPTIONS.find(f => f.label === (field === 'frequency' ? value : row.frequency))?.value || 1;
-      const dosage = field === 'dosage' ? value : row.dosage;
-      const days = field === 'days' ? value : row.days;
-      row.total_quantity = dosage * freqValue * days;
-      
-      // Re-check stock
-      checkStock(row.medicine_id, row.total_quantity, index);
-    }
-    
-    updatedRows[index] = row;
-    setRows(updatedRows);
-  };
-
   const checkStock = async (medicineId: string, requiredQty: number, index: number) => {
     try {
-      const { data: inventory, error: invError } = await supabase
-        .from('medicine_inventory')
-        .select('bulk_quantity')
-        .eq('id', medicineId)
+      const { data: indent, error: indentError } = await supabase
+        .from('hospital_indent')
+        .select('remaining_loose_quantity, unit_type')
+        .eq('medicine_id', medicineId)
+        .eq('hospital_id', hospitalId)
         .single();
 
-      const { data: indent, error: indentError } = await supabase
-        .from('daily_indent')
-        .select('current_loose_quantity')
+      const { data: inventory, error: invError } = await supabase
+        .from('medicine_inventory')
+        .select('quantity')
         .eq('medicine_id', medicineId)
         .single();
 
-      let status: PrescriptionRow['status'] = 'In Stock';
-      const looseQty = indent?.current_loose_quantity || 0;
-      const bulkQty = inventory?.bulk_quantity || 0;
+      const looseQty = indent?.remaining_loose_quantity || 0;
+      const unitType = indent?.unit_type || '';
+      const invQty = inventory?.quantity || 0;
 
-      if (looseQty < requiredQty) {
-        if (bulkQty > 0) {
-          status = 'Request Pharmacist to Issue Bulk Unit';
-        } else {
-          status = 'Out of Stock';
-        }
+      let status: PrescriptionRow['status'] = 'Out of Stock';
+      let warning: string | undefined;
+
+      if (looseQty >= requiredQty && requiredQty > 0) {
+        status = 'In Stock';
+      } else if (invQty > 0) {
+        status = 'In Inventory/Indent Required';
+      } else {
+        status = 'Out of Stock';
+      }
+
+      if (requiredQty > looseQty) {
+        warning = `Insufficient Stock. Available: ${looseQty}`;
       }
 
       setRows(prev => {
         const newRows = [...prev];
         if (newRows[index]) {
           newRows[index].status = status;
+          newRows[index].available_quantity = looseQty;
+          newRows[index].unit = unitType || newRows[index].unit;
+          newRows[index].warning = warning;
         }
         return newRows;
       });
@@ -217,11 +300,10 @@ export default function PrescriptionTable({ hospitalId, onPrescriptionChange, in
             <thead>
               <tr className="bg-slate-50 border-b border-gray-100">
                 <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Medicine</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Dosage</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Frequency</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Days</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Loose Qty</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Unit</th>
                 <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
                 <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400"></th>
               </tr>
             </thead>
@@ -230,48 +312,66 @@ export default function PrescriptionTable({ hospitalId, onPrescriptionChange, in
                 <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-4">
                     <p className="font-bold text-slate-900">{row.medicine_name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{row.unit}</p>
+                    <p className="text-[10px] font-bold text-slate-500">Available: {row.available_quantity} {row.unit}</p>
                   </td>
                   <td className="px-4 py-4">
                     <input 
                       type="number"
-                      value={row.dosage}
-                      onChange={(e) => updateRow(index, 'dosage', parseFloat(e.target.value))}
-                      className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      value={row.loose_quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        const updatedRows = [...rows];
+                        updatedRows[index].loose_quantity = val;
+                        setRows(updatedRows);
+                        if (val > 0) {
+                          checkStock(row.medicine_id, val, index);
+                        } else {
+                          updatedRows[index].status = 'Checking...';
+                          updatedRows[index].warning = undefined;
+                          setRows(updatedRows);
+                        }
+                      }}
+                      className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </td>
                   <td className="px-4 py-4">
-                    <select 
-                      value={row.frequency}
-                      onChange={(e) => updateRow(index, 'frequency', e.target.value)}
-                      className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                      {FREQUENCY_OPTIONS.map(opt => (
-                        <option key={opt.label} value={opt.label}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <span className="text-sm font-bold text-slate-600">{row.unit}</span>
                   </td>
                   <td className="px-4 py-4">
-                    <input 
-                      type="number"
-                      value={row.days}
-                      onChange={(e) => updateRow(index, 'days', parseInt(e.target.value))}
-                      className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
+                    {row.status !== 'Checking...' && (
+                      <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
+                        row.status === 'In Stock' ? 'text-emerald-600' : 
+                        row.status === 'Out of Stock' ? 'text-red-500' : 'text-amber-600'
+                      }`}>
+                        {row.status === 'In Stock' ? <CheckCircle2 size={14} /> : 
+                         row.status === 'Out of Stock' ? <AlertCircle size={14} /> : <Package size={14} />}
+                        {row.status}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-4">
-                    <span className="font-black text-emerald-700">{row.total_quantity}</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase ml-1">{row.unit}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
-                      row.status === 'In Stock' ? 'text-emerald-600' : 
-                      row.status === 'Out of Stock' ? 'text-red-500' : 'text-amber-600'
-                    }`}>
-                      {row.status === 'In Stock' ? <CheckCircle2 size={14} /> : 
-                       row.status === 'Out of Stock' ? <AlertCircle size={14} /> : <Package size={14} />}
-                      {row.status}
-                    </div>
+                    {row.loose_quantity > row.available_quantity ? (
+                      <button 
+                        onClick={() => onNavigateToIndent?.()}
+                        className="bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-700"
+                      >
+                        Indent
+                      </button>
+                    ) : row.dispensed ? (
+                      <button 
+                        disabled
+                        className="bg-gray-300 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold cursor-not-allowed"
+                      >
+                        Dispensed
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => dispenseMedicine(row, index)}
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700"
+                      >
+                        Dispense
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <button 

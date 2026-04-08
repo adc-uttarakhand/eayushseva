@@ -52,10 +52,28 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
     unit_type: 'Tablet'
   });
 
+  const [hospitalName, setHospitalName] = useState<string>('');
+
   useEffect(() => {
     fetchInventory();
     fetchMasterData();
+    fetchHospitalName();
   }, [hospitalId]);
+
+  const fetchHospitalName = async () => {
+    try {
+      const { data } = await supabase
+        .from('hospitals')
+        .select('name')
+        .eq('id', hospitalId)
+        .single();
+      if (data) {
+        setHospitalName(data.name);
+      }
+    } catch (err) {
+      console.error('Error fetching hospital name:', err);
+    }
+  };
 
   const fetchInventory = async () => {
     setLoading(true);
@@ -300,6 +318,8 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
         .upsert({
           hospital_id: hospitalId,
           medicine_id: item.medicine_id,
+          batch_number: item.batch_number,
+          expiry_date: item.expiry_date,
           medicine_name: medicineName,
           unit_type: unitType,
           packing_size: packingSize,
@@ -307,7 +327,7 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
           remaining_loose_quantity: newLooseQty,
           last_updated: new Date().toISOString()
         }, {
-          onConflict: 'hospital_id,medicine_id'
+          onConflict: 'hospital_id,medicine_id,batch_number,expiry_date'
         });
 
       if (indentError) throw indentError;
@@ -319,6 +339,30 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
         .eq('id', item.id);
 
       if (updateError) throw updateError;
+
+      // 4. Log to indent_logs
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+
+      const { error: logError } = await supabase
+        .from('indent_logs')
+        .insert([{
+          medicine_inventory_id: item.id,
+          hospital_id: hospitalId,
+          hospital_name: hospitalName,
+          medicine_name: medicineName,
+          batch_number: item.batch_number,
+          mfg_date: item.mfg_date,
+          expiry_date: item.expiry_date,
+          manufacturer_name: item.manufacturer_name || item.medicine_master?.manufacturer_name,
+          order_number: item.order_number,
+          packing_size: packingSize.toString(),
+          units_indented: quantity,
+          indent_type: 'ISSUE',
+          performed_by: userId
+        }]);
+
+      if (logError) console.error('Error logging indent:', logError);
 
       alert(`Successfully moved ${quantity} units (${totalLoose} ${unitType}s) to Indent`);
       fetchInventory();
@@ -378,6 +422,30 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
               .eq('id', item.id);
             
             if (updateError) throw updateError;
+
+            // Log to indent_logs
+            const { data: authData } = await supabase.auth.getUser();
+            const userId = authData.user?.id;
+
+            const { error: logError } = await supabase
+              .from('indent_logs')
+              .insert([{
+                medicine_inventory_id: item.id,
+                hospital_id: hospitalId,
+                hospital_name: hospitalName,
+                medicine_name: medicineName,
+                batch_number: item.batch_number,
+                mfg_date: item.mfg_date,
+                expiry_date: item.expiry_date,
+                manufacturer_name: item.manufacturer_name || item.medicine_master?.manufacturer_name,
+                order_number: item.order_number,
+                packing_size: packingSize.toString(),
+                units_indented: qty,
+                indent_type: 'ISSUE',
+                performed_by: userId
+              }]);
+
+            if (logError) console.error('Error logging bulk indent:', logError);
           }
         }
       }
@@ -418,9 +486,10 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/50">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-50/50">
               <th className="px-4 py-4 w-10"><input type="checkbox" onChange={(e) => setSelectedItems(e.target.checked ? inventory.map(i => i.id) : [])} /></th>
               <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Medicine</th>
               <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Batch</th>
@@ -483,6 +552,7 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Confirmation Modal */}
@@ -914,9 +984,10 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
                 ) : historyData.length === 0 ? (
                   <div className="text-center py-20 text-slate-400 font-medium italic">No transaction history found for this medicine.</div>
                 ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse whitespace-nowrap">
+                      <thead>
+                        <tr className="border-b border-slate-100">
                         <th className="py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date Received</th>
                         <th className="py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Order No.</th>
                         <th className="py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Manufacturer</th>
@@ -942,6 +1013,7 @@ export default function MainInventory({ hospitalId, district }: MainInventoryPro
                       ))}
                     </tbody>
                   </table>
+                </div>
                 )}
               </div>
             </motion.div>

@@ -20,9 +20,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
   const [formData, setFormData] = useState({
     full_name: '',
     mobile_number: '',
-    employee_id: '',
     role: '',
-    posting_place_id: ''
+    posting_place_id: '',
+    employment_type: 'Permanent'
   });
   
   const [roles, setRoles] = useState<string[]>([]);
@@ -60,9 +60,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
       setFormData({
         full_name: '',
         mobile_number: '',
-        employee_id: '',
         role: '',
-        posting_place_id: ''
+        posting_place_id: '',
+        employment_type: 'Permanent'
       });
       setHospitalSearch('');
       setRoleSearch('');
@@ -88,8 +88,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
     e.preventDefault();
     setError('');
     
-    if (!formData.mobile_number && !formData.employee_id) {
-      setError('Please provide either Mobile Number or Employee ID.');
+    if (!formData.mobile_number) {
+      setError('Please provide Mobile Number.');
       return;
     }
 
@@ -107,17 +107,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
 
       try {
         // Check if employee already exists
-        let query = supabase.from('staff').select('id');
-        
-        if (formData.mobile_number && formData.employee_id) {
-          query = query.or(`mobile_number.eq."${formData.mobile_number}",employee_id.eq."${formData.employee_id}"`);
-        } else if (formData.mobile_number) {
-          query = query.eq('mobile_number', formData.mobile_number);
-        } else if (formData.employee_id) {
-          query = query.eq('employee_id', formData.employee_id);
-        }
-
-        const { data: existingStaff, error: checkError } = await query;
+        const { data: existingStaff, error: checkError } = await supabase
+          .from('staff')
+          .select('id')
+          .eq('mobile_number', formData.mobile_number);
 
         if (checkError) throw checkError;
 
@@ -134,10 +127,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
       const { error: insertError } = await supabase.from('staff').insert([{
         full_name: formData.full_name,
         mobile_number: formData.mobile_number.trim(),
-        employee_id: formData.employee_id.trim(),
         role: formData.role,
         hospital_id: formData.posting_place_id,
         first_posting_place: postingPlaceName,
+        employment_type: formData.employment_type,
         login_password: 'ayush@123',
         is_active: true
       }]);
@@ -191,11 +184,12 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Mobile Number</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Mobile Number *</label>
                   <input
                     type="tel"
+                    required
                     pattern="[0-9]{10}"
                     title="Please enter a valid 10-digit mobile number"
                     value={formData.mobile_number}
@@ -204,18 +198,20 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                     placeholder="Enter 10-digit mobile number"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Employee ID</label>
-                  <input
-                    type="text"
-                    value={formData.employee_id}
-                    onChange={e => setFormData({ ...formData, employee_id: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    placeholder="Enter employee ID"
-                  />
-                </div>
               </div>
-              <p className="text-xs text-slate-500 -mt-4">Please provide either Mobile Number or Employee ID.</p>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Employment Type *</label>
+                <select
+                  value={formData.employment_type}
+                  onChange={e => setFormData({ ...formData, employment_type: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="Permanent">Permanent</option>
+                  <option value="Contractual">Contractual</option>
+                  <option value="Outsourced">Outsourced</option>
+                </select>
+              </div>
 
               <div className="relative" ref={roleDropdownRef}>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Role *</label>

@@ -259,7 +259,7 @@ export default function RequestStock({ hospitalId, district }: RequestStockProps
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Medicine Details</th>
@@ -361,7 +361,7 @@ export default function RequestStock({ hospitalId, district }: RequestStockProps
       ) : (
         <div className="space-y-6">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Request Date</th>

@@ -8,6 +8,7 @@ export interface UserSession {
   role: 'SUPER_ADMIN' | 'HOSPITAL' | 'DOCTOR' | 'DISTRICT_ADMIN' | 'STATE_ADMIN' | 'STAFF' | 'DISTRICT_MEDICINE_INCHARGE' | 'PHARMACY_MANAGER';
   id: string; // For STAFF, this is their staff ID. For HOSPITAL, this is hospital_id.
   hospitalId?: string; // For STAFF, this is the hospital they belong to.
+  selectedHospitalId?: string; // The hospital the staff has currently 'Logged into'.
   name?: string;
   modules?: string[];
   staffRole?: string;
@@ -221,6 +222,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       role: 'STAFF',
       id: staffData.id.toString(),
       hospitalId: staffData.hospital_id,
+      selectedHospitalId: staffData.hospital_id,
       name: staffData.full_name,
       modules: staffData.assigned_modules || [],
       staffRole: staffData.role,
@@ -305,13 +307,12 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Username</label>
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                       <input
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="Hospital ID, Mobile, or Emp ID"
-                        className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-4 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                         required
                       />
                     </div>
@@ -320,13 +321,12 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                       <input
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-4 px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                         required
                       />
                       <button

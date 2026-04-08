@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileSpreadsheet, 
@@ -17,16 +17,14 @@ import RishikulPharmacyManager from './RishikulPharmacyManager';
 
 type StateTab = 'upload' | 'manual' | 'monitor' | 'samples' | 'rishikul';
 
-export default function StateSupplyDashboard() {
-  const [activeTab, setActiveTab] = useState<StateTab>('monitor');
+export default function StateSupplyDashboard({ activeSubTab = 'monitor' }: { activeSubTab?: 'upload' | 'manual' | 'monitor' | 'samples' | 'rishikul' }) {
+  const [activeTab, setActiveTab] = useState<'upload' | 'manual' | 'monitor' | 'samples' | 'rishikul'>('monitor');
 
-  const tabs = [
-    { id: 'monitor', label: 'Supply Monitor', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'upload', label: 'Excel Upload', icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { id: 'manual', label: 'Manual Entry', icon: PlusCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { id: 'samples', label: 'Samples', icon: FlaskConical, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { id: 'rishikul', label: 'Rishikul Pharmacy', icon: Truck, color: 'text-red-600', bg: 'bg-red-50' },
-  ];
+  useEffect(() => {
+    if (activeSubTab) {
+      setActiveTab(activeSubTab);
+    }
+  }, [activeSubTab]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 sm:px-8">
@@ -45,23 +43,7 @@ export default function StateSupplyDashboard() {
             <p className="text-slate-500 font-medium ml-13">Manage and monitor medicine distribution across all 13 districts.</p>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="bg-white p-1.5 rounded-[2rem] shadow-sm border border-slate-100 flex gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as StateTab)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-[1.5rem] font-bold transition-all ${
-                  activeTab === tab.id 
-                    ? `${tab.bg} ${tab.color} shadow-sm` 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <tab.icon size={18} />
-                <span className="text-sm">{tab.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Tab Switcher moved to bottom bar */}
         </div>
 
         {/* Content Area */}

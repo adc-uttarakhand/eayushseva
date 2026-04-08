@@ -19,6 +19,7 @@ interface Staff {
   assigned_modules?: string[];
   service_dossier?: string;
   email?: string;
+  employment_type?: string;
 }
 
 interface Hospital {
@@ -40,6 +41,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState('All');
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -120,8 +122,9 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                          s.mobile_number.includes(searchQuery);
     const matchesDistrict = selectedDistrict === 'All' || hospital?.district === selectedDistrict;
     const matchesRole = selectedRole === 'All' || s.role === selectedRole;
+    const matchesEmploymentType = selectedEmploymentType === 'All' || s.employment_type === selectedEmploymentType;
     
-    return hasAccess && matchesSearch && matchesDistrict && matchesRole;
+    return hasAccess && matchesSearch && matchesDistrict && matchesRole && matchesEmploymentType;
   });
 
   const exportToExcel = () => {
@@ -144,7 +147,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
   const canAddEmployee = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role || '');
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pt-24 pb-40 px-4 md:px-8">
+    <div className="min-h-screen bg-slate-50/50 pt-8 pb-40 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>
@@ -195,6 +198,17 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                 className="bg-white border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium shadow-sm text-sm"
               >
                 {roles.map(r => <option key={r} value={r}>{r === 'All' ? 'All Roles' : r}</option>)}
+              </select>
+
+              <select 
+                value={selectedEmploymentType}
+                onChange={(e) => setSelectedEmploymentType(e.target.value)}
+                className="bg-white border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium shadow-sm text-sm"
+              >
+                <option value="All">All Employment Types</option>
+                <option value="Permanent">Permanent</option>
+                <option value="Contractual">Contractual</option>
+                <option value="Outsourced">Outsourced</option>
               </select>
             </div>
           </div>
@@ -248,7 +262,6 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">ID: {s.employee_id || '-'}</span>
                           </div>
                         </div>
                       </td>
@@ -280,7 +293,6 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                       )}
                       <div>
                         <div className="font-bold text-slate-900">{s.full_name}</div>
-                        <div className="text-xs text-slate-500">ID: {s.employee_id || '-'}</div>
                       </div>
                     </div>
                     <div className="mt-3 text-sm text-slate-600">Role: {s.role}</div>

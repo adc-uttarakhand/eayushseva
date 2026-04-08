@@ -47,8 +47,8 @@ interface DispatchRow {
   quantity: number;
 }
 
-export default function PharmacyManagerDashboard({ session }: { session: any }) {
-  const [activeTab, setActiveTab] = useState('medicine_list');
+export default function PharmacyManagerDashboard({ session, initialActiveTab = 'medicine_list', initialMedicineSubTab = 'list' }: { session: any, initialActiveTab?: string, initialMedicineSubTab?: string }) {
+  const [activeTab, setActiveTab] = useState(initialActiveTab);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
   const [dispatchRows, setDispatchRows] = useState<DispatchRow[]>([{
@@ -90,7 +90,7 @@ export default function PharmacyManagerDashboard({ session }: { session: any }) 
   const [isRequestMedicineOpen, setIsRequestMedicineOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('dispatch_form');
-  const [medicineSubTab, setMedicineSubTab] = useState('list');
+  const [medicineSubTab, setMedicineSubTab] = useState(initialMedicineSubTab);
   const [showProfile, setShowProfile] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);

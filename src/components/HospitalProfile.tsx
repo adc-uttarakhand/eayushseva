@@ -71,6 +71,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
   const [fetchingAltitude, setFetchingAltitude] = useState(false);
   const [isChangeInchargeOpen, setIsChangeInchargeOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const canEdit = ['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role) || session?.id === hospitalDetails?.incharge_staff_id;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -542,7 +543,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
                 value={formData.facility_name}
                 onChange={e => setFormData({...formData, facility_name: e.target.value})}
                 className="text-2xl font-bold text-slate-900 tracking-tight w-full bg-transparent border-none focus:ring-0 p-0"
-                disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                disabled={!canEdit}
               />
               {hospitalDetails.is_verified && (
                 <div className="flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full whitespace-nowrap">
@@ -625,7 +626,12 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Mobile</label>
-            <p className="font-bold text-slate-900">{hospitalDetails.mobile}</p>
+            <input 
+              value={formData.mobile}
+              onChange={e => setFormData({...formData, mobile: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!canEdit}
+            />
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Region</label>
@@ -633,7 +639,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.region_indicator}
               onChange={e => setFormData({...formData, region_indicator: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             >
               <option value="Rural">Rural</option>
               <option value="Urban">Urban</option>
@@ -645,7 +651,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.operational_status}
               onChange={e => setFormData({...formData, operational_status: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             >
               <option value="Operational">Operational</option>
               <option value="Non-Operational">Non-Operational</option>
@@ -657,7 +663,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.status}
               onChange={e => setFormData({...formData, status: e.target.value})}
               className="font-bold text-emerald-900 w-full bg-emerald-50 rounded-lg p-1 border border-emerald-200"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             >
               <option value="Sugam">Sugam</option>
               <option value="Durgam">Durgam</option>
@@ -669,7 +675,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.ipd_services}
               onChange={e => setFormData({...formData, ipd_services: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             >
               <option value="OPD Only">OPD Only</option>
               <option value="IPD">IPD</option>
@@ -683,7 +689,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
                 value={formData.hospital_password}
                 onChange={e => setFormData({...formData, hospital_password: e.target.value})}
                 className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1 pr-10"
-                disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                disabled={!canEdit}
               />
               <button
                 type="button"
@@ -700,7 +706,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.email}
               onChange={e => setFormData({...formData, email: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
           <div className="col-span-2 md:col-span-4">
@@ -709,7 +715,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.special_services.join(', ')}
               onChange={e => setFormData({...formData, special_services: e.target.value.split(',').map(s => s.trim())})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
           <div className="col-span-2 md:col-span-4 flex flex-col gap-4">
@@ -720,18 +726,18 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
                   type="checkbox" 
                   checked={!!formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false'} 
                   onChange={e => setFormData({...formData, centre_of_excellence: e.target.checked ? 'True' : ''})} 
-                  disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                  disabled={!canEdit}
                 />
                 {!!formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' && <CheckCircle2 className="text-emerald-500" size={16} />}
               </label>
               <label className="flex items-center gap-2">
                 <span className="text-sm font-bold text-slate-900">Panchakarma Centre</span>
-                <input type="checkbox" checked={formData.panchakarma_centre} onChange={e => setFormData({...formData, panchakarma_centre: e.target.checked})} disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)} />
+                <input type="checkbox" checked={formData.panchakarma_centre} onChange={e => setFormData({...formData, panchakarma_centre: e.target.checked})} disabled={!canEdit} />
                 {formData.panchakarma_centre && <CheckCircle2 className="text-emerald-500" size={16} />}
               </label>
               <label className="flex items-center gap-2">
                 <span className="text-sm font-bold text-slate-900">Supraja Centre</span>
-                <input type="checkbox" checked={formData.supraja_centre} onChange={e => setFormData({...formData, supraja_centre: e.target.checked})} disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)} />
+                <input type="checkbox" checked={formData.supraja_centre} onChange={e => setFormData({...formData, supraja_centre: e.target.checked})} disabled={!canEdit} />
                 {formData.supraja_centre && <CheckCircle2 className="text-emerald-500" size={16} />}
               </label>
             </div>
@@ -744,7 +750,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
                   onChange={e => setFormData({...formData, centre_of_excellence: e.target.value})}
                   placeholder="e.g. Eye Disorder, Pediatric, etc."
                   className="font-bold text-slate-900 w-full bg-slate-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+                  disabled={!canEdit}
                 />
               </div>
             )}
@@ -842,7 +848,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.building_status}
               onChange={e => setFormData({...formData, building_status: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             >
               <option value="">Select Status</option>
               <option value="Own">Own</option>
@@ -856,7 +862,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.no_of_rooms}
               onChange={e => setFormData({...formData, no_of_rooms: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
           <div>
@@ -866,7 +872,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.total_area}
               onChange={e => setFormData({...formData, total_area: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
           <div>
@@ -876,7 +882,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.construction_year}
               onChange={e => setFormData({...formData, construction_year: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
           <div>
@@ -886,7 +892,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               value={formData.no_of_beds}
               onChange={e => setFormData({...formData, no_of_beds: e.target.value})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
-              disabled={!['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role)}
+              disabled={!canEdit}
             />
           </div>
         </div>

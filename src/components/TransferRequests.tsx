@@ -147,11 +147,28 @@ export default function TransferRequests({ session }: { session: any }) {
           .from('staff')
           .update({ 
             hospital_id: request.new_hospital_id,
-            postings: updatedPostings
+            postings: updatedPostings,
+            is_incharge: false // Remove incharge status upon transfer
           })
           .eq('id', request.staff_id);
 
         if (staffUpdateError) throw staffUpdateError;
+
+        // 3. Remove from previous hospital incharge if applicable
+        if (request.current_hospital_id) {
+          const { error: hospitalUpdateError } = await supabase
+            .from('hospitals')
+            .update({ 
+              incharge_staff_id: null,
+              incharge_name: null
+            })
+            .eq('hospital_id', request.current_hospital_id)
+            .eq('incharge_staff_id', request.staff_id);
+            
+          if (hospitalUpdateError) {
+            console.warn('Failed to update previous hospital incharge status:', hospitalUpdateError);
+          }
+        }
       }
 
       // Refresh list

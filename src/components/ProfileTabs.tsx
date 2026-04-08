@@ -119,15 +119,6 @@ export const renderBasicInfo = (
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
-        <input 
-          value={profile.empId} 
-          onChange={e => setProfile({...profile, empId: e.target.value})} 
-          className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-        />
-      </div>
-
-      <div className="space-y-1">
         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
         <input 
           value={profile.aadhaarNumber} 

@@ -86,8 +86,11 @@ export default function App() {
     }
     _setActiveTab(newTab);
   };
-  const [hospitalSubTab, setHospitalSubTab] = useState<'directory' | 'employees' | 'incharge'>('directory');
-  const [requestsSubTab, setRequestsSubTab] = useState<'transfer_requests'>('transfer_requests');
+  const [hospitalSubTab, setHospitalSubTab] = useState<'hospitals' | 'employees' | 'incharges'>('hospitals');
+  const [supplySubTab, setSupplySubTab] = useState<'upload' | 'manual' | 'monitor' | 'samples' | 'rishikul'>('monitor');
+  const [transferSubTab, setTransferSubTab] = useState<'hospitals' | 'employees'>('hospitals');
+  const [pharmacySubTab, setPharmacySubTab] = useState('list');
+  const [requestsSubTab, setRequestsSubTab] = useState<'transfer_requests' | 'registration_requests'>('transfer_requests');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -768,21 +771,9 @@ export default function App() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">Hospital Directory</h1>
           <p className="text-slate-500 mt-2">Explore and manage 800+ healthcare facilities</p>
         </div>
-        
-        <div className="flex bg-neutral-100 p-1 rounded-full">
-          {(['directory', 'employees', 'incharge'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setHospitalSubTab(tab)}
-              className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-widest transition-all ${hospitalSubTab === tab ? 'bg-white text-emerald-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {hospitalSubTab === 'directory' && (
+      {hospitalSubTab === 'hospitals' && (
         <>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
             <div className="w-full md:w-auto flex gap-3">
@@ -845,7 +836,7 @@ export default function App() {
           <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
         )
       )}
-      {hospitalSubTab === 'incharge' && session && <InchargeManagement session={session} />}
+      {hospitalSubTab === 'incharges' && session && <InchargeManagement session={session} />}
     </motion.div>
   );
 
@@ -1196,24 +1187,28 @@ export default function App() {
         {activeTab === 'stats' && renderStats()}
         {activeTab === 'hospitals' && (
           (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') 
-            ? <HospitalDirectory session={session} /> 
+            ? <HospitalDirectory session={session} activeSubTab={hospitalSubTab} /> 
             : renderHospitals()
         )}
         {activeTab === 'eparchi' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="eparchi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <EParchi 
-              hospitalId={session.hospitalId || session.id} 
+              hospitalId={session.selectedHospitalId || session.hospitalId || session.id} 
               hospitalName={currentHospital?.facility_name}
               district={currentHospital?.district}
               hospitalType={currentHospital?.type}
               regionIndicator={currentHospital?.region_indicator}
               session={session}
+              onNavigateToIndent={() => {
+                setPharmacySubTab('list');
+                setActiveTab('pharmacy_dashboard');
+              }}
             />
           </motion.div>
         )}
         {activeTab === 'patients' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="patients" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <PatientList hospitalId={session.hospitalId || session.id} />
+            <PatientList hospitalId={session.selectedHospitalId || session.hospitalId || session.id} />
           </motion.div>
         )}
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
@@ -1240,7 +1235,7 @@ export default function App() {
         )}
         {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
           <motion.div key="supply_upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <StateSupplyDashboard />
+            <StateSupplyDashboard activeSubTab={supplySubTab} />
           </motion.div>
         )}
         {activeTab === 'district_supply' && (session?.role === 'DISTRICT_ADMIN' || session?.role === 'DISTRICT_MEDICINE_INCHARGE') && (
@@ -1255,12 +1250,12 @@ export default function App() {
         )}
         {activeTab === 'pharmacy_dashboard' && session?.role === 'PHARMACY_MANAGER' && (
           <motion.div key="pharmacy_dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <PharmacyManagerDashboard session={session} />
+            <PharmacyManagerDashboard session={session} initialMedicineSubTab={pharmacySubTab} />
           </motion.div>
         )}
         {activeTab === 'transfer_module' && isTransferEnabled && (
           <motion.div key="transfer_module" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <TransferModule session={session} />
+            <TransferModule session={session} activeSubTab={transferSubTab} />
           </motion.div>
         )}
         {activeTab === 'transfer_module' && !isTransferEnabled && (
@@ -1315,6 +1310,34 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Sub-tab Container */}
+      {(activeTab === 'hospitals' || activeTab === 'supply_upload' || activeTab === 'transfer_module') && (
+        <div className="fixed bottom-[60px] md:bottom-[68px] left-1/2 -translate-x-1/2 z-40 bg-white/90 backdrop-blur-md border border-slate-200 shadow-lg rounded-full overflow-x-auto flex p-1 gap-1 w-max max-w-[95vw]">
+          {activeTab === 'hospitals' && (
+            <>
+              <button onClick={() => setHospitalSubTab('hospitals')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${hospitalSubTab === 'hospitals' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Hospitals</button>
+              <button onClick={() => setHospitalSubTab('employees')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${hospitalSubTab === 'employees' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Employees</button>
+              <button onClick={() => setHospitalSubTab('incharges')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${hospitalSubTab === 'incharges' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Incharges</button>
+            </>
+          )}
+          {activeTab === 'supply_upload' && (
+            <>
+              <button onClick={() => setSupplySubTab('monitor')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${supplySubTab === 'monitor' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Monitor</button>
+              <button onClick={() => setSupplySubTab('upload')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${supplySubTab === 'upload' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Upload</button>
+              <button onClick={() => setSupplySubTab('manual')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${supplySubTab === 'manual' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Manual</button>
+              <button onClick={() => setSupplySubTab('samples')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${supplySubTab === 'samples' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Samples</button>
+              <button onClick={() => setSupplySubTab('rishikul')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${supplySubTab === 'rishikul' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Rishikul</button>
+            </>
+          )}
+          {activeTab === 'transfer_module' && (
+            <>
+              <button onClick={() => setTransferSubTab('hospitals')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${transferSubTab === 'hospitals' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Hospitals</button>
+              <button onClick={() => setTransferSubTab('employees')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${transferSubTab === 'employees' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Employees</button>
+            </>
+          )}
+        </div>
+      )}
 
       {!(session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
         <BottomNav 

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
+import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -30,6 +31,7 @@ const AVAILABLE_MODULES = [
   { id: 'eparchi_consultation', label: 'E-Parchi: Consultation' },
   { id: 'eparchi_queue', label: 'E-Parchi: Queue' },
   { id: 'eparchi_pharmacy', label: 'E-Parchi: Pharmacy Dispensing' },
+  { id: 'eparchi_fees', label: 'E-Parchi: Fees Collection' },
   { id: 'inventory', label: 'Inventory Management' },
   { id: 'medicine_demand', label: 'Medicine Demand' },
   { id: 'equipment_demand', label: 'Equipment / Furniture Demand' },
@@ -237,7 +239,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [profileSubTab, setProfileSubTab] = useState<'basic' | 'service' | 'trainings'>('basic');
   const [staffSubTab, setStaffSubTab] = useState<'list' | 'registration_requests'>('list');
   const [eparchiSubTab, setEparchiSubTab] = useState<'registration' | 'queue' | 'dispensing'>('registration');
-  const [inventorySubTab, setInventorySubTab] = useState<'receive' | 'add_request' | 'main' | 'indent' | 'consumption'>('receive');
+  const [inventorySubTab, setInventorySubTab] = useState<'receive' | 'add_request' | 'main' | 'indent' | 'indent_logs' | 'consumption'>('receive');
   const [isDirty, setIsDirty] = useState(false);
   const [initialProfile, setInitialProfile] = useState<any>(null);
   const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false);
@@ -281,6 +283,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   };
 
   // Profile State
+  const [postingToDelete, setPostingToDelete] = useState<string | null>(null);
   const [profile, setProfile] = useState({
     fullName: session?.name || '',
     designation: '',
@@ -336,11 +339,34 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [staffForm, setStaffForm] = useState({
     fullName: '',
     mobile: '',
-    employeeId: '',
     role: 'Pharmacist'
   });
+  const [isMobileRegistered, setIsMobileRegistered] = useState(false);
+  const [isCheckingMobile, setIsCheckingMobile] = useState(false);
   const [selectedModules, setSelectedModules] = useState<string[]>(['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
+
+  useEffect(() => {
+    const checkMobile = async () => {
+      const trimmedMobile = staffForm.mobile.trim();
+      if (trimmedMobile && trimmedMobile.length >= 10) {
+        setIsCheckingMobile(true);
+        const { data } = await supabase
+          .from('staff')
+          .select('id')
+          .eq('mobile_number', trimmedMobile)
+          .neq('id', editingStaffId || -1)
+          .maybeSingle();
+        setIsMobileRegistered(!!data);
+        setIsCheckingMobile(false);
+      } else {
+        setIsMobileRegistered(false);
+      }
+    };
+    
+    const timeoutId = setTimeout(checkMobile, 500);
+    return () => clearTimeout(timeoutId);
+  }, [staffForm.mobile, editingStaffId]);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -1201,35 +1227,53 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     setStaffForm({ 
       fullName: staff.full_name || staff.name || '', 
       mobile: staff.mobile_number || staff.mobile || '', 
-      employeeId: staff.employee_id || '', 
       aadhaarNumber: staff.aadhaar_number || '',
       role: staff.role || 'Pharmacist', 
       password: '',
       firstPostingPlace: staff.first_posting_place || ''
     });
-    setSelectedModules(staff.assigned_modules || ['profile']);
+    let modules = staff.assigned_modules || ['profile'];
+    if (modules.includes('eparchi_consultation') && !modules.includes('eparchi_queue')) {
+      modules = [...modules, 'eparchi_queue'];
+    }
+    setSelectedModules(modules);
     setIsStaffModalOpen(true);
   };
 
   const handleToggleModule = (moduleId: string) => {
     if (moduleId === 'profile') return; // Cannot toggle default module
-    setSelectedModules(prev =>
-      prev.includes(moduleId)
-        ? prev.filter(id => id !== moduleId)
-        : [...prev, moduleId]
-    );
+    setSelectedModules(prev => {
+      let next;
+      if (prev.includes(moduleId)) {
+        next = prev.filter(id => id !== moduleId);
+      } else {
+        next = [...prev, moduleId];
+      }
+      
+      // Enforce Consultation -> Queue dependency
+      if (next.includes('eparchi_consultation') && !next.includes('eparchi_queue')) {
+        next.push('eparchi_queue');
+      }
+      
+      return next;
+    });
   };
 
   const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!staffForm.fullName || !staffForm.mobile) {
-      alert('Name and Mobile Number are compulsory! / नाम और मोबाइल नंबर अनिवार्य हैं!');
+    if (!staffForm.fullName) {
+      alert('Name is compulsory! / नाम अनिवार्य है!');
       return;
     }
 
-    if (!staffForm.employeeId) {
-      alert('Kripya Employee ID bharein');
+    if (!staffForm.mobile) {
+      alert('Mobile Number is compulsory! / मोबाइल नंबर अनिवार्य है!');
+      return;
+    }
+
+    if (isMobileRegistered) {
+      alert('Mobile Number Already Registered! / मोबाइल नंबर पहले से पंजीकृत है!');
       return;
     }
 
@@ -1238,25 +1282,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       return;
     }
 
-    if (staffForm.employeeId) {
-      const { data: existingEmpId } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('employee_id', staffForm.employeeId)
-        .neq('id', editingStaffId || -1)
-        .maybeSingle();
-      
-      if (existingEmpId) {
-        alert('Employee ID already exists');
-        return;
-      }
-    }
-
     const payload: any = {
       hospital_id: session.hospitalId,
       full_name: staffForm.fullName,
       mobile_number: staffForm.mobile.trim(),
-      employee_id: staffForm.employeeId.trim(),
       role: staffForm.role,
       assigned_modules: selectedModules,
       login_password: 'ayush@123',
@@ -1264,15 +1293,47 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     };
 
     if (editingStaffId) {
+      // Check if staff is being transferred from another hospital
+      const { data: currentStaff } = await supabase
+        .from('staff')
+        .select('hospital_id')
+        .eq('id', editingStaffId)
+        .single();
+
+      if (currentStaff && currentStaff.hospital_id !== session.hospitalId) {
+        // Remove from previous hospital incharge if applicable
+        await supabase
+          .from('hospitals')
+          .update({ 
+            incharge_staff_id: null,
+            incharge_name: null
+          })
+          .eq('hospital_id', currentStaff.hospital_id)
+          .eq('incharge_staff_id', editingStaffId);
+          
+        // Remove incharge status on staff record
+        payload.is_incharge = false;
+      }
+
       const { error } = await supabase.from('staff').update(payload).eq('id', editingStaffId);
       if (error) {
-        alert('Update failed: ' + error.message);
+        if (error.code === '23505' || error.message?.includes('unique constraint')) {
+          setIsMobileRegistered(true);
+          alert('Mobile Number or Employee ID Already Registered! / मोबाइल नंबर या कर्मचारी आईडी पहले से पंजीकृत है!');
+        } else {
+          alert('Update failed: ' + error.message);
+        }
         return;
       }
     } else {
       const { error } = await supabase.from('staff').insert([payload]);
       if (error) {
-        alert('Addition failed: ' + error.message);
+        if (error.code === '23505' || error.message?.includes('unique constraint')) {
+          setIsMobileRegistered(true);
+          alert('Mobile Number or Employee ID Already Registered! / मोबाइल नंबर या कर्मचारी आईडी पहले से पंजीकृत है!');
+        } else {
+          alert('Addition failed: ' + error.message);
+        }
         return;
       }
     }
@@ -1532,6 +1593,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <button onClick={() => setInventorySubTab('receive')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'receive' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Receive Stock</button>
                   <button onClick={() => setInventorySubTab('add_request')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'add_request' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Add/Request Stock</button>
                   <button onClick={() => setInventorySubTab('main')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'main' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Main Inventory</button>
+                  <button onClick={() => setInventorySubTab('indent_logs')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'indent_logs' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Indent Logs</button>
                   <button onClick={() => setInventorySubTab('indent')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'indent' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Indent</button>
                   <button onClick={() => setInventorySubTab('consumption')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all whitespace-nowrap ${inventorySubTab === 'consumption' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Daily Consumption</button>
                 </>
@@ -1908,12 +1970,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employment Type</label>
+                <div className="space-y-1 bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 ml-4">Employment Type</label>
                   <select 
                     value={profile.employmentType} 
                     onChange={e => setProfile({...profile, employmentType: e.target.value as any})} 
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    className="w-full bg-white border border-emerald-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <option value="Permanent">Permanent</option>
                     <option value="Contractual">Contractual</option>
@@ -2094,18 +2156,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Employment Type</label>
-                      <select 
-                        value={profile.employmentType} 
-                        onChange={e => setProfile({...profile, employmentType: e.target.value as any})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      >
-                        <option>Permanent</option>
-                        <option>Contractual</option>
-                        <option>Outsourced</option>
-                      </select>
-                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Home District</label>
                       <select 
@@ -2132,341 +2183,356 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </div>
                 </div>
 
-            <div className={`bg-white rounded-3xl p-8 shadow-sm border border-gray-100 transition-all ${profile.employmentType !== 'Permanent' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
-              </h2>
-              <div className="space-y-4">
-                {/* Current Posting Row (Auto-added format) */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
-                  <div className="space-y-1 md:col-span-6">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place (Auto)</label>
-                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
-                      {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
+                {profile.employmentType === 'Permanent' && (
+                  <>
+                    <div className={`bg-white rounded-3xl p-8 shadow-sm border border-gray-100 transition-all`}>
+                      <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <MapPin className="text-emerald-600" size={20} /> Posting History (Permanent Only)
+                      </h2>
+                  <div className="space-y-4">
+                    {/* Current Posting Row (Auto-added format) */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
+                      <div className="space-y-1 md:col-span-6">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place (Auto)</label>
+                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 font-bold text-slate-700 min-h-[3rem] flex items-center leading-tight">
+                          {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
+                        </div>
+                        <div className="flex gap-3 ml-2 mt-1">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitalDetails?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {hospitalDetails?.status || 'Sugam'}
+                          </span>
+                          {hospitalDetails?.facility_name && (
+                            <span className="text-[9px] font-bold text-slate-400">
+                              Above 7000 ft: <span className="text-slate-600">{(hospitalDetails?.region_indicator === 'Above 7000' || hospitalDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
+                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600">
+                          {profile.currentPostingJoiningDate || '---'}
+                        </div>
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
+                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600 font-bold italic">
+                          Present
+                        </div>
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Days (Auto)</label>
+                        <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-center font-bold text-emerald-700">
+                          {(() => {
+                            const start = parseDateStr(profile.currentPostingJoiningDate);
+                            if (isNaN(start.getTime())) return '---';
+                            const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                            return (
+                              <>
+                                <div className="text-lg">{days} days</div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-3 ml-2 mt-1">
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitalDetails?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {hospitalDetails?.status || 'Sugam'}
-                      </span>
-                      {hospitalDetails?.facility_name && (
-                        <span className="text-[9px] font-bold text-slate-400">
-                          Above 7000 ft: <span className="text-slate-600">{(hospitalDetails?.region_indicator === 'Above 7000' || hospitalDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
-                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600">
-                      {profile.currentPostingJoiningDate || '---'}
-                    </div>
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
-                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-slate-600 font-bold italic">
-                      Present
-                    </div>
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Days (Auto)</label>
-                    <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-center font-bold text-emerald-700">
-                      {(() => {
-                        const start = parseDateStr(profile.currentPostingJoiningDate);
-                        if (isNaN(start.getTime())) return '---';
-                        const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+                    {/* Past Postings (Reverse Chronological) */}
+                    {(() => {
+                      const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                      return sorted.map((posting, index) => {
+                        const nextPosting = index < sorted.length - 1 ? sorted[index + 1] : null;
+                        const gap = nextPosting ? (parseDateStr(posting.fromDate).getTime() - parseDateStr(nextPosting.toDate).getTime()) / (1000 * 60 * 60 * 24) - 1 : 0;
+                        
                         return (
-                          <>
-                            <div className="text-lg">{days} days</div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Past Postings (Reverse Chronological) */}
-                {(() => {
-                  const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
-                  return sorted.map((posting, index) => {
-                    const nextPosting = index < sorted.length - 1 ? sorted[index + 1] : null;
-                    const gap = nextPosting ? (parseDateStr(posting.fromDate).getTime() - parseDateStr(nextPosting.toDate).getTime()) / (1000 * 60 * 60 * 24) - 1 : 0;
-                    
-                    return (
-                      <div key={posting.id} className={`space-y-2`}>
-                        {gap > 0 && (
-                          <div className="text-red-500 text-xs font-bold text-center bg-red-50 py-1 rounded-lg border border-red-200">
-                            Gap detected: {gap} days
-                          </div>
-                        )}
-                        <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${gap > 0 ? 'border-red-300 bg-red-50/20' : 'border-gray-100 bg-slate-50'}`}>
-                          <div className="space-y-1 md:col-span-5">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
-                              Subsequent Posting
-                            </label>
-                            <div className="space-y-2">
-                              <HospitalSearchInput
-                                isTextarea
-                                value={posting.hospitalName}
-                                onChange={val => updatePosting(posting.id, 'hospitalName', val)}
-                                hospitals={hospitals}
-                                placeholder="Type hospital name..."
-                              />
-                            </div>
-                            <div className="flex gap-3 ml-2 mt-1">
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                {posting.status || 'Sugam'}
-                              </span>
-                              <span className="text-[9px] font-bold text-slate-400">
-                                Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
-                              </span>
-                            </div>
-                          </div>
-                        {(() => {
-                          const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
-                          const lastPosting = sorted[sorted.length - 1];
-                          const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
-                          const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
-                          const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
-                          const isInvalidDate = posting.fromDate && !isNaN(parseDateStr(posting.fromDate).getTime()) && parseDateStr(posting.fromDate).getTime() < deptStart.getTime();
-
-                          return (
-                            <div className="space-y-1 md:col-span-2">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
-                              <input 
-                                type="text"
-                                placeholder="DD-MMM-YYYY"
-                                value={posting.fromDate} 
-                                onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
-                                className={`w-full bg-white border ${isInvalidDate ? 'border-red-500' : 'border-gray-200'} rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} 
-                              />
-                              {isInvalidDate && (
-                                <div className="text-red-500 text-[10px] mt-1">
-                                  Service history cannot start before your Department Joining Date ({profile.dateOfFirstJoiningDepartment})
+                          <div key={posting.id} className={`space-y-2`}>
+                            {gap > 0 && (
+                              <div className="text-red-500 text-xs font-bold text-center bg-red-50 py-1 rounded-lg border border-red-200">
+                                Gap detected: {gap} days
+                              </div>
+                            )}
+                            <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${gap > 0 ? 'border-red-300 bg-red-50/20' : 'border-gray-100 bg-slate-50'}`}>
+                              <div className="space-y-1 md:col-span-5">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
+                                  Subsequent Posting
+                                </label>
+                                <div className="space-y-2">
+                                  <HospitalSearchInput
+                                    isTextarea
+                                    value={posting.hospitalName}
+                                    onChange={val => updatePosting(posting.id, 'hospitalName', val)}
+                                    hospitals={hospitals}
+                                    placeholder="Type hospital name..."
+                                  />
                                 </div>
-                              )}
+                                <div className="flex gap-3 ml-2 mt-1">
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {posting.status || 'Sugam'}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-slate-400">
+                                    Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            {(() => {
+                              const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                              const lastPosting = sorted[sorted.length - 1];
+                              const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
+                              const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
+                              const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
+                              const isInvalidDate = posting.fromDate && !isNaN(parseDateStr(posting.fromDate).getTime()) && parseDateStr(posting.fromDate).getTime() < deptStart.getTime();
+
+                              return (
+                                <div className="space-y-1 md:col-span-2">
+                                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
+                                  <input 
+                                    type="text"
+                                    placeholder="DD-MMM-YYYY"
+                                    value={posting.fromDate} 
+                                    onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
+                                    className={`w-full bg-white border ${isInvalidDate ? 'border-red-500' : 'border-gray-200'} rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} 
+                                  />
+                                  {isInvalidDate && (
+                                    <div className="text-red-500 text-[10px] mt-1">
+                                      Service history cannot start before your Department Joining Date ({profile.dateOfFirstJoiningDepartment})
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                              <div className="space-y-1 md:col-span-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
+                                <input 
+                                  type="text"
+                                  placeholder="Pending"
+                                  value={posting.toDate} 
+                                  readOnly
+                                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-2 px-3 text-slate-500 font-bold" 
+                                />
+                              </div>
+                              <div className="space-y-1 md:col-span-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                                <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                                  <div className="text-lg">{posting.days || 0} days</div>
+                                </div>
+                              </div>
+                              <div className="md:col-span-1 flex justify-center pt-6">
+                                <button 
+                                  type="button"
+                                  onClick={() => setPostingToDelete(posting.id)}
+                                  className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all`}
+                                >
+                                  <X size={20} />
+                                </button>
+                              </div>
                             </div>
-                          );
-                        })()}
-                          <div className="space-y-1 md:col-span-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
-                            <input 
-                              type="text"
-                              placeholder="Pending"
-                              value={posting.toDate} 
-                              readOnly
-                              className="w-full bg-slate-50 border border-gray-200 rounded-xl py-2 px-3 text-slate-500 font-bold" 
-                            />
                           </div>
-                          <div className="space-y-1 md:col-span-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
-                            <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                              <div className="text-lg">{posting.days || 0} days</div>
+                        );
+                      });
+                    })()}
+
+                    <PostingDeleteConfirmationModal
+                      isOpen={!!postingToDelete}
+                      onClose={() => setPostingToDelete(null)}
+                      onConfirm={() => {
+                        if (postingToDelete) {
+                          removePosting(postingToDelete);
+                          setPostingToDelete(null);
+                        }
+                      }}
+                    />
+
+                    {(() => {
+                      const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+                      const lastPosting = sorted[sorted.length - 1];
+                      const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
+                      const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
+                      const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
+
+                      return (
+                        <>
+                          {isComplete ? (
+                            <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm px-4 py-2">
+                              <CheckCircle size={16} /> Service History Complete
                             </div>
-                          </div>
-                          <div className="md:col-span-1 flex justify-center pt-6">
+                          ) : (
                             <button 
                               type="button"
-                              onClick={() => removePosting(posting.id)}
-                              className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all`}
+                              onClick={addPosting}
+                              disabled={isDisabled}
+                              className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              <X size={20} />
+                              <Plus size={16} /> Add Another Posting
                             </button>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                  <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Calendar className="text-emerald-600" size={20} /> Long Leaves ({'>'}30 Days)
+                  </h2>
+                  <div className="space-y-4">
+                    {profile.longLeaves.map((leave, index) => (
+                      <div key={leave.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
+                          <input 
+                            type="text"
+                            placeholder="DD-MMM-YYYY"
+                            value={leave.fromDate} 
+                            onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
+                          <input 
+                            type="text"
+                            placeholder="DD-MMM-YYYY"
+                            value={leave.toDate} 
+                            onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Leave Type</label>
+                          <input 
+                            value={leave.leaveType} 
+                            onChange={e => updateLongLeave(leave.id, 'leaveType', e.target.value)} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                            placeholder="e.g. Study Leave"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Total Days</label>
+                          <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                            <div className="text-lg">{leave.totalDays || 0} days</div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  });
-                })()}
-
-                {(() => {
-                  const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
-                  const lastPosting = sorted[sorted.length - 1];
-                  const deptStart = parseDateStr(profile.dateOfFirstJoiningDepartment);
-                  const isComplete = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() === deptStart.getTime();
-                  const isDisabled = lastPosting && !isNaN(parseDateStr(lastPosting.fromDate).getTime()) && parseDateStr(lastPosting.fromDate).getTime() <= deptStart.getTime();
-
-                  return (
-                    <>
-                      {isComplete ? (
-                        <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm px-4 py-2">
-                          <CheckCircle size={16} /> Service History Complete
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => removeLongLeave(leave.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px]"
+                          >
+                            <X size={20} />
+                          </button>
                         </div>
-                      ) : (
-                        <button 
-                          type="button"
-                          onClick={addPosting}
-                          disabled={isDisabled}
-                          className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <Plus size={16} /> Add Another Posting
-                        </button>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Calendar className="text-emerald-600" size={20} /> Long Leaves ({'>'}30 Days)
-              </h2>
-              <div className="space-y-4">
-                {profile.longLeaves.map((leave, index) => (
-                  <div key={leave.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={leave.fromDate} 
-                        onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={leave.toDate} 
-                        onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Leave Type</label>
-                      <input 
-                        value={leave.leaveType} 
-                        onChange={e => updateLongLeave(leave.id, 'leaveType', e.target.value)} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                        placeholder="e.g. Study Leave"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Total Days</label>
-                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                        <div className="text-lg">{leave.totalDays || 0} days</div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => removeLongLeave(leave.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px]"
-                      >
-                        <X size={20} />
-                      </button>
+                    ))}
+                    <button 
+                      type="button"
+                      onClick={addLongLeave}
+                      className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:bg-emerald-50 p-3 rounded-2xl transition-all w-full justify-center border-2 border-dashed border-emerald-100"
+                    >
+                      <Plus size={18} /> Add Leave
+                    </button>
+
+                    {/* Total Leaves Duration Display */}
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                      <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration ({'>'}30 days)</span>
+                      <div className="text-2xl font-black text-slate-700">{serviceDays.totalLeaves} days</div>
                     </div>
                   </div>
-                ))}
-                <button 
-                  type="button"
-                  onClick={addLongLeave}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:bg-emerald-50 p-3 rounded-2xl transition-all w-full justify-center border-2 border-dashed border-emerald-100"
-                >
-                  <Plus size={18} /> Add Leave
-                </button>
-
-                {/* Total Leaves Duration Display */}
-                <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                  <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration ({'>'}30 days)</span>
-                  <div className="text-2xl font-black text-slate-700">{serviceDays.totalLeaves} days</div>
                 </div>
-              </div>
-            </div>
 
-            {/* Attachments Section */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Upload className="text-emerald-600" size={20} /> Attachments (If any)
-              </h2>
-              <div className="space-y-4">
-                {profile.attachments.map((att) => (
-                  <div key={att.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border border-gray-100 p-4 rounded-2xl bg-slate-50">
-                    <div className="space-y-1 md:col-span-5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Place</label>
-                      <div className="space-y-2">
+                {/* Attachments Section */}
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                  <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Upload className="text-emerald-600" size={20} /> Attachments (If any)
+                  </h2>
+                  <div className="space-y-4">
+                    {profile.attachments.map((att) => (
+                      <div key={att.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border border-gray-100 p-4 rounded-2xl bg-slate-50">
+                        <div className="space-y-1 md:col-span-5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Place</label>
+                          <div className="space-y-2">
 
-                          <HospitalSearchInput
-                            isTextarea
-                            value={att.hospital}
-                            onChange={val => updateAttachment(att.id, 'hospital', val)}
-                            hospitals={hospitals}
-                            placeholder="Search hospital..."
+                              <HospitalSearchInput
+                                isTextarea
+                                value={att.hospital}
+                                onChange={val => updateAttachment(att.id, 'hospital', val)}
+                                hospitals={hospitals}
+                                placeholder="Search hospital..."
+                              />
+                          </div>
+                          <div className="flex gap-3 ml-2 mt-1">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${att.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {att.status || 'Sugam'}
+                            </span>
+                              <span className="text-[9px] font-bold text-slate-400">
+                                Above 7000 ft: <span className="text-slate-600">{att.above7000 || 'No'}</span>
+                              </span>
+                          </div>
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
+                          <input 
+                            type="text"
+                            placeholder="DD-MMM-YYYY"
+                            value={att.from} 
+                            onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
+                          <input 
+                            type="text"
+                            placeholder="DD-MMM-YYYY"
+                            value={att.to} 
+                            onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
+                            className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                          />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                          <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
+                            <div className="text-lg">{att.days || 0} days</div>
+                          </div>
+                        </div>
+                        <div className="md:col-span-1 flex justify-center pt-6">
+                          <button 
+                            type="button"
+                            onClick={() => removeAttachment(att.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-3 ml-2 mt-1">
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${att.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {att.status || 'Sugam'}
-                        </span>
-                          <span className="text-[9px] font-bold text-slate-400">
-                            Above 7000 ft: <span className="text-slate-600">{att.above7000 || 'No'}</span>
-                          </span>
-                      </div>
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={att.from} 
-                        onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={att.to} 
-                        onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
-                      <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600">
-                        <div className="text-lg">{att.days || 0} days</div>
-                      </div>
-                    </div>
-                    <div className="md:col-span-1 flex justify-center pt-6">
-                      <button 
-                        type="button"
-                        onClick={() => removeAttachment(att.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  type="button"
-                  onClick={addAttachment}
-                  className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
-                >
-                  <Plus size={16} /> Add More Attachments
-                </button>
+                    ))}
+                    <button 
+                      type="button"
+                      onClick={addAttachment}
+                      className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"
+                    >
+                      <Plus size={16} /> Add More Attachments
+                    </button>
 
-                {/* Attachment Summary Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Total Sugam Attachment Days</p>
-                    <div className="text-2xl font-black text-emerald-700">{serviceDays.attachmentSugam} days</div>
-                  </div>
-                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">Total Durgam (Below 7000ft) Attachment Days</p>
-                    <div className="text-2xl font-black text-amber-700">{serviceDays.attachmentDurgam} days</div>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-1">Total Durgam (Above 7000 ft: Yes) Attachment Days</p>
-                    <div className="text-2xl font-black text-red-700">{serviceDays.attachmentDurgamAbove7000} days</div>
+                    {/* Attachment Summary Buttons */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                      <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Total Sugam Attachment Days</p>
+                        <div className="text-2xl font-black text-emerald-700">{serviceDays.attachmentSugam} days</div>
+                      </div>
+                      <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">Total Durgam (Below 7000ft) Attachment Days</p>
+                        <div className="text-2xl font-black text-amber-700">{serviceDays.attachmentDurgam} days</div>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-1">Total Durgam (Above 7000 ft: Yes) Attachment Days</p>
+                        <div className="text-2xl font-black text-red-700">{serviceDays.attachmentDurgamAbove7000} days</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-slate-100">
               <div className="space-y-1 text-center bg-emerald-600 p-6 rounded-3xl shadow-lg shadow-emerald-100">
@@ -2844,27 +2910,31 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
         {activeTab === 'patients' && (
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <PatientList hospitalId={session.hospitalId || session.id} />
+            <PatientList hospitalId={session.selectedHospitalId || session.hospitalId || session.id} />
           </div>
         )}
 
         {activeTab === 'eparchi' && (
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
             <EParchi 
-              hospitalId={session.hospitalId || session.id} 
+              hospitalId={session.selectedHospitalId || session.hospitalId || session.id} 
               hospitalName={hospitalName}
               district={hospitalDetails?.district}
               hospitalType={hospitalDetails?.type}
               regionIndicator={hospitalDetails?.region_indicator}
               session={session}
               activeSubTab={eparchiSubTab}
+              onNavigateToIndent={() => {
+                setActiveTab('inventory');
+                setInventorySubTab('indent');
+              }}
             />
           </div>
         )}
 
         {showMedicineManagement && activeTab === 'inventory' && (
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <InventoryManager hospitalId={session.hospitalId || session.id} district={profile.presentDistrict} activeSubTab={inventorySubTab} />
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <InventoryManager hospitalId={session.selectedHospitalId || session.hospitalId || session.id} district={profile.presentDistrict} activeSubTab={inventorySubTab} />
           </div>
         )}
 
@@ -2920,19 +2990,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="tel"
                         pattern="[0-9]{10}"
                         title="Please enter a valid 10-digit mobile number"
-                        required
                         value={staffForm.mobile} 
                         onChange={e => setStaffForm({...staffForm, mobile: e.target.value})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                        className={`w-full bg-slate-50 border ${isMobileRegistered ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-100 focus:ring-emerald-500/20'} rounded-2xl py-3 px-4 focus:outline-none focus:ring-2`} 
                       />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
-                      <input 
-                        value={staffForm.employeeId} 
-                        onChange={e => setStaffForm({...staffForm, employeeId: e.target.value})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
+                      {isCheckingMobile && <p className="text-xs text-slate-500 ml-4 mt-1">Checking mobile number...</p>}
+                      {isMobileRegistered && <p className="text-xs text-red-500 font-bold ml-4 mt-1">Mobile Number Already Registered</p>}
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Role</label>
@@ -3003,7 +3066,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </button>
                   <button 
                     type="submit"
-                    className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+                    disabled={isMobileRegistered}
+                    className={`${isMobileRegistered ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95'} px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2`}
                   >
                     <Save size={18} />
                     {editingStaffId ? 'Update Staff' : 'Save Staff'}
@@ -3084,7 +3148,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <button 
                       onClick={() => {
                         setEditingStaffId(null);
-                        setStaffForm({ fullName: '', mobile: '', employeeId: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '' });
+                        setStaffForm({ fullName: '', mobile: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '' });
                         setSelectedModules(['profile']);
                         setIsStaffModalOpen(true);
                         setIsStaffSearchOpen(false);
@@ -3268,6 +3332,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </motion.div>
           </div>
         )}
+        {/* Posting Deletion Confirmation Modal */}
+        <PostingDeleteConfirmationModal 
+          isOpen={!!postingToDelete} 
+          onClose={() => setPostingToDelete(null)} 
+          onConfirm={() => {
+            if (postingToDelete) {
+              removePosting(postingToDelete);
+              setPostingToDelete(null);
+            }
+          }} 
+        />
       </AnimatePresence>
     </div>
   );
