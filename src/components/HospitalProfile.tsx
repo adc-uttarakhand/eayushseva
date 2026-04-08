@@ -34,7 +34,6 @@ const CENTRES_OF_EXCELLENCE = [
 
 export default function HospitalProfile({ hospitalDetails, onUpdate, session, onDirtyChange }: HospitalProfileProps) {
   const [formData, setFormData] = useState({
-    type: '',
     taluka: '',
     ipd_services: '',
     mobile: '',
@@ -60,7 +59,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     construction_year: '',
     no_of_beds: '',
     altitude: '',
-    above_7000_feet: ''
+    above_7000_feet: '',
+    type: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -296,7 +296,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
         construction_year: formData.construction_year ? parseInt(formData.construction_year) : null,
         no_of_beds: formData.no_of_beds ? parseInt(formData.no_of_beds) : null,
         altitude: formData.altitude ? parseInt(formData.altitude.toString().replace(/ft|feet/gi, '').trim()) : null,
-        above_7000_feet: formData.above_7000_feet || 'No'
+        above_7000_feet: formData.above_7000_feet || 'No',
+        type: formData.type
       };
 
       if (isVerifying && isAdmin) {
@@ -581,7 +582,29 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Type</label>
-            <p className="font-bold text-slate-900">{hospitalDetails.type || 'N/A'}</p>
+            <select 
+              value={formData.type}
+              onChange={e => setFormData({...formData, type: e.target.value})}
+              className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
+              disabled={!canEdit}
+            >
+              <option value="">Select Type</option>
+              {[
+                'AYUSH 50 Bed',
+                'AYUSH Educational Institute',
+                'AYUSH WING - PHC',
+                'AYUSH Wing - CHC',
+                'AYUSH Wing at District Hospital',
+                'AYUSHMAN AROGYA MANDIR (AYUSH)',
+                'Ayurveda 10 Bed',
+                'Government AYUSH Dispensary',
+                'Government AYUSH Hospital',
+                'MOCH - PHC',
+                'MOCH - CHC'
+              ].map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">District</label>
@@ -851,8 +874,9 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               disabled={!canEdit}
             >
               <option value="">Select Status</option>
-              <option value="Own">Own</option>
+              <option value="Owner">Owner</option>
               <option value="Rented">Rented</option>
+              <option value="Free">Free</option>
             </select>
           </div>
           <div>
