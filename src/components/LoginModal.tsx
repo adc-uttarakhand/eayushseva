@@ -220,11 +220,12 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       return;
     }
 
-    let isIncharge = false;
+    let isIncharge = !!staffData.is_incharge;
     let activeModules = staffData.assigned_modules || [];
+    const targetHospitalId = staffData.selectedHospitalId || staffData.hospital_id;
     
     // Check if selected hospital is secondary
-    if (staffData.hospital_id !== staffData.selectedHospitalId) {
+    if (staffData.hospital_id !== staffData.selectedHospitalId && staffData.selectedHospitalId) {
       const secondaryHospitals = staffData.secondary_hospitals || [];
       const secondary = secondaryHospitals.find((h: any) => h.hospital_id === staffData.selectedHospitalId);
       if (secondary) {
@@ -232,11 +233,11 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       }
     }
 
-    if (staffData.selectedHospitalId) {
+    if (targetHospitalId) {
       const { data: hospitalData } = await supabase
         .from('hospitals')
         .select('incharge_staff_id')
-        .eq('hospital_id', staffData.selectedHospitalId)
+        .eq('hospital_id', targetHospitalId)
         .maybeSingle();
       
       if (hospitalData && hospitalData.incharge_staff_id?.toString() === staffData.id.toString()) {
@@ -248,7 +249,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       role: 'STAFF',
       id: staffData.id.toString(),
       hospitalId: staffData.hospital_id,
-      activeHospitalId: staffData.selectedHospitalId,
+      activeHospitalId: targetHospitalId,
       activeModules: activeModules,
       name: staffData.full_name,
       modules: staffData.assigned_modules || [],

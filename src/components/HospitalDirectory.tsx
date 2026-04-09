@@ -39,7 +39,7 @@ interface Hospital {
   supraja_centre?: boolean;
   panchakarma_centre?: boolean;
   is_verified?: boolean;
-  above_7000ft?: boolean;
+  above_7000_feet?: string;
   last_edited_on?: string;
   verified_by?: string;
   verified_at?: string;
@@ -71,7 +71,8 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
     type: 'All',
     system: 'All',
     region: 'All',
-    status: 'All'
+    status: 'All',
+    above7000ft: 'All'
   });
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [isDossierOpen, setIsDossierOpen] = useState(false);
@@ -212,8 +213,9 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
     const matchesSystem = filters.system === 'All' || h.system === filters.system;
     const matchesRegion = filters.region === 'All' || h.region_indicator === filters.region;
     const matchesStatus = filters.status === 'All' || h.status === filters.status;
+    const matchesAbove7000ft = filters.above7000ft === 'All' || h.above_7000_feet === filters.above7000ft;
     
-    return matchesSearch && matchesDistrict && matchesType && matchesSystem && matchesRegion && matchesStatus;
+    return matchesSearch && matchesDistrict && matchesType && matchesSystem && matchesRegion && matchesStatus && matchesAbove7000ft;
   });
 
   const handleDownloadExcel = () => {
@@ -326,6 +328,15 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   <option value="All">All Status</option>
                   {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <select 
+                  value={filters.above7000ft}
+                  onChange={(e) => setFilters({...filters, above7000ft: e.target.value})}
+                  className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="All">Above 7000ft: All</option>
+                  <option value="Yes">Above 7000ft: Yes</option>
+                  <option value="No">Above 7000ft: No</option>
+                </select>
               </div>
             </div>
 
@@ -387,7 +398,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                           </td>
                           <td className="py-4 px-6 text-slate-600">{h.district}</td>
                           <td className="py-4 px-6 text-slate-600">{h.type}</td>
-                          <td className="py-4 px-6 text-slate-600">{h.above_7000ft ? 'Yes' : 'No'}</td>
+                          <td className="py-4 px-6 text-slate-600">{h.above_7000_feet || 'No'}</td>
                           <td className="py-4 px-6">
                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
                               {h.status || 'N/A'}
@@ -417,7 +428,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                       </div>
                       <div className="text-xs text-slate-600 mb-1">District: {h.district}</div>
                       <div className="text-xs text-slate-600 mb-1">Type: {h.type}</div>
-                      <div className="text-xs text-slate-600">Above 7000ft: {h.above_7000ft ? 'Yes' : 'No'}</div>
+                      <div className="text-xs text-slate-600">Above 7000ft: {h.above_7000_feet || 'No'}</div>
                     </div>
                   ))}
                 </div>

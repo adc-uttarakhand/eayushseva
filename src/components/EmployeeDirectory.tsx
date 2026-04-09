@@ -69,7 +69,8 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     // Join staff with hospitals to filter by district and system
     let query = supabase
       .from('staff')
-      .select('*');
+      .select('*')
+      .range(0, 5000);
 
     console.log('Executing Supabase query...');
     const { data, error } = await query;

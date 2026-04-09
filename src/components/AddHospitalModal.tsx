@@ -82,6 +82,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
     latitude: '',
     longitude: '',
     region_indicator: '',
+    above_7000_feet: 'No',
     email: '',
     status: '',
     hospital_password: 'ABCD_1234'
@@ -118,6 +119,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
         latitude: '',
         longitude: '',
         region_indicator: '',
+        above_7000_feet: 'No',
         email: '',
         status: '',
         hospital_password: 'ABCD_1234'
@@ -368,6 +370,18 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
                     <option value="">Select Status</option>
                     <option value="Sugam">Sugam</option>
                     <option value="Durgam">Durgam</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Above 7000 ft</label>
+                  <select 
+                    value={formData.above_7000_feet}
+                    onChange={e => setFormData({...formData, above_7000_feet: e.target.value})}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                  >
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
                   </select>
                 </div>
 

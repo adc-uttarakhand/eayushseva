@@ -403,6 +403,7 @@ export default function StateSamplesManager() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 text-sm text-slate-500">
+                    <th className="pb-3 font-medium">Order No</th>
                     <th className="pb-3 font-medium">Medicine</th>
                     <th className="pb-3 font-medium">District</th>
                     <th className="pb-3 font-medium">Status</th>
@@ -413,6 +414,7 @@ export default function StateSamplesManager() {
                 <tbody className="text-sm">
                   {samples.filter(s => s.status === 'Sent').map((sample) => (
                     <tr key={sample.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="py-3 font-mono text-xs text-slate-600">{sample.order_no}</td>
                       <td className="py-3 font-medium text-slate-900">
                         <div>{sample.medicine_name} / {sample.manufacturer_name}</div>
                         <div className="text-xs text-slate-500">
@@ -455,7 +457,7 @@ export default function StateSamplesManager() {
                   ))}
                   {samples.filter(s => s.status === 'Sent').length === 0 && !loading && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500">No samples sent by districts yet.</td>
+                      <td colSpan={6} className="py-8 text-center text-slate-500">No samples sent by districts yet.</td>
                     </tr>
                   )}
                 </tbody>
@@ -476,15 +478,21 @@ export default function StateSamplesManager() {
               }, {})).map((group: any, index: number) => (
                 <div key={index} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                   <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded uppercase tracking-wider">Order: {group[0].order_no}</span>
+                    </div>
                     <h3 className="font-bold text-slate-900">{group[0].medicine_name} / {group[0].manufacturer_name}</h3>
                     <p className="text-xs text-slate-500">Batch: {group[0].batch_number} | Mfg: {group[0].mfg_date} | Exp: {group[0].expiry_date}</p>
                   </div>
                   <div className="space-y-2">
                     {group.map((sample: any) => (
                       <div key={sample.id} className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm">
-                        <div>
-                          <span className="font-medium text-slate-700">{sample.district}</span>
-                          <span className="text-slate-500 ml-2">Received: {sample.received_amount}</span>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">#{sample.order_no}</span>
+                            <span className="font-medium text-slate-700">{sample.district}</span>
+                          </div>
+                          <span className="text-slate-500 text-xs">Received: {sample.received_amount}</span>
                         </div>
                         {sample.status === 'Reported' && (
                           <span className={`px-2 py-1 rounded-md text-xs font-medium ${

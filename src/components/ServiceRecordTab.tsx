@@ -169,8 +169,12 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           .eq('staff_id', targetStaffId)
           .maybeSingle();
 
-        const presentHospitalObj = hospitalsData.find(h => h.facility_name === staffData.present_hospital);
+        const presentPosting = (staffData.postings || []).find((p: any) => p.toDate === 'Present' || p.toDate === 'present');
+        const presentHospitalId = staffData.present_hospital_id || (presentPosting ? presentPosting.hospital_id : '');
+        const presentHospitalObj = hospitalsData.find(h => h.hospital_id === presentHospitalId);
         const firstHospitalObj = hospitalsData.find(h => h.facility_name === staffData.first_posting_place);
+        
+        const presentHospitalName = presentHospitalObj ? presentHospitalObj.facility_name : (staffData.present_hospital || '');
 
         setProfile({
           fullName: staffData.full_name || '',
@@ -185,11 +189,12 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           employmentType: staffData.employment_type || 'Permanent',
           gender: staffData.gender || 'Male',
           dob: formatDateForUI(staffData.dob),
-          currentPostingJoiningDate: formatDateForUI(staffData.current_posting_joining_date),
+          currentPostingJoiningDate: formatDateForUI(staffData.current_posting_joining_date || (presentPosting ? presentPosting.fromDate : '')),
           presentDistrict: staffData.present_district || '',
-          presentHospital: staffData.present_hospital || '',
-          presentPostingType: presentHospitalObj?.status || 'N/A',
-          presentPostingAbove7000: presentHospitalObj?.above_7000_feet || 'No',
+          presentHospital: presentHospitalName,
+          presentHospitalId: presentHospitalId,
+          presentPostingType: presentHospitalObj ? (presentHospitalObj.status || 'Sugam') : (presentPosting ? presentPosting.status : 'Sugam'),
+          presentPostingAbove7000: presentHospitalObj ? (presentHospitalObj.region_indicator === 'Above 7000' || presentHospitalObj.above_7000_feet === 'Yes' ? 'Yes' : 'No') : (presentPosting ? presentPosting.above7000 : 'No'),
           bloodGroup: staffData.blood_group || '',
           permanentAddress: staffData.permanent_address || '',
           currentResidentialAddress: staffData.current_residential_address || '',
@@ -202,7 +207,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           bcpRegistrationNo: staffData.bcp_registration_no || '',
           longLeaves: staffData.long_leaves || [],
           trainings: staffData.trainings || [],
-          postings: staffData.postings || [],
+          postings: (staffData.postings || []).filter((p: any) => p.toDate !== 'Present' && p.toDate !== 'present'),
           attachments: staffData.attachments || [],
           isVerified: staffData.is_verified || false,
           lastVerifiedOn: staffData.last_verified_on || '',
@@ -280,7 +285,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
     return `${years}Y ${months}M ${days}D`;
   };
 
-  const calculateServiceDays = (postings: any[], attachments: any[] = [], longLeaves: any[] = [], currentJoiningDate: string = '', hDetails: any = null) => {
+  const calculateServiceDays = (postings: any[], attachments: any[] = [], longLeaves: any[] = [], currentJoiningDate: string = '', currentPostingType: string = 'Sugam', currentPostingAbove7000: string = 'No') => {
     let sugam = 0;
     let durgamNoAbove7000 = 0;
     let durgamAbove7000 = 0;
@@ -292,13 +297,14 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
     const overlaps = (s1: Date, e1: Date, s2: Date, e2: Date) => s1 <= e2 && s2 <= e1;
 
     const allPostings = [...postings];
-    if (currentJoiningDate) {
+    const hasPresent = allPostings.some(p => p.toDate === 'Present' || p.toDate === 'present');
+    if (currentJoiningDate && !hasPresent) {
       allPostings.push({
         isAuto: true,
         fromDate: currentJoiningDate,
         toDate: new Date().toISOString().split('T')[0],
-        status: hDetails?.status || 'Sugam',
-        above7000: (hDetails?.region_indicator === 'Above 7000' || hDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'
+        status: currentPostingType,
+        above7000: currentPostingAbove7000
       });
     }
 
@@ -446,13 +452,22 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           }
         }
         
-        const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
+        const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, profile.presentPostingType, profile.presentPostingAbove7000);
         
         const sanitizedPostings = profile.postings.map((p: any) => ({
           ...p,
+          hospital_id: p.hospital_id,
           fromDate: formatDateForDB(p.fromDate),
           toDate: formatDateForDB(p.toDate)
         }));
+        
+        sanitizedPostings.push({
+          hospital_id: profile.presentHospitalId,
+          fromDate: formatDateForDB(profile.currentPostingJoiningDate),
+          toDate: 'Present',
+          status: profile.presentPostingType,
+          above7000: profile.presentPostingAbove7000
+        });
         
         const sanitizedAttachments = profile.attachments.map((a: any) => ({
           ...a,
@@ -554,7 +569,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
 
   const addPosting = () => {
     const newPosting = { 
-        id: Date.now().toString(), 
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
         hospitalName: '', 
         hospital_id: '', 
         fromDate: '', 
@@ -613,13 +628,12 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
   const updatePosting = (id: string, field: string, value: any) => {
     let newPostings = profile.postings.map((p: any) => p.id === id ? { ...p, [field]: value } : p);
     
-    if (field === 'hospitalName') {
+    if (field === 'hospital_id') {
       newPostings = newPostings.map((p: any) => {
         if (p.id === id) {
-          const h = hospitals.find(h => h.facility_name === p.hospitalName);
+          const h = hospitals.find(h => h.hospital_id === p.hospital_id);
           return { 
             ...p, 
-            hospital_id: h ? h.hospital_id : '',
             status: h ? (h.status || 'Sugam') : p.status, 
             above7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : p.above7000
           };
@@ -762,7 +776,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
     return <div className="text-center py-20 text-slate-500">Staff profile not found.</div>;
   }
 
-  const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
+  const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, profile.presentPostingType, profile.presentPostingAbove7000);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-8 py-8">
@@ -1210,25 +1224,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
               <Calendar className="text-emerald-600" size={20} /> Service Details
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting Place</label>
-                <div className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-3 px-4 text-slate-800 font-medium">
-                  {profile.presentHospital}
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded">{profile.presentPostingType || 'N/A'}</span>
-                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded">Above 7000ft: {profile.presentPostingAbove7000 === 'Yes' ? 'Yes' : 'No'}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting District</label>
-                <input 
-                  value={profile.presentDistrict} 
-                  readOnly
-                  className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-3 px-4 focus:outline-none" 
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of Joining at Present Posting</label>
                 <input 
@@ -1251,12 +1247,23 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">First Posting Place</label>
-                <div className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-3 px-4 text-slate-800 font-medium">
-                  {profile.firstPostingPlace}
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded">{profile.firstPostingType || 'N/A'}</span>
-                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded">Above 7000ft: {profile.firstPostingAbove7000 === 'Yes' ? 'Yes' : 'No'}</span>
-                  </div>
+                <HospitalSearchInput
+                  isTextarea
+                  value={profile.firstPostingPlace || ''}
+                  onChange={(val: string) => {
+                    const h = hospitals.find(h => h.facility_name === val);
+                    updateProfile({ 
+                      firstPostingPlace: val,
+                      firstPostingType: h ? (h.status || 'Sugam') : 'Sugam',
+                      firstPostingAbove7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : 'No'
+                    });
+                  }}
+                  hospitals={hospitals}
+                  placeholder="Type hospital name..."
+                />
+                <div className="flex gap-2 mt-1 ml-4">
+                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">{profile.firstPostingType || 'N/A'}</span>
+                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">Above 7000ft: {profile.firstPostingAbove7000 || 'No'}</span>
                 </div>
               </div>
             </div>
@@ -1277,7 +1284,15 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
               <HospitalSearchInput
                 isTextarea
                 value={profile.presentHospital || ''}
-                onChange={(val: string) => updateProfile({ presentHospital: val })}
+                onChange={(val: string) => {
+                  const h = hospitals.find(h => h.facility_name === val);
+                  updateProfile({ 
+                    presentHospital: val,
+                    presentHospitalId: h ? h.hospital_id : '',
+                    presentPostingType: h ? (h.status || 'Sugam') : 'Sugam',
+                    presentPostingAbove7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : 'No'
+                  });
+                }}
                 hospitals={hospitals}
                 placeholder="Type hospital name..."
               />
@@ -1317,14 +1332,17 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Previous Posting</label>
                 <HospitalSearchInput
                   isTextarea
-                  value={posting.hospitalName}
-                  onChange={(val: string) => updatePosting(posting.id, 'hospitalName', val)}
+                  value={hospitals.find(h => h.hospital_id === posting.hospital_id)?.facility_name || ''}
+                  onChange={(val: string) => {
+                    const h = hospitals.find(h => h.facility_name === val);
+                    updatePosting(posting.id, 'hospital_id', h ? h.hospital_id : '');
+                  }}
                   hospitals={hospitals}
                   placeholder="Type hospital name..."
                 />
                 <div className="flex gap-2 mt-1 ml-4">
-                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">{hospitals.find(h => h.facility_name === posting.hospitalName)?.status || 'N/A'}</span>
-                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">Above 7000ft: {hospitals.find(h => h.facility_name === posting.hospitalName)?.above_7000_feet === 'Yes' ? 'Yes' : 'No'}</span>
+                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">{hospitals.find(h => h.hospital_id === posting.hospital_id)?.status || 'N/A'}</span>
+                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-black font-bold">Above 7000ft: {hospitals.find(h => h.hospital_id === posting.hospital_id)?.above_7000_feet === 'Yes' ? 'Yes' : 'No'}</span>
                 </div>
               </div>
               <div className="space-y-1 md:col-span-2">

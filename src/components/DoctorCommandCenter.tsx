@@ -4,6 +4,7 @@ import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, 
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
+import HospitalChangeModal from './HospitalChangeModal';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -284,13 +285,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   // Profile State
   const [postingToDelete, setPostingToDelete] = useState<string | null>(null);
+  const [hospitalToDelete, setHospitalToDelete] = useState<any>(null);
   const [profile, setProfile] = useState({
     fullName: session?.name || '',
     designation: '',
     empId: '',
     mobile: '',
     password: '',
-    aadhaarNumber: '',
     fatherName: '',
     photograph: '',
     email: '',
@@ -305,19 +306,20 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     currentResidentialAddress: '',
     system: '',
     hospitalConnectedName: '',
+    hospitalConnectedId: '',
     bcpRegistrationNo: '',
     specialization: 'General',
     qualification: '',
     clinicalExperienceSince: '',
     keywords: '',
-    trainings: [{ id: Date.now().toString(), title: '', year: '' }],
+    trainings: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), title: '', year: '' }],
     dateOfFirstAppointment: '',
     dateOfFirstJoiningDepartment: '',
     firstPostingPlace: '',
     homeDistrict: '',
-    longLeaves: [{ id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
-    postings: [{ id: Date.now().toString(), hospitalName: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
-    attachments: [{ id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+    longLeaves: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
+    postings: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
+    attachments: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
   });
 
   // Staff State
@@ -331,6 +333,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isHospitalChangeModalOpen, setIsHospitalChangeModalOpen] = useState(false);
+  const [isActualHospitalChangeModalOpen, setIsActualHospitalChangeModalOpen] = useState(false);
   const [isStaffSearchOpen, setIsStaffSearchOpen] = useState(false);
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [staffSearchResults, setStaffSearchResults] = useState<any[]>([]);
@@ -473,7 +476,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         empId: staffData?.employee_id || '',
         mobile: staffData?.mobile_number || '',
         password: staffData?.login_password || '',
-        aadhaarNumber: staffData?.aadhaar_number || '',
         fatherName: staffData?.father_name || '',
         photograph: staffData?.photograph_url || '',
         email: staffData?.email_id || '',
@@ -487,7 +489,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         permanentAddress: staffData?.permanent_address || '',
         currentResidentialAddress: staffData?.current_residential_address || '',
         system: hospitalInfo?.system || '',
-        hospitalConnectedName: hospitalInfo?.facility_name || '',
+        hospitalConnectedName: hospitalName || hospitalInfo?.facility_name || '',
+        hospitalConnectedId: session.activeHospitalId || session.hospitalId || staffData?.hospital_id || '',
+        mainPostingName: hospitalInfo?.facility_name || '',
+        mainPostingId: staffData?.hospital_id || '',
+        attachedHospitals: staffData?.secondary_hospitals ? staffData.secondary_hospitals.map((h: any) => {
+          const hosp = hospitals.find(hp => hp.hospital_id === h.hospital_id);
+          return {
+            id: h.hospital_id,
+            name: hosp ? hosp.facility_name : h.hospital_id
+          };
+        }) : [],
         bcpRegistrationNo: staffData?.bcp_registration_no || '',
         specialization: docData?.specialization || 'General',
         qualification: docData?.highest_qualification || '',
@@ -594,21 +606,33 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       const { data, error } = await supabase
         .from('staff')
         .select('*')
-        .eq('hospital_id', targetHospitalId);
+        .or(`hospital_id.eq.${targetHospitalId},secondary_hospitals.cs.[{"hospital_id":"${targetHospitalId}"}]`)
+        .range(0, 5000);
 
       if (data) {
         const loggedInUserMobile = profile.mobile;
         const filteredStaff = data.filter(s => s.mobile_number !== loggedInUserMobile && s.id.toString() !== session.id);
         
-        setStaffList(filteredStaff.map(s => ({
-          id: s.id,
-          name: s.full_name,
-          role: s.role,
-          mobile: s.mobile_number,
-          isActive: s.is_active,
-          roleColor: s.role === 'Nurse' ? 'bg-pink-100 text-pink-700' : s.role === 'Pharmacist' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
-          assigned_modules: s.assigned_modules || []
-        })));
+        setStaffList(filteredStaff.map(s => {
+          // Determine the correct modules for this hospital
+          let modules = s.assigned_modules || [];
+          if (s.hospital_id !== targetHospitalId && s.secondary_hospitals) {
+            const secAssignment = s.secondary_hospitals.find((h: any) => h.hospital_id === targetHospitalId);
+            if (secAssignment && secAssignment.assigned_modules) {
+              modules = secAssignment.assigned_modules;
+            }
+          }
+
+          return {
+            id: s.id,
+            name: s.full_name,
+            role: s.role,
+            mobile: s.mobile_number,
+            isActive: s.is_active,
+            roleColor: s.role === 'Nurse' ? 'bg-pink-100 text-pink-700' : s.role === 'Pharmacist' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
+            assigned_modules: modules
+          };
+        }));
       }
     };
     if (activeTab === 'staff' || activeTab === 'dashboard') fetchStaff();
@@ -657,7 +681,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     return `${years}Y ${months}M ${days}D`;
   };
 
-  const calculateServiceDays = (postings: any[], attachments: any[] = [], longLeaves: any[] = [], currentJoiningDate: string = '', hDetails: any = null) => {
+  const calculateServiceDays = (postings: any[], attachments: any[] = [], longLeaves: any[] = [], currentJoiningDate: string = '', currentPostingType: string = 'Sugam', currentPostingAbove7000: string = 'No') => {
     let sugam = 0;
     let durgamNoAbove7000 = 0;
     let durgamAbove7000 = 0;
@@ -686,8 +710,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         isAuto: true,
         fromDate: currentJoiningDate,
         toDate: new Date().toISOString().split('T')[0], // Simplified for now
-        status: hDetails?.status || 'Sugam',
-        above7000: (hDetails?.region_indicator === 'Above 7000' || hDetails?.above_7000_feet === 'Yes') ? 'Yes' : 'No'
+        status: currentPostingType,
+        above7000: currentPostingAbove7000
       });
     }
 
@@ -696,7 +720,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       const end = parseDateStr(p.toDate);
       if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
 
-      let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + (p.isAuto ? 0 : 1);
+      let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       let pSugam = 0, pDurgamNoAbove7000 = 0, pDurgamAbove7000 = 0;
 
       if (p.status === 'Sugam') pSugam = days;
@@ -819,7 +843,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     }
   };
 
-  const serviceDays = calculateServiceDays(profile.postings, profile.attachments, profile.longLeaves, profile.currentPostingJoiningDate, hospitalDetails);
+  const serviceDays = calculateServiceDays(profile.postings.slice(1), profile.attachments, profile.longLeaves, profile.postings[0]?.fromDate, profile.postings[0]?.status, profile.postings[0]?.above7000);
 
   const validatePostings = () => {
     const sortedPostings = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
@@ -931,7 +955,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         mobile_number: profile.mobile,
         employee_id: profile.empId || null,
         login_password: profile.password,
-        aadhaar_number: profile.aadhaarNumber,
         father_name: profile.fatherName,
         photograph_url: profile.photograph,
         email_id: profile.email,
@@ -954,6 +977,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         trainings: profile.trainings,
         postings: sanitizedPostings,
         attachments: sanitizedAttachments,
+        secondary_hospitals: profile.attachedHospitals.map((h: any) => ({
+          hospital_id: h.id,
+          assigned_modules: h.assigned_modules
+        })),
         long_leaves_count: serviceDays.totalLeaves,
         attachment_sugam_days: serviceDays.attachmentSugam,
         attachment_durgam_days: serviceDays.attachmentDurgam,
@@ -1062,7 +1089,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addPosting = () => {
     setProfile(prev => {
       const newPosting = { 
-        id: Date.now().toString(), 
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
         hospitalName: '', 
         hospital_id: '', 
         fromDate: '', 
@@ -1093,6 +1120,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   };
 
   const removePosting = (id: string) => {
+    console.log('Removing posting:', id);
     setProfile(prev => ({
       ...prev,
       postings: prev.postings.filter(p => p.id !== id)
@@ -1103,14 +1131,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     setProfile(prev => {
       let newPostings = prev.postings.map(p => p.id === id ? { ...p, [field]: value } : p);
       
-      // Auto-fetch hospital details if name changes
-      if (field === 'hospitalName') {
+      // Auto-fetch hospital details if id changes
+      if (field === 'hospital_id') {
         newPostings = newPostings.map(p => {
           if (p.id === id) {
-            const h = hospitals.find(h => h.facility_name === p.hospitalName);
+            const h = hospitals.find(h => h.hospital_id === p.hospital_id);
             return { 
               ...p, 
-              hospital_id: h ? h.hospital_id : '',
               status: h ? (h.status || 'Sugam') : p.status, 
               above7000: h ? (h.above_7000_feet || 'No') : p.above7000
             };
@@ -1232,12 +1259,23 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     setStaffForm({ 
       fullName: staff.full_name || staff.name || '', 
       mobile: staff.mobile_number || staff.mobile || '', 
-      aadhaarNumber: staff.aadhaar_number || '',
       role: staff.role || 'Pharmacist', 
       password: '',
       firstPostingPlace: staff.first_posting_place || ''
     });
-    let modules = staff.assigned_modules || ['profile'];
+
+    const currentHospitalId = session.activeHospitalId || session.hospitalId;
+    let modules = ['profile'];
+
+    if (staff.hospital_id === currentHospitalId) {
+      modules = staff.assigned_modules || ['profile'];
+    } else if (staff.secondary_hospitals && Array.isArray(staff.secondary_hospitals)) {
+      const secAssignment = staff.secondary_hospitals.find((h: any) => h.hospital_id === currentHospitalId);
+      if (secAssignment && secAssignment.assigned_modules) {
+        modules = secAssignment.assigned_modules;
+      }
+    }
+
     if (modules.includes('eparchi_consultation') && !modules.includes('eparchi_queue')) {
       modules = [...modules, 'eparchi_queue'];
     }
@@ -1298,37 +1336,49 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     };
 
     if (editingStaffId) {
-      // Check if staff is being transferred from another hospital
+      const currentHospitalId = session.activeHospitalId || session.hospitalId;
+      
+      // Check if staff is being transferred from another hospital or just assigned secondarily
       const { data: currentStaff } = await supabase
         .from('staff')
-        .select('hospital_id')
+        .select('*')
         .eq('id', editingStaffId)
         .single();
 
-      if (currentStaff && currentStaff.hospital_id !== session.hospitalId) {
-        // Remove from previous hospital incharge if applicable
-        await supabase
-          .from('hospitals')
-          .update({ 
-            incharge_staff_id: null,
-            incharge_name: null
-          })
-          .eq('hospital_id', currentStaff.hospital_id)
-          .eq('incharge_staff_id', editingStaffId);
-          
-        // Remove incharge status on staff record
-        payload.is_incharge = false;
-      }
+      if (currentStaff && currentStaff.hospital_id !== currentHospitalId) {
+        // Staff belongs primarily to another hospital. Update secondary_hospitals.
+        const currentSecondary = currentStaff.secondary_hospitals || [];
+        const otherSecondary = currentSecondary.filter((h: any) => h.hospital_id !== currentHospitalId);
+        
+        const newSecondaryHospitals = [
+          ...otherSecondary,
+          {
+            hospital_id: currentHospitalId,
+            assigned_modules: selectedModules
+          }
+        ];
 
-      const { error } = await supabase.from('staff').update(payload).eq('id', editingStaffId);
-      if (error) {
-        if (error.code === '23505' || error.message?.includes('unique constraint')) {
-          setIsMobileRegistered(true);
-          alert('Mobile Number or Employee ID Already Registered! / मोबाइल नंबर या कर्मचारी आईडी पहले से पंजीकृत है!');
-        } else {
+        const { error } = await supabase
+          .from('staff')
+          .update({ secondary_hospitals: newSecondaryHospitals })
+          .eq('id', editingStaffId);
+
+        if (error) {
           alert('Update failed: ' + error.message);
+          return;
         }
-        return;
+      } else {
+        // Staff belongs primarily to THIS hospital. Update their main details.
+        const { error } = await supabase.from('staff').update(payload).eq('id', editingStaffId);
+        if (error) {
+          if (error.code === '23505' || error.message?.includes('unique constraint')) {
+            setIsMobileRegistered(true);
+            alert('Mobile Number or Employee ID Already Registered! / मोबाइल नंबर या कर्मचारी आईडी पहले से पंजीकृत है!');
+          } else {
+            alert('Update failed: ' + error.message);
+          }
+          return;
+        }
       }
     } else {
       const { error } = await supabase.from('staff').insert([payload]);
@@ -1365,7 +1415,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       const { data, error } = await supabase
         .from('staff')
         .select('*')
-        .or(`full_name.ilike.%${staffSearchQuery}%,aadhaar_number.eq.${staffSearchQuery},employee_id.eq.${staffSearchQuery},mobile_number.eq.${staffSearchQuery}`);
+        .or(`full_name.ilike.%${staffSearchQuery}%,employee_id.eq.${staffSearchQuery},mobile_number.eq.${staffSearchQuery}`);
       
       if (data) {
         setStaffSearchResults(data);
@@ -1807,7 +1857,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Photograph (Passport Size)</label>
                   <div className="flex gap-6 items-center bg-slate-50 p-6 rounded-3xl border border-gray-100">
@@ -1904,15 +1954,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Aadhaar Number</label>
-                  <input 
-                    value={profile.aadhaarNumber} 
-                    onChange={e => setProfile({...profile, aadhaarNumber: e.target.value})} 
-                    placeholder="12-digit Aadhaar"
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
-                </div>
-                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">BCP Registration Number</label>
                   <input 
                     value={profile.bcpRegistrationNo} 
@@ -1945,24 +1986,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     readOnly
                     className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold" 
                   />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Connected Hospital</label>
-                  <div className="relative">
-                    <input 
-                      value={profile.hospitalConnectedName} 
-                      readOnly
-                      className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold" 
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setIsHospitalChangeModalOpen(true)}
-                      className="text-[10px] text-emerald-600 hover:underline mt-1 font-bold ml-4"
-                    >
-                      Change Hospital?
-                    </button>
-                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -2062,6 +2085,83 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   />
                 </div>
               </div>
+                
+                {/* Hospital Details Section */}
+                <div className="mt-8 pt-8 border-t border-gray-100 w-full">
+                  <h3 className="text-lg font-bold text-slate-900 mb-6">Hospital Details</h3>
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Connected Hospital</label>
+                      <input 
+                        value={profile.hospitalConnectedName || 'Not Set'} 
+                        readOnly
+                        className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold" 
+                      />
+                      <span className="text-xs text-slate-400 ml-4">ID: {profile.hospitalConnectedId || 'N/A'}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Main Posting (Mool Tainati)</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 flex flex-col gap-1">
+                          <input 
+                            value={profile.mainPostingName || 'Not Set'} 
+                            readOnly
+                            className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold" 
+                          />
+                          <span className="text-xs text-slate-400 ml-4">ID: {profile.mainPostingId || 'N/A'}</span>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setIsActualHospitalChangeModalOpen(true)}
+                          className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all self-start"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attached Hospitals</label>
+                      <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 space-y-2">
+                        {profile.attachedHospitals && profile.attachedHospitals.length > 0 ? (
+                          profile.attachedHospitals.map((h: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100">
+                              <div>
+                                <span className="font-bold text-slate-700">{h.name}</span>
+                                <p className="text-xs text-slate-500">ID: {h.id} | Modules: {h.assigned_modules?.join(', ') || 'None'}</p>
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={() => setHospitalToDelete(h)}
+                                className="text-red-600 hover:text-red-800 font-bold text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-slate-400 text-sm italic">No attached hospitals.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {hospitalToDelete && (
+                      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-2xl space-y-4 max-w-sm w-full">
+                          <h3 className="font-bold text-lg">Confirm Deletion</h3>
+                          <p>Are you sure you want to remove {hospitalToDelete.name}?</p>
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => setHospitalToDelete(null)} className="px-4 py-2 bg-gray-200 rounded-xl font-bold">Cancel</button>
+                            <button onClick={() => {
+                              const updated = profile.attachedHospitals.filter((h: any) => h.id !== hospitalToDelete.id);
+                              setProfile({...profile, attachedHospitals: updated});
+                              setHospitalToDelete(null);
+                            }} className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold">Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
             </div>
 
               </>
@@ -2126,40 +2226,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting Place</label>
-                      <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold min-h-[3rem] flex items-center">
-                        {hospitalDetails?.office_name ? `${hospitalDetails.office_name}, ${hospitalDetails.district || 'N/A'}` : (hospitalName || 'Not Assigned')}
-                      </div>
-                      {hospitalDetails && (
-                        <div className="flex gap-4 ml-4 mt-1">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${hospitalDetails.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {hospitalDetails.status || 'Sugam'}
-                          </span>
-                          {hospitalDetails.facility_name && (
-                            <span className="text-[10px] font-bold text-slate-400">
-                              Above 7000 ft: <span className="text-slate-600">{(hospitalDetails.region_indicator === 'Above 7000' || hospitalDetails.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present Posting District</label>
-                      <div className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 text-slate-600 font-bold">
-                        {hospitalDetails?.district || '---'}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of Joining at Present Posting</label>
-                      <input 
-                        type="text"
-                        placeholder="DD-MMM-YYYY"
-                        value={profile.currentPostingJoiningDate} 
-                        onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})} 
-                        className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      />
-                    </div>
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Home District</label>
@@ -2200,17 +2266,28 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place</label>
                         <HospitalSearchInput
                           isTextarea
-                          value={profile.presentHospital || ''}
-                          onChange={val => setProfile({...profile, presentHospital: val})}
+                          value={profile.postings[0]?.hospitalName || ''}
+                          onChange={val => {
+                            const h = hospitals.find(h => h.facility_name === val);
+                            const newPostings = [...profile.postings];
+                            newPostings[0] = {
+                              ...newPostings[0],
+                              hospitalName: val,
+                              hospital_id: h ? h.hospital_id : '',
+                              status: h ? (h.status || 'Sugam') : 'Sugam',
+                              above7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : 'No'
+                            };
+                            setProfile({ ...profile, postings: newPostings });
+                          }}
                           hospitals={hospitals}
                           placeholder="Type hospital name..."
                         />
                         <div className="flex gap-3 ml-2 mt-1">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${profile.presentPostingType === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {profile.presentPostingType || 'Sugam'}
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${profile.postings[0]?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {profile.postings[0]?.status || 'Sugam'}
                           </span>
                           <span className="text-[9px] font-bold text-slate-400">
-                            Above 7000 ft: <span className="text-slate-600">{profile.presentPostingAbove7000 || 'No'}</span>
+                            Above 7000 ft: <span className="text-slate-600">{profile.postings[0]?.above7000 || 'No'}</span>
                           </span>
                         </div>
                       </div>
@@ -2219,8 +2296,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         <input 
                           type="text"
                           placeholder="DD-MMM-YYYY"
-                          value={profile.currentPostingJoiningDate || ''}
-                          onChange={e => setProfile({...profile, currentPostingJoiningDate: maskDate(e.target.value)})}
+                          value={profile.postings[0]?.fromDate || ''}
+                          onChange={e => {
+                            const newPostings = [...profile.postings];
+                            newPostings[0] = { ...newPostings[0], fromDate: maskDate(e.target.value) };
+                            setProfile({ ...profile, postings: newPostings });
+                          }}
                           className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                         />
                       </div>
@@ -2234,9 +2315,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Days (Auto)</label>
                         <div className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-center font-bold text-emerald-700">
                           {(() => {
-                            const start = parseDateStr(profile.currentPostingJoiningDate);
+                            const start = parseDateStr(profile.postings[0]?.fromDate || '');
                             if (isNaN(start.getTime())) return '---';
-                            const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                            const days = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                             return (
                               <div className="text-lg">{days > 0 ? days : 0} days</div>
                             );
@@ -2245,11 +2326,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       </div>
                     </div>
 
+
                     {/* Past Postings (Reverse Chronological) */}
                     {(() => {
                       const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
-                      return sorted.map((posting, index) => {
-                        const nextPosting = index < sorted.length - 1 ? sorted[index + 1] : null;
+                      // Exclude the first posting (the present posting)
+                      const pastPostings = sorted.slice(1);
+                      return pastPostings.map((posting, index) => {
+                        const nextPosting = index < pastPostings.length - 1 ? pastPostings[index + 1] : null;
                         const gap = nextPosting ? (parseDateStr(posting.fromDate).getTime() - parseDateStr(nextPosting.toDate).getTime()) / (1000 * 60 * 60 * 24) - 1 : 0;
                         
                         return (
@@ -2267,18 +2351,21 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                                 <div className="space-y-2">
                                   <HospitalSearchInput
                                     isTextarea
-                                    value={posting.hospitalName}
-                                    onChange={val => updatePosting(posting.id, 'hospitalName', val)}
+                                    value={hospitals.find(h => h.hospital_id === posting.hospital_id)?.facility_name || ''}
+                                    onChange={val => {
+                                      const h = hospitals.find(h => h.facility_name === val);
+                                      updatePosting(posting.id, 'hospital_id', h ? h.hospital_id : '');
+                                    }}
                                     hospitals={hospitals}
                                     placeholder="Type hospital name..."
                                   />
                                 </div>
                                 <div className="flex gap-3 ml-2 mt-1">
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {posting.status || 'Sugam'}
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitals.find(h => h.hospital_id === posting.hospital_id)?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {hospitals.find(h => h.hospital_id === posting.hospital_id)?.status || 'Sugam'}
                                   </span>
                                   <span className="text-[9px] font-bold text-slate-400">
-                                    Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span>
+                                    Above 7000 ft: <span className="text-slate-600">{(hospitals.find(h => h.hospital_id === posting.hospital_id)?.region_indicator === 'Above 7000' || hospitals.find(h => h.hospital_id === posting.hospital_id)?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span>
                                   </span>
                                 </div>
                               </div>
@@ -2327,7 +2414,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                               <div className="md:col-span-1 flex justify-center pt-6">
                                 <button 
                                   type="button"
-                                  onClick={() => setPostingToDelete(posting.id)}
+                                  onClick={() => {
+                                    console.log('Direct delete button clicked for posting:', posting.id);
+                                    removePosting(posting.id);
+                                  }}
                                   className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all`}
                                 >
                                   <X size={20} />
@@ -2338,17 +2428,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         );
                       });
                     })()}
-
-                    <PostingDeleteConfirmationModal
-                      isOpen={!!postingToDelete}
-                      onClose={() => setPostingToDelete(null)}
-                      onConfirm={() => {
-                        if (postingToDelete) {
-                          removePosting(postingToDelete);
-                          setPostingToDelete(null);
-                        }
-                      }}
-                    />
 
                     {(() => {
                       const sorted = [...profile.postings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
@@ -3153,18 +3232,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-gray-200">
                     <Users size={40} className="mx-auto text-slate-300 mb-3" />
                     <p className="text-slate-500 font-medium">No staff found matching your search.</p>
-                    <button 
-                      onClick={() => {
-                        setEditingStaffId(null);
-                        setStaffForm({ fullName: '', mobile: '', aadhaarNumber: '', role: 'Pharmacist', password: '', firstPostingPlace: '' });
-                        setSelectedModules(['profile']);
-                        setIsStaffModalOpen(true);
-                        setIsStaffSearchOpen(false);
-                      }}
-                      className="mt-4 bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all"
-                    >
-                      Add as New Staff
-                    </button>
                   </div>
                 ) : (
                   <p className="text-center text-slate-400 py-10">Enter search criteria to find existing staff</p>
@@ -3177,6 +3244,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
       {/* Hospital Change Modal */}
       <AnimatePresence>
+        {isActualHospitalChangeModalOpen && (
+          <HospitalChangeModal 
+            isOpen={isActualHospitalChangeModalOpen} 
+            onClose={() => setIsActualHospitalChangeModalOpen(false)} 
+            currentHospitalId={profile.hospitalConnectedId} 
+            staffId={session.id}
+          />
+        )}
         {isHospitalChangeModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
