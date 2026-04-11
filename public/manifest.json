@@ -1,0 +1,19 @@
+{
+  "name": "eAYUSHseval",
+  "short_name": "eAYUSHseval",
+  "display": "standalone",
+  "theme_color": "#1e40af",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/eAYUSHSeva%20(1).png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/eAYUSHSeva%20(1).png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
