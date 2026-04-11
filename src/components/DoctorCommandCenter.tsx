@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
+import StaffDeleteConfirmationModal from './StaffDeleteConfirmationModal';
 import HospitalChangeModal from './HospitalChangeModal';
+import AddEmployeeModal from './AddEmployeeModal';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -204,9 +207,9 @@ const OfficeSearchInput = ({
       
       {isOpen && query && filteredOffices.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredOffices.map((o, idx) => (
+          {filteredOffices.map((o) => (
             <div
-              key={idx}
+              key={o.office_name}
               className="px-4 py-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0"
               onClick={() => {
                 setQuery(o.office_name);
@@ -245,6 +248,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [initialProfile, setInitialProfile] = useState<any>(null);
   const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState<number | null>(null);
   const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
   const [isHospitalProfileDirty, setIsHospitalProfileDirty] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
@@ -331,6 +336,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   // Modal State
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isHospitalChangeModalOpen, setIsHospitalChangeModalOpen] = useState(false);
   const [isActualHospitalChangeModalOpen, setIsActualHospitalChangeModalOpen] = useState(false);
@@ -497,7 +503,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
           const hosp = hospitals.find(hp => hp.hospital_id === h.hospital_id);
           return {
             id: h.hospital_id,
-            name: hosp ? hosp.facility_name : h.hospital_id
+            name: hosp ? hosp.facility_name : h.hospital_id,
+            assigned_modules: h.assigned_modules || []
           };
         }) : [],
         bcpRegistrationNo: staffData?.bcp_registration_no || '',
@@ -616,10 +623,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         setStaffList(filteredStaff.map(s => {
           // Determine the correct modules for this hospital
           let modules = s.assigned_modules || [];
+          let staffType = 'Main Posting';
+          
           if (s.hospital_id !== targetHospitalId && s.secondary_hospitals) {
             const secAssignment = s.secondary_hospitals.find((h: any) => h.hospital_id === targetHospitalId);
-            if (secAssignment && secAssignment.assigned_modules) {
-              modules = secAssignment.assigned_modules;
+            if (secAssignment) {
+              staffType = 'Attachment';
+              if (secAssignment.assigned_modules) {
+                modules = secAssignment.assigned_modules;
+              }
             }
           }
 
@@ -627,10 +639,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             id: s.id,
             name: s.full_name,
             role: s.role,
+            employee_id: s.employee_id,
             mobile: s.mobile_number,
             isActive: s.is_active,
             roleColor: s.role === 'Nurse' ? 'bg-pink-100 text-pink-700' : s.role === 'Pharmacist' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
-            assigned_modules: modules
+            assigned_modules: modules,
+            staffType: staffType
           };
         }));
       }
@@ -1254,6 +1268,58 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     });
   };
 
+  const handleRemoveAttachment = async (staffId: number) => {
+    setStaffToDelete(staffId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmRemoveAttachment = async () => {
+    if (staffToDelete === null) return;
+    
+    const staffId = staffToDelete;
+    
+    toast.promise(
+      (async () => {
+        const targetHospitalId = session?.role === 'HOSPITAL' ? session.id : session?.hospitalId;
+        
+        // 1. Get current staff data
+        const { data: staffData, error: fetchError } = await supabase
+          .from('staff')
+          .select('secondary_hospitals')
+          .eq('id', staffId)
+          .single();
+          
+        if (fetchError || !staffData) {
+          throw new Error('Error fetching staff for removal');
+        }
+        
+        // 2. Filter out the current hospital
+        const updatedSecondaryHospitals = (staffData.secondary_hospitals || []).filter(
+          (h: any) => String(h.hospital_id) !== String(targetHospitalId)
+        );
+        
+        // 3. Update Supabase
+        const { error: updateError } = await supabase
+          .from('staff')
+          .update({ secondary_hospitals: updatedSecondaryHospitals })
+          .eq('id', staffId);
+          
+        if (updateError) {
+          throw new Error('Error removing attachment');
+        }
+        
+        // 4. Update local state
+        setStaffList(prev => prev.filter(s => s.id !== staffId));
+      })(),
+      {
+        loading: 'Removing attachment...',
+        success: 'Attachment removed successfully',
+        error: (err) => err.message || 'Error removing attachment',
+      }
+    );
+    setStaffToDelete(null);
+  };
+
   const handleOpenEditStaff = (staff: any) => {
     setEditingStaffId(staff.id);
     setStaffForm({ 
@@ -1538,6 +1604,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 pb-32 bg-slate-50 min-h-screen">
+      <Toaster />
       {/* Header & Navigation */}
       <div className="mb-8">
         <div className="mb-4">
@@ -1792,13 +1859,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       <h2 className="text-2xl font-bold">Facility Staff</h2>
                       <p className="text-slate-400 mt-1">Manage your facility's staff members.</p>
                     </div>
-                    <button 
-                      onClick={handleOpenAddStaff} 
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                    >
-                      <Plus size={18} />
-                      Add New Staff
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button 
+                        onClick={handleOpenAddStaff} 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                      >
+                        <Plus size={18} />
+                        Attach existing staff
+                      </button>
+                      <button 
+                        onClick={() => setIsAddEmployeeModalOpen(true)} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                      >
+                        <Plus size={14} />
+                        Add Employee
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
@@ -2123,8 +2199,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attached Hospitals</label>
                       <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 space-y-2">
                         {profile.attachedHospitals && profile.attachedHospitals.length > 0 ? (
-                          profile.attachedHospitals.map((h: any, index: number) => (
-                            <div key={index} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100">
+                          profile.attachedHospitals.map((h: any) => (
+                            <div key={h.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100">
                               <div>
                                 <span className="font-bold text-slate-700">{h.name}</span>
                                 <p className="text-xs text-slate-500">ID: {h.id} | Modules: {h.assigned_modules?.join(', ') || 'None'}</p>
@@ -2800,7 +2876,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <div className="space-y-4">
               {reviews.length > 0 ? (
                 reviews.map((review, idx) => (
-                  <div key={review.id || idx} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
+                  <div key={review.id !== undefined && review.id !== null ? review.id : `review-${idx}`} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex gap-1">
                         {[1, 2, 3, 4, 5].map(s => (
@@ -2873,7 +2949,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               <div className="space-y-4">
                 {hospitalReviews.length > 0 ? (
                   hospitalReviews.map((review, idx) => (
-                    <div key={review.id || idx} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
+                    <div key={review.id !== undefined && review.id !== null ? review.id : `h-review-${idx}`} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map(s => (
@@ -2919,7 +2995,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     onClick={handleOpenAddStaff}
                     className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
                   >
-                    <Plus size={16} /> Add New Staff
+                    <Plus size={16} /> Attach existing staff
                   </button>
                 </div>
               )}
@@ -2932,6 +3008,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <tr className="border-b border-gray-100">
                       <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Staff Member</th>
                       <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Role</th>
+                      <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Staff Type</th>
                       <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4">Mobile</th>
                       {isIncharge && (
                         <>
@@ -2960,6 +3037,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             {staff.role}
                           </span>
                         </td>
+                        <td className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {staff.staffType}
+                        </td>
                         <td className="py-4 px-4 text-sm font-medium text-slate-600">{staff.mobile}</td>
                         {isIncharge && (
                           <>
@@ -2972,12 +3052,23 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                               </button>
                             </td>
                             <td className="py-4 px-4 text-right">
-                              <button 
-                                onClick={() => handleOpenEditStaff(staff)}
-                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                              >
-                                <Edit2 size={16} />
-                              </button>
+                              <div className="flex justify-end gap-2">
+                                {staff.staffType === 'Attachment' && (
+                                  <button 
+                                    onClick={() => handleRemoveAttachment(staff.id)}
+                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Remove Attachment"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => handleOpenEditStaff(staff)}
+                                  className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                              </div>
                             </td>
                           </>
                         )}
@@ -3415,6 +3506,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </motion.div>
           </div>
         )}
+        {/* Staff Deletion Confirmation Modal */}
+        <StaffDeleteConfirmationModal 
+          isOpen={isDeleteModalOpen} 
+          onClose={() => setIsDeleteModalOpen(false)} 
+          onConfirm={confirmRemoveAttachment} 
+        />
         {/* Posting Deletion Confirmation Modal */}
         <PostingDeleteConfirmationModal 
           isOpen={!!postingToDelete} 
@@ -3426,6 +3523,18 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             }
           }} 
         />
+        {/* Add Employee Modal */}
+        {isAddEmployeeModalOpen && (
+          <AddEmployeeModal 
+            isOpen={isAddEmployeeModalOpen} 
+            onClose={() => setIsAddEmployeeModalOpen(false)} 
+            onAdd={() => {
+              setIsAddEmployeeModalOpen(false);
+              // Optionally refresh staff list
+            }}
+            hospitals={hospitals || []}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

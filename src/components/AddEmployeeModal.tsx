@@ -155,7 +155,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-3xl shadow-xl overflow-hidden flex flex-col md:max-h-[90vh]"
+          className="bg-white w-full h-full md:h-auto md:max-w-3xl md:rounded-3xl shadow-xl overflow-hidden flex flex-col md:max-h-[95vh]"
         >
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50">
             <h2 className="text-2xl font-bold text-slate-900">Add Employee</h2>
@@ -164,7 +164,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto flex-1">
+          <div className="p-6 pb-20 overflow-y-auto flex-1">
             {error && (
               <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium">
                 {error}
@@ -184,7 +184,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Mobile Number *</label>
                   <input
@@ -198,19 +198,18 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                     placeholder="Enter 10-digit mobile number"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Employment Type *</label>
-                <select
-                  value={formData.employment_type}
-                  onChange={e => setFormData({ ...formData, employment_type: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="Permanent">Permanent</option>
-                  <option value="Contractual">Contractual</option>
-                  <option value="Outsourced">Outsourced</option>
-                </select>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Employment Type *</label>
+                  <select
+                    value={formData.employment_type}
+                    onChange={e => setFormData({ ...formData, employment_type: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="Permanent">Permanent</option>
+                    <option value="Contractual">Contractual</option>
+                    <option value="Outsourced">Outsourced</option>
+                  </select>
+                </div>
               </div>
 
               <div className="relative" ref={roleDropdownRef}>
@@ -237,9 +236,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                 {showRoleDropdown && (
                   <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                     {filteredRoles.length > 0 ? (
-                      filteredRoles.map(role => (
+                      filteredRoles.map((role, index) => (
                         <div
-                          key={role}
+                          key={`${role}-${index}`}
                           className="px-4 py-3 hover:bg-emerald-50 cursor-pointer text-sm"
                           onClick={() => {
                             setFormData({ ...formData, role });
@@ -279,7 +278,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
                 </div>
                 
                 {showHospitalDropdown && (
-                  <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg max-h-80 overflow-y-auto">
                     {filteredHospitals.length > 0 ? (
                       filteredHospitals.map(hospital => (
                         <div

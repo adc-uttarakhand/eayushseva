@@ -182,7 +182,7 @@ export default function InchargeManagement({ session }: InchargeManagementProps)
               className="bg-white border border-gray-100 rounded-2xl py-4 px-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-medium shadow-sm"
             >
               <option value="All">All Districts</option>
-              {districts.map(d => <option key={d} value={d}>{d}</option>)}
+              {districts.map((d, index) => <option key={`${d}-${index}`} value={d}>{d}</option>)}
             </select>
             <div className="relative w-full md:w-96">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />

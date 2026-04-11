@@ -84,6 +84,11 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
   const [receivedManufacturerFilter, setReceivedManufacturerFilter] = useState('');
   const [districtHospitals, setDistrictHospitals] = useState<any[]>([]);
 
+  // Batch editing state
+  const [isEditBatchModalOpen, setIsEditBatchModalOpen] = useState(false);
+  const [editingBatchItem, setEditingBatchItem] = useState<any>(null);
+  const [editBatchForm, setEditBatchForm] = useState({ batch_no: '', mfg_date: '', expiry_date: '' });
+
   // Per-row state for receiving batch details
   const [rowValues, setRowValues] = useState<{ [key: string]: { batch_no: string, mfg_date: string, expiry_date: string } }>({});
 
@@ -1278,6 +1283,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
                             <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Medicine & Order Info</th>
                             <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Batch Details</th>
                             <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Quantities</th>
+                            <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -1371,6 +1377,19 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
                                   </div>
                                 </div>
                               </td>
+                              <td className="px-6 py-4">
+                                <button 
+                                  onClick={() => {
+                                    console.log('Edit clicked for item:', item);
+                                    setEditingBatchItem(item);
+                                    setEditBatchForm({ batch_no: item.batch_no, mfg_date: item.mfg_date, expiry_date: item.expiry_date });
+                                    setIsEditBatchModalOpen(true);
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-800 font-bold text-xs"
+                                >
+                                  Edit
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1404,6 +1423,73 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
                     </div>
                   </div>
                 </div>
+
+                {isEditBatchModalOpen && (
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+                      <h2 className="text-2xl font-bold text-slate-900 mb-6">Edit Batch Details</h2>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1 block mb-2">Batch Number</label>
+                          <input 
+                            value={editBatchForm.batch_no}
+                            onChange={e => setEditBatchForm({ ...editBatchForm, batch_no: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1 block mb-2">Manufacturing Date</label>
+                          <input 
+                            type="month"
+                            value={editBatchForm.mfg_date}
+                            onChange={e => setEditBatchForm({ ...editBatchForm, mfg_date: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1 block mb-2">Expiry Date</label>
+                          <input 
+                            type="month"
+                            value={editBatchForm.expiry_date}
+                            onChange={e => setEditBatchForm({ ...editBatchForm, expiry_date: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-8">
+                        <button 
+                          onClick={() => setIsEditBatchModalOpen(false)}
+                          className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            const { error } = await supabase
+                              .from('district_inventory')
+                              .update({
+                                batch_no: editBatchForm.batch_no,
+                                mfg_date: editBatchForm.mfg_date,
+                                expiry_date: editBatchForm.expiry_date
+                              })
+                              .eq('id', editingBatchItem.id);
+                            
+                            if (error) {
+                              console.error('Error updating batch:', error);
+                              alert('Failed to update batch details.');
+                            } else {
+                              setReceivedInventory(receivedInventory.map(item => item.id === editingBatchItem.id ? { ...item, ...editBatchForm } : item));
+                              setIsEditBatchModalOpen(false);
+                            }
+                          }}
+                          className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {receivedInventory
                   .filter(item => item.is_returned)

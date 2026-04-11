@@ -294,7 +294,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="All">All Districts</option>
-                  {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                  {districts.map((d, index) => <option key={`${d}-${index}`} value={d}>{d}</option>)}
                 </select>
                 <select 
                   value={filters.type}
@@ -302,7 +302,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="All">All Types</option>
-                  {types.map(t => <option key={t} value={t}>{t}</option>)}
+                  {types.map((t, index) => <option key={`${t}-${index}`} value={t}>{t}</option>)}
                 </select>
                 <select 
                   value={filters.system}
@@ -310,7 +310,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="All">All Systems</option>
-                  {systems.map(s => <option key={s} value={s}>{s}</option>)}
+                  {systems.map((s, index) => <option key={`${s}-${index}`} value={s}>{s}</option>)}
                 </select>
                 <select 
                   value={filters.region}
@@ -318,7 +318,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="All">All Regions</option>
-                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                  {regions.map((r, index) => <option key={`${r}-${index}`} value={r}>{r}</option>)}
                 </select>
                 <select 
                   value={filters.status}
@@ -326,7 +326,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                   className="bg-white border border-gray-100 rounded-xl py-2 px-3 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="All">All Status</option>
-                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  {statuses.map((s, index) => <option key={`${s}-${index}`} value={s}>{s}</option>)}
                 </select>
                 <select 
                   value={filters.above7000ft}

@@ -262,7 +262,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
                     className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
                   >
                     <option value="">Select Type</option>
-                    {HOSPITAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {HOSPITAL_TYPES.map((t, index) => <option key={`${t}-${index}`} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -274,7 +274,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
                     className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
                   >
                     <option value="">Select System</option>
-                    {SYSTEMS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {SYSTEMS.map((s, index) => <option key={`${s}-${index}`} value={s}>{s}</option>)}
                   </select>
                 </div>
 
@@ -298,7 +298,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
                     className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
                   >
                     <option value="">Select District</option>
-                    {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {DISTRICTS.map((d, index) => <option key={`${d}-${index}`} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>

@@ -5,6 +5,7 @@ import { HospitalSearchInput } from './SearchInputs';
 import imageCompression from 'browser-image-compression';
 import { useRef } from 'react';
 import EmployeeDetailsPanel from './EmployeeDetailsPanel';
+import HospitalChangeModal from './HospitalChangeModal';
 
 const UTTARAKHAND_DISTRICTS = [
   'Almora', 'Bageshwar', 'Chamoli', 'Champawat', 'Dehradun', 'Haridwar',
@@ -31,6 +32,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'posting' | 'leave' | 'attachment', id: string } | null>(null);
   const [hospitalDetails, setHospitalDetails] = useState<any>(null);
   const [activeSubTab, setActiveSubTab] = useState<'basic' | 'service'>('basic');
+  const [isActualHospitalChangeModalOpen, setIsActualHospitalChangeModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [overlapError, setOverlapError] = useState<string | null>(null);
@@ -170,11 +172,18 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
           .maybeSingle();
 
         const presentPosting = (staffData.postings || []).find((p: any) => p.toDate === 'Present' || p.toDate === 'present');
-        const presentHospitalId = staffData.present_hospital_id || (presentPosting ? presentPosting.hospital_id : '');
-        const presentHospitalObj = hospitalsData.find(h => h.hospital_id === presentHospitalId);
-        const firstHospitalObj = hospitalsData.find(h => h.facility_name === staffData.first_posting_place);
+        let presentHospitalId = staffData.present_hospital_id || (presentPosting ? presentPosting.hospital_id : '');
+        
+        let presentHospitalObj = hospitalsData.find(h => h.hospital_id === presentHospitalId);
+        if (!presentHospitalObj && staffData.present_hospital) {
+          presentHospitalObj = hospitalsData.find(h => h.facility_name === staffData.present_hospital);
+          if (presentHospitalObj) {
+            presentHospitalId = presentHospitalObj.hospital_id;
+          }
+        }
         
         const presentHospitalName = presentHospitalObj ? presentHospitalObj.facility_name : (staffData.present_hospital || '');
+        const firstHospitalObj = hospitalsData.find(h => h.facility_name === staffData.first_posting_place);
 
         setProfile({
           fullName: staffData.full_name || '',
@@ -1084,26 +1093,98 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
               </select>
             </div>
 
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Permanent Address</label>
-              <textarea 
-                readOnly
-                value={profile.permanentAddress} 
-                onChange={e => updateProfile({ permanentAddress: e.target.value })} 
-                rows={2}
-                className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:col-span-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Permanent Address</label>
+                <textarea 
+                  readOnly
+                  value={profile.permanentAddress} 
+                  onChange={e => updateProfile({ permanentAddress: e.target.value })} 
+                  rows={2}
+                  className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
+                />
+              </div>
 
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Current Residential Address</label>
-              <textarea 
-                readOnly
-                value={profile.currentResidentialAddress} 
-                onChange={e => updateProfile({ currentResidentialAddress: e.target.value })} 
-                rows={2}
-                className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
-              />
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Current Residential Address</label>
+                <textarea 
+                  readOnly
+                  value={profile.currentResidentialAddress} 
+                  onChange={e => updateProfile({ currentResidentialAddress: e.target.value })} 
+                  rows={2}
+                  className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none" 
+                />
+              </div>
+            </div>
+            
+            {/* Hospital Details Section */}
+            <div className="mt-8 pt-8 border-t border-gray-100 w-full md:col-span-2">
+              <h3 className="text-lg font-bold text-slate-900 mb-6">Hospital Details</h3>
+              <div className="space-y-6">
+                <div className="w-full">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Connected Hospital</label>
+                  <input 
+                    value={hospitalDetails?.facility_name || 'Not Set'} 
+                    readOnly
+                    className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 pl-[17px] pr-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold mt-1 truncate" 
+                  />
+                  <span className="text-xs text-slate-400 ml-4">ID: {hospitalDetails?.hospital_id || 'N/A'}</span>
+                </div>
+                
+                <div className="w-full">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Main Posting (Mool Tainati)</label>
+                  <div className="flex gap-2 mt-1 w-full">
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <input 
+                        value={profile.presentHospital || 'Not Set'} 
+                        readOnly
+                        className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold truncate" 
+                      />
+                      <span className="text-xs text-slate-400 ml-4">ID: {profile.presentHospitalId || 'N/A'}</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setIsActualHospitalChangeModalOpen(true)}
+                      className="bg-emerald-600 text-white pl-6 pr-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all self-start whitespace-nowrap"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="w-full">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attached Hospitals</label>
+                  <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 space-y-2 mt-1 w-full">
+                    {profile.attachments && profile.attachments.length > 0 ? (
+                      profile.attachments.map((h: any) => (
+                        <div key={h.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 w-full gap-4">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-slate-700 block truncate">{h.hospital}</span>
+                            <p className="text-xs text-slate-500">ID: {h.hospital_id}</p>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to remove this attached hospital?')) {
+                                confirmRemoveAttachment(h.id);
+                                setToast({ show: true, message: 'Attached hospital removed', type: 'success' });
+                                setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+                              }
+                            }}
+                            className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl font-bold hover:bg-rose-100 transition-all text-sm whitespace-nowrap"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-slate-500 text-center">
+                        No attached hospitals.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1705,6 +1786,21 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             </div>
           </div>
         </div>
+      )}
+
+      {isActualHospitalChangeModalOpen && (
+        <HospitalChangeModal
+          isOpen={isActualHospitalChangeModalOpen}
+          onClose={() => setIsActualHospitalChangeModalOpen(false)}
+          onConfirm={(newHospitalId: string, newHospitalName: string) => {
+            updateProfile({
+              presentHospital: newHospitalName,
+              presentHospitalId: newHospitalId,
+            });
+            setIsActualHospitalChangeModalOpen(false);
+          }}
+          hospitals={hospitals}
+        />
       )}
 
       {showPrintPanel && rawStaffData && (
