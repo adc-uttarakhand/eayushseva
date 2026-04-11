@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { toast, Toaster } from 'react-hot-toast';
 import { 
   Plus, 
   Search, 
@@ -129,7 +130,6 @@ export default function ManualSupplyEntry() {
         medicine_name: medicineName,
         district_name: district,
         allocated_qty: Number(qty),
-        source_type: formData.source_type,
         status: 'Dispatched',
         created_at: new Date().toISOString()
       }));
@@ -141,6 +141,7 @@ export default function ManualSupplyEntry() {
       if (error) throw error;
 
       setSuccess(true);
+      toast.success('Order Created Successfully');
       setFormData({
         order_no: '',
         firm_name: '',
@@ -155,6 +156,7 @@ export default function ManualSupplyEntry() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error('Error submitting manual entry:', err);
+      toast.error('Failed to submit: ' + err.message);
       alert('Failed to submit: ' + err.message);
     } finally {
       setLoading(false);
@@ -165,6 +167,7 @@ export default function ManualSupplyEntry() {
 
   return (
     <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
+      <Toaster position="top-right" />
       <div className="p-8 border-b border-slate-50">
         <h2 className="text-2xl font-bold text-slate-900">Manual Supply Entry</h2>
         <p className="text-slate-500 text-sm font-medium">Create new supply orders manually without Excel.</p>
