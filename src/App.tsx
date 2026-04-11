@@ -392,21 +392,20 @@ export default function App() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="pb-40"
+      className="pb-20"
     >
-      <header className="relative pt-20 pb-12 px-4 sm:px-8 overflow-hidden">
+      <header className="relative pt-12 pb-8 px-4 sm:px-8 overflow-hidden">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="max-w-4xl"
         >
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter text-slate-900 leading-[0.9]">
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tighter text-slate-900 leading-[0.9]">
             Healing from the <br />
             <span className="text-emerald-600">Himalayas.</span>
           </h1>
-          <p className="mt-6 text-lg sm:text-xl text-slate-500 max-w-xl font-medium leading-relaxed">
-            Access 800+ premium AYUSH healthcare facilities across Uttarakhand. 
-            Modern care rooted in ancient wisdom.
+          <p className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl font-medium leading-relaxed">
+            Access premium AYUSH healthcare facilities.
           </p>
         </motion.div>
         
@@ -448,7 +447,7 @@ export default function App() {
                 <FacilityCard 
                   key={facility.sr_no} 
                   name={facility.facility_name}
-                  rating={4.5}
+                  rating={0}
                   ratingCount={0}
                   district={facility.district}
                   system={facility.system}
@@ -474,7 +473,7 @@ export default function App() {
                 <FacilityCard 
                   key={facility.sr_no} 
                   name={facility.facility_name}
-                  rating={4.5}
+                  rating={0}
                   ratingCount={0}
                   district={facility.district}
                   system={facility.system}
@@ -495,16 +494,12 @@ export default function App() {
             </div>
             <div className="flex gap-12">
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-600">800+</div>
+                <div className="text-4xl font-bold text-emerald-600">{hospitals.length}</div>
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">Facilities</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-600">13</div>
+                <div className="text-4xl font-bold text-emerald-600">{new Set(hospitals.map(h => h.district)).size}</div>
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">Districts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-600">50k+</div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">Patients</div>
               </div>
             </div>
           </div>
@@ -673,89 +668,10 @@ export default function App() {
         <p className="text-slate-500 mt-2">Real-time insights into Uttarakhand's AYUSH network performance.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Today's Total OPD</p>
-          <p className="text-5xl font-bold text-slate-900 tracking-tighter">4,281</p>
-          <div className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-xs">
-            <span className="bg-emerald-100 px-2 py-0.5 rounded-full">+12%</span>
-            <span>vs yesterday</span>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Monthly OPD</p>
-          <p className="text-5xl font-bold text-slate-900 tracking-tighter">1.2L</p>
-          <div className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-xs">
-            <span className="bg-emerald-100 px-2 py-0.5 rounded-full">+5%</span>
-            <span>vs last month</span>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Yearly IPD</p>
-          <p className="text-5xl font-bold text-slate-900 tracking-tighter">85K</p>
-          <div className="mt-4 flex items-center gap-2 text-slate-400 font-bold text-xs">
-            <span>On track for 2026</span>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Patient Satisfaction</p>
-          <p className="text-5xl font-bold text-slate-900 tracking-tighter">4.8</p>
-          <div className="mt-4 flex items-center gap-2 text-amber-500 font-bold text-xs">
-            <span>★★★★★</span>
-            <span>(12k reviews)</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-slate-900 rounded-[3rem] p-10 text-white">
-          <h3 className="text-2xl font-bold mb-6">OPD Trends</h3>
-          <div className="h-64 flex items-end gap-3">
-            {[40, 60, 45, 90, 65, 80, 100].map((h, i) => (
-              <div key={i} className="flex-1 bg-emerald-500/20 rounded-t-xl relative group">
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: `${h}%` }}
-                  className="absolute bottom-0 left-0 right-0 bg-emerald-500 rounded-t-xl transition-all group-hover:bg-emerald-400"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-            <span>Sun</span>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-[3rem] p-10">
-          <h3 className="text-2xl font-bold text-slate-900 mb-6">System Distribution</h3>
-          <div className="space-y-6">
-            {[
-              { label: 'Ayurveda', val: 65, color: 'bg-emerald-500' },
-              { label: 'Homeopathy', val: 20, color: 'bg-blue-500' },
-              { label: 'Unani', val: 8, color: 'bg-amber-500' },
-              { label: 'Yoga & Naturopathy', val: 7, color: 'bg-purple-500' },
-            ].map((s, i) => (
-              <div key={i} className="space-y-2">
-                <div className="flex justify-between text-xs font-bold uppercase tracking-widest">
-                  <span className="text-slate-500">{s.label}</span>
-                  <span className="text-slate-900">{s.val}%</span>
-                </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${s.val}%` }}
-                    className={`h-full ${s.color}`}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="bg-white border border-gray-100 p-12 rounded-[2.5rem] shadow-sm text-center">
+        <Activity className="mx-auto text-emerald-600 mb-4" size={48} />
+        <h3 className="text-2xl font-bold text-slate-900">Statistics Coming Soon</h3>
+        <p className="text-slate-500 mt-2">We are currently integrating real-time data from all facilities.</p>
       </div>
     </motion.div>
   );
@@ -770,7 +686,7 @@ export default function App() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">Hospital Directory</h1>
-          <p className="text-slate-500 mt-2">Explore and manage 800+ healthcare facilities</p>
+          <p className="text-slate-500 mt-2">Explore and manage healthcare facilities</p>
         </div>
       </div>
 

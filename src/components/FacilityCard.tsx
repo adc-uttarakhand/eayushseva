@@ -44,7 +44,7 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
           referrerPolicy="no-referrer"
         />
         <div className="absolute top-4 left-4">
-          <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+          <span className="bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider text-emerald-700">
             {system}
           </span>
         </div>
@@ -72,11 +72,15 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <div className="flex items-center gap-1 bg-neutral-50 px-2 py-1 rounded-lg">
-              <Star size={14} className="fill-amber-400 text-amber-400" />
-              <span className="text-sm font-bold">{(Number(rating) || 0).toFixed(1)}</span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-bold mt-1">({ratingCount} reviews)</span>
+            {rating > 0 && (
+              <>
+                <div className="flex items-center gap-1 bg-neutral-50 px-2 py-1 rounded-lg">
+                  <Star size={14} className="fill-amber-400 text-amber-400" />
+                  <span className="text-sm font-bold">{(Number(rating) || 0).toFixed(1)}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold mt-1">({ratingCount} reviews)</span>
+              </>
+            )}
           </div>
         </div>
       </div>

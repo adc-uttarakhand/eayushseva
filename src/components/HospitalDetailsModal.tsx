@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Building2, MapPin, Phone, Mail, Activity, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import HospitalChangeModal from './HospitalChangeModal';
+import { supabase } from '../lib/supabase';
 
 interface Hospital {
   hospital_id: string;
@@ -26,6 +27,21 @@ interface HospitalDetailsModalProps {
 
 export default function HospitalDetailsModal({ hospital, isOpen, onClose, staffId }: HospitalDetailsModalProps) {
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+
+  const fetchHospitals = async () => {
+    const { data, error } = await supabase
+      .from('hospitals')
+      .select('hospital_id, facility_name, district, system')
+      .order('facility_name');
+    if (data) setHospitals(data);
+  };
+
+  useEffect(() => {
+    if (isChangeModalOpen) {
+      fetchHospitals();
+    }
+  }, [isChangeModalOpen]);
 
   if (!hospital || !isOpen) return null;
 
@@ -134,6 +150,12 @@ export default function HospitalDetailsModal({ hospital, isOpen, onClose, staffI
           setIsChangeModalOpen(false);
           onClose(); // Close both modals after successful submission
         }}
+        onConfirm={(newHospitalId: string, newHospitalName: string) => {
+          console.log('Hospital changed to:', newHospitalName, newHospitalId);
+          setIsChangeModalOpen(false);
+          onClose();
+        }}
+        hospitals={hospitals}
         currentHospitalId={hospital.hospital_id}
         staffId={staffId}
       />

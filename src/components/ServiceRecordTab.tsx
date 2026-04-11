@@ -1800,6 +1800,8 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack }:
             setIsActualHospitalChangeModalOpen(false);
           }}
           hospitals={hospitals}
+          currentHospitalId={profile.presentHospitalId}
+          staffId={targetStaffId}
         />
       )}
 

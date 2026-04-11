@@ -313,7 +313,7 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
           <h3 className="text-lg font-bold mb-3">Leave Records</h3>
           <table className="w-full text-xs border-collapse border border-slate-300">
             <thead><tr className="bg-slate-100"><th className="border border-slate-300 p-1">Type</th><th className="border border-slate-300 p-1">Duration</th><th className="border border-slate-300 p-1">Total Days</th></tr></thead>
-            <tbody>{sortData(employee.long_leaves, 'fromDate').map((l: any, i: number) => <tr key={`leave-${l.id || i}`}><td className="border border-slate-300 p-1">{l.leaveType}</td><td className="border border-slate-300 p-1">{formatDate(l.fromDate)} - {formatDate(l.toDate)}</td><td className="border border-slate-300 p-1">{l.totalDays}</td></tr>)}</tbody>
+            <tbody>{sortData(employee.long_leaves, 'fromDate').map((l: any, i: number) => <tr key={l.id || `leave-${i}`}><td className="border border-slate-300 p-1">{l.leaveType}</td><td className="border border-slate-300 p-1">{formatDate(l.fromDate)} - {formatDate(l.toDate)}</td><td className="border border-slate-300 p-1">{l.totalDays}</td></tr>)}</tbody>
           </table>
         </section>
 
@@ -321,7 +321,7 @@ export default function EmployeeDetailsPanel({ employee, onClose }: EmployeeDeta
           <h3 className="text-lg font-bold mb-3">Attachment Details</h3>
           <table className="w-full text-xs border-collapse border border-slate-300">
             <thead><tr className="bg-slate-100"><th className="border border-slate-300 p-1">Hospital</th><th className="border border-slate-300 p-1">Status</th><th className="border border-slate-300 p-1">Above 7000ft</th><th className="border border-slate-300 p-1">Duration</th><th className="border border-slate-300 p-1">Total Days</th></tr></thead>
-            <tbody>{sortData(employee.attachments, 'from').map((a: any, i: number) => <tr key={`attach-${a.id || i}`}><td className="border border-slate-300 p-1">{a.hospital}</td><td className="border border-slate-300 p-1">{a.status}</td><td className="border border-slate-300 p-1">{a.above7000}</td><td className="border border-slate-300 p-1">{formatDate(a.from)} - {formatDate(a.to)}</td><td className="border border-slate-300 p-1">{a.days}</td></tr>)}</tbody>
+            <tbody>{sortData(employee.attachments, 'from').map((a: any, i: number) => <tr key={a.id || `attach-${i}`}><td className="border border-slate-300 p-1">{a.hospital}</td><td className="border border-slate-300 p-1">{a.status}</td><td className="border border-slate-300 p-1">{a.above7000}</td><td className="border border-slate-300 p-1">{formatDate(a.from)} - {formatDate(a.to)}</td><td className="border border-slate-300 p-1">{a.days}</td></tr>)}</tbody>
           </table>
         </section>
 

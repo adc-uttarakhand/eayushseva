@@ -71,6 +71,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
   const [fetchingAltitude, setFetchingAltitude] = useState(false);
   const [isChangeInchargeOpen, setIsChangeInchargeOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const canEdit = ['DISTRICT_ADMIN', 'STATE_ADMIN', 'SUPER_ADMIN'].includes(session?.role) || session?.id === hospitalDetails?.incharge_staff_id;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,36 +81,41 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     }
   }, [incharge]);
 
+  const normalize = (val: any) => {
+    if (val === null || val === undefined) return '';
+    return String(val).trim();
+  };
+
   useEffect(() => {
     if (hospitalDetails && formData) {
       const isCurrentlyDirty = 
-        formData.email !== (hospitalDetails.email || '') ||
-        formData.hospital_password !== (hospitalDetails.hospital_password || '') ||
-        JSON.stringify(formData.special_services) !== JSON.stringify(hospitalDetails.special_services || []) ||
-        formData.centre_of_excellence !== (hospitalDetails.centre_of_excellence || '') ||
+        normalize(formData.email) !== normalize(hospitalDetails.email || '') ||
+        normalize(formData.hospital_password) !== normalize(hospitalDetails.hospital_password || '') ||
+        JSON.stringify(formData.special_services.sort()) !== JSON.stringify((hospitalDetails.special_services || []).sort()) ||
+        normalize(formData.centre_of_excellence) !== normalize(hospitalDetails.centre_of_excellence || '') ||
         formData.supraja_centre !== (hospitalDetails.supraja_centre || false) ||
         formData.panchakarma_centre !== (hospitalDetails.panchakarma_centre || false) ||
-        formData.latitude !== (hospitalDetails.latitude?.toString() || '') ||
-        formData.longitude !== (hospitalDetails.longitude?.toString() || '') ||
-        formData.photo_url !== (hospitalDetails.photo_url || '') ||
-        formData.facility_name !== (hospitalDetails.facility_name || '') ||
-        formData.pincode !== (hospitalDetails.pincode || '') ||
-        formData.block !== (hospitalDetails.block || '') ||
-        formData.region_indicator !== (hospitalDetails.region_indicator || '') ||
-        formData.operational_status !== (hospitalDetails.operational_status || '') ||
-        formData.status !== (hospitalDetails.status || '') ||
-        formData.type !== (hospitalDetails.type || '') ||
-        formData.taluka !== (hospitalDetails.taluka || '') ||
-        formData.ipd_services !== (hospitalDetails.ipd_services || '') ||
-        formData.mobile !== (hospitalDetails.mobile || '') ||
-        formData.location !== (hospitalDetails.location || '') ||
-        formData.building_status !== (hospitalDetails.building_status || '') ||
-        formData.no_of_rooms !== (hospitalDetails.no_of_rooms?.toString() || '') ||
-        formData.total_area !== (hospitalDetails.total_area_sqft?.toString() || '') ||
-        formData.construction_year !== (hospitalDetails.construction_year?.toString() || '') ||
-        formData.no_of_beds !== (hospitalDetails.no_of_beds?.toString() || '') ||
-        formData.altitude !== (hospitalDetails.altitude?.toString() || '') ||
-        formData.above_7000_feet !== (hospitalDetails.above_7000_feet || '');
+        normalize(formData.latitude) !== normalize(hospitalDetails.latitude?.toString() || '') ||
+        normalize(formData.longitude) !== normalize(hospitalDetails.longitude?.toString() || '') ||
+        normalize(formData.photo_url) !== normalize(hospitalDetails.photo_url || '') ||
+        normalize(formData.facility_name) !== normalize(hospitalDetails.facility_name || '') ||
+        normalize(formData.pincode) !== normalize(hospitalDetails.pincode || '') ||
+        normalize(formData.block) !== normalize(hospitalDetails.block || '') ||
+        normalize(formData.region_indicator) !== normalize(hospitalDetails.region_indicator || '') ||
+        normalize(formData.operational_status) !== normalize(hospitalDetails.operational_status || '') ||
+        normalize(formData.status) !== normalize(hospitalDetails.status || '') ||
+        normalize(formData.type) !== normalize(hospitalDetails.type || '') ||
+        normalize(formData.taluka) !== normalize(hospitalDetails.taluka || '') ||
+        normalize(formData.ipd_services) !== normalize(hospitalDetails.ipd_services || '') ||
+        normalize(formData.mobile) !== normalize(hospitalDetails.mobile || '') ||
+        normalize(formData.location) !== normalize(hospitalDetails.location || '') ||
+        normalize(formData.building_status) !== normalize(hospitalDetails.building_status || '') ||
+        normalize(formData.no_of_rooms) !== normalize(hospitalDetails.no_of_rooms?.toString() || '') ||
+        normalize(formData.total_area) !== normalize(hospitalDetails.total_area_sqft?.toString() || '') ||
+        normalize(formData.construction_year) !== normalize(hospitalDetails.construction_year?.toString() || '') ||
+        normalize(formData.no_of_beds) !== normalize(hospitalDetails.no_of_beds?.toString() || '') ||
+        normalize(formData.altitude) !== normalize(hospitalDetails.altitude?.toString() || '') ||
+        normalize(formData.above_7000_feet) !== normalize(hospitalDetails.above_7000_feet || '');
 
       setIsDirty(isCurrentlyDirty);
       onDirtyChange?.(isCurrentlyDirty);
@@ -117,7 +123,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
   }, [formData, hospitalDetails, onDirtyChange]);
 
   useEffect(() => {
-    if (hospitalDetails) {
+    if (hospitalDetails && !initialized) {
       setFormData({
         email: hospitalDetails.email || '',
         hospital_password: hospitalDetails.hospital_password || '',
@@ -147,6 +153,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
         altitude: hospitalDetails.altitude?.toString() || '',
         above_7000_feet: hospitalDetails.above_7000_feet || ''
       });
+      setInitialized(true);
       
       const fetchInchargeAndStaff = async () => {
         if (hospitalDetails.incharge_staff_id) {
@@ -397,6 +404,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
       }
 
       onUpdate();
+      onDirtyChange?.(false);
       alert('Profile updated successfully!');
     } catch (error: any) {
       console.error('Error updating profile:', error);
@@ -741,7 +749,7 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Special Services</label>
             <input 
               value={formData.special_services.join(', ')}
-              onChange={e => setFormData({...formData, special_services: e.target.value.split(',').map(s => s.trim())})}
+              onChange={e => setFormData({...formData, special_services: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')})}
               className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1"
               disabled={!canEdit}
             />

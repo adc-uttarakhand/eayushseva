@@ -373,7 +373,7 @@ export default function TransferModule({ session, activeSubTab = 'hospitals' }: 
                   </thead>
                   <tbody>
                     {filteredHospitals.map((h, index) => (
-                      <tr key={h.hospital_id || index} className="border-b border-gray-100">
+                      <tr key={h.hospital_id || `hosp-tr-${index}`} className="border-b border-gray-100">
                         <td className="py-4 px-6">
                           <div className="font-bold">{h.facility_name}</div>
                           <div className="text-xs font-bold text-slate-500">{h.type} | Staff: {h.staff_count}</div>
@@ -452,7 +452,7 @@ export default function TransferModule({ session, activeSubTab = 'hospitals' }: 
               {/* Mobile Card View */}
               <div className="md:hidden p-4 space-y-4">
                 {filteredHospitals.map((h, index) => (
-                  <div key={h.hospital_id || index} className="bg-slate-50 p-4 rounded-2xl border border-gray-100">
+                  <div key={h.hospital_id || `hosp-div-${index}`} className="bg-slate-50 p-4 rounded-2xl border border-gray-100">
                     <div className="font-bold text-slate-900 mb-1">{h.facility_name}</div>
                     <div className="text-xs font-bold text-slate-500 mb-2">{h.type} | Staff: {h.staff_count}</div>
                     <div className="text-xs text-slate-600 mb-1">District: {h.district}</div>

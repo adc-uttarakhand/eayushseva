@@ -21,7 +21,6 @@ interface DoctorCommandCenterProps {
   session: any;
   hospitalName?: string;
   hospitals?: any[];
-  offices?: any[];
   onOpenEParchi: () => void;
   onEditHospital?: () => void;
   onUpdateHospital?: () => void;
@@ -138,96 +137,12 @@ const HospitalSearchInput = ({
   );
 };
 
-const OfficeSearchInput = ({ 
-  value, 
-  onChange, 
-  offices, 
-  placeholder = "Search office...", 
-  className = "",
-  isTextarea = false
-}: { 
-  value: string, 
-  onChange: (val: string) => void, 
-  offices: any[], 
-  placeholder?: string,
-  className?: string,
-  isTextarea?: boolean
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value || '');
-  const containerRef = useRef<HTMLDivElement>(null);
+// OfficeSearchInput removed as requested
 
-  useEffect(() => {
-    setQuery(value || '');
-  }, [value]);
+let _idCounter = 0;
+const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
-  const filteredOffices = offices
-    .filter(o => (o.office_name || '').toLowerCase().includes((query || '').toLowerCase()))
-    .slice(0, 10);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div className="relative w-full" ref={containerRef}>
-      {isTextarea ? (
-        <textarea
-          rows={2}
-          value={query || ''}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none leading-tight ${className}`}
-          placeholder={placeholder}
-        />
-      ) : (
-        <input
-          type="text"
-          value={query || ''}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${className}`}
-          placeholder={placeholder}
-        />
-      )}
-      
-      {isOpen && query && filteredOffices.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredOffices.map((o) => (
-            <div
-              key={o.office_name}
-              className="px-4 py-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0"
-              onClick={() => {
-                setQuery(o.office_name);
-                onChange(o.office_name);
-                setIsOpen(false);
-              }}
-            >
-              <div className="font-bold text-slate-700 text-sm">{o.office_name}</div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{o.district}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], offices = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
+export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
   const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback'>('dashboard');
   const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
@@ -238,6 +153,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       setShowUnsavedModal(true);
     } else {
       _setActiveTab(newTab);
+      setIsHospitalProfileDirty(false);
     }
   };
   const [profileSubTab, setProfileSubTab] = useState<'basic' | 'service' | 'trainings'>('basic');
@@ -317,14 +233,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     qualification: '',
     clinicalExperienceSince: '',
     keywords: '',
-    trainings: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), title: '', year: '' }],
+    trainings: [{ id: generateId(), title: '', year: '' }],
     dateOfFirstAppointment: '',
     dateOfFirstJoiningDepartment: '',
     firstPostingPlace: '',
     homeDistrict: '',
-    longLeaves: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
-    postings: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
-    attachments: [{ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+    longLeaves: [{ id: generateId(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
+    postings: [{ id: generateId(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
+    attachments: [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
   });
 
   // Staff State
@@ -515,10 +431,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         trainings: staffData?.trainings && staffData.trainings.length > 0 
           ? staffData.trainings.map((t: any) => ({
               ...t,
+              id: generateId(),
               title: t.title || '',
               year: t.year || ''
             }))
-          : [{ id: Date.now().toString(), title: '', year: '' }],
+          : [{ id: generateId(), title: '', year: '' }],
         dateOfFirstAppointment: formatDateForUI(staffData?.date_of_first_appointment || ''),
         dateOfFirstJoiningDepartment: formatDateForUI(staffData?.first_joining_date || ''),
         firstPostingPlace: staffData?.first_posting_place || '',
@@ -526,12 +443,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         longLeaves: staffData?.long_leaves && staffData.long_leaves.length > 0 
           ? staffData.long_leaves.map((l: any) => ({
               ...l,
+              id: generateId(),
               leaveType: l.leaveType || '',
               totalDays: l.totalDays || 0,
               fromDate: formatDateForUI(l.fromDate),
               toDate: formatDateForUI(l.toDate)
             }))
-          : [{ id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
+          : [{ id: generateId(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
         postings: staffData?.postings && staffData.postings.length > 0 
           ? staffData.postings.map((p: any) => {
               const latestHospital = hospitals.find(h => h.hospital_id === p.hospital_id);
@@ -540,6 +458,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
               return {
                 ...p,
+                id: generateId(),
                 hospitalName: latestHospital ? latestHospital.facility_name : p.hospitalName,
                 fromDate: formatDateForUI(p.fromDate),
                 toDate: formatDateForUI(p.toDate),
@@ -547,7 +466,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 days: days > 0 ? days : 0
               };
             })
-          : [{ id: Date.now().toString(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
+          : [{ id: generateId(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
         attachments: staffData?.attachments && staffData.attachments.length > 0 
           ? staffData.attachments.map((a: any) => {
               const latestHospital = hospitals.find(h => h.hospital_id === a.hospital_id);
@@ -556,6 +475,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
               return {
                 ...a,
+                id: generateId(),
                 hospital_id: a.hospital_id || '',
                 hospital: latestHospital ? latestHospital.facility_name : a.hospital,
                 status: latestHospital ? (latestHospital.status || 'Sugam') : (a.status || 'Sugam'),
@@ -565,7 +485,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 days: days > 0 ? days : 0
               };
             })
-          : [{ id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+          : [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
       };
       setProfile(newProfile);
       setInitialProfile(newProfile);
@@ -604,7 +524,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       }
     };
     fetchProfile();
-  }, [session?.id, session?.role, session?.hospitalId, hospitals]);
+  }, [session?.id, session?.role, session?.hospitalId]);
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -618,7 +538,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
       if (data) {
         const loggedInUserMobile = profile.mobile;
-        const filteredStaff = data.filter(s => s.mobile_number !== loggedInUserMobile && s.id.toString() !== session.id);
+        const seen = new Set();
+        const filteredStaff = data.filter(s => {
+          if (s.mobile_number === loggedInUserMobile || s.id.toString() === session.id) return false;
+          if (seen.has(s.id)) return false;
+          seen.add(s.id);
+          return true;
+        });
         
         setStaffList(filteredStaff.map(s => {
           // Determine the correct modules for this hospital
@@ -1035,7 +961,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addTraining = () => {
     setProfile(prev => ({
       ...prev,
-      trainings: [...prev.trainings, { id: Date.now().toString(), title: '', year: '' }]
+      trainings: [...prev.trainings, { id: Date.now().toString() + Math.random().toString(36), title: '', year: '' }]
     }));
   };
 
@@ -1049,7 +975,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addLongLeave = () => {
     setProfile(prev => ({
       ...prev,
-      longLeaves: [...prev.longLeaves, { id: Date.now().toString(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }]
+      longLeaves: [...prev.longLeaves, { id: Date.now().toString() + Math.random().toString(36), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }]
     }));
   };
 
@@ -1103,7 +1029,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addPosting = () => {
     setProfile(prev => {
       const newPosting = { 
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
+        id: Date.now().toString() + Math.random().toString(36), 
         hospitalName: '', 
         hospital_id: '', 
         fromDate: '', 
@@ -1217,7 +1143,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const addAttachment = () => {
     setProfile(prev => ({
       ...prev,
-      attachments: [...prev.attachments, { id: Date.now().toString(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+      attachments: [...prev.attachments, { id: Date.now().toString() + Math.random().toString(36), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
     }));
   };
 
@@ -1797,7 +1723,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Today's OPD</p>
-                  <p className="text-3xl font-bold text-slate-900">142</p>
+                  <p className="text-3xl font-bold text-slate-900">--</p>
                 </div>
               </div>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -1806,7 +1732,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Active Staff</p>
-                  <p className="text-3xl font-bold text-slate-900">12</p>
+                  <p className="text-3xl font-bold text-slate-900">--</p>
                 </div>
               </div>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -1860,37 +1786,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       <p className="text-slate-400 mt-1">Manage your facility's staff members.</p>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <button 
-                        onClick={handleOpenAddStaff} 
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                      >
-                        <Plus size={18} />
-                        Attach existing staff
-                      </button>
-                      <button 
-                        onClick={() => setIsAddEmployeeModalOpen(true)} 
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
-                      >
-                        <Plus size={14} />
-                        Add Employee
-                      </button>
                     </div>
                   </div>
                   
                   <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                     {staffList.length > 0 ? (
-                      staffList.map(staff => (
-                        <div key={staff.id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center border border-white/10">
+                      staffList.map((staff, index) => (
+                        <div key={staff.id || `staff-${index}`} className="bg-white/5 rounded-xl p-4 flex justify-between items-center border border-white/10">
                           <div>
                             <p className="font-bold text-white">{staff.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5">{staff.role}</p>
                           </div>
-                          <button
-                            onClick={() => setActiveTab('staff')}
-                            className="text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors"
-                          >
-                            Manage
-                          </button>
                         </div>
                       ))
                     ) : (
@@ -1902,11 +1808,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
                   {onEditHospital && (
                     <button 
-                      onClick={onEditHospital} 
+                      onClick={() => setActiveTab('staff')} 
                       className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 w-full mt-auto"
                     >
-                      <Edit2 size={18} />
-                      Edit Hospital Profile
+                      <Users size={18} />
+                      Manage Staff
                     </button>
                   )}
                 </div>
@@ -1994,8 +1900,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <option value="">Select Role</option>
-                    {roles.map(role => (
-                      <option key={role} value={role}>{role}</option>
+                    {roles.map((role, index) => (
+                      <option key={role + index} value={role}>{role}</option>
                     ))}
                   </select>
                   {!(isIncharge || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
@@ -2136,8 +2042,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <option value="">Select District</option>
-                    {UTTARAKHAND_DISTRICTS.map(d => (
-                      <option key={d} value={d}>{d}</option>
+                    {UTTARAKHAND_DISTRICTS.map((d, index) => (
+                      <option key={d + index} value={d}>{d}</option>
                     ))}
                   </select>
                 </div>
@@ -2199,8 +2105,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attached Hospitals</label>
                       <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 space-y-2">
                         {profile.attachedHospitals && profile.attachedHospitals.length > 0 ? (
-                          profile.attachedHospitals.map((h: any) => (
-                            <div key={h.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100">
+                          profile.attachedHospitals.map((h: any, index) => (
+                            <div key={h.id || `hosp-${index}`} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100">
                               <div>
                                 <span className="font-bold text-slate-700">{h.name}</span>
                                 <p className="text-xs text-slate-500">ID: {h.id} | Modules: {h.assigned_modules?.join(', ') || 'None'}</p>
@@ -2311,8 +2217,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       >
                         <option value="">Select Home District</option>
-                        {UTTARAKHAND_DISTRICTS.map(d => (
-                          <option key={d} value={d}>{d}</option>
+                        {UTTARAKHAND_DISTRICTS.map((d, index) => (
+                          <option key={d + index} value={d}>{d}</option>
                         ))}
                       </select>
                     </div>
@@ -2609,7 +2515,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     <Upload className="text-emerald-600" size={20} /> Attachments (If any)
                   </h2>
                   <div className="space-y-4">
-                    {profile.attachments.map((att) => (
+                    {profile.attachments.map((att, index) => (
                       <div key={att.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border border-gray-100 p-4 rounded-2xl bg-slate-50">
                         <div className="space-y-1 md:col-span-5">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Attachment Place</label>
@@ -2949,7 +2855,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               <div className="space-y-4">
                 {hospitalReviews.length > 0 ? (
                   hospitalReviews.map((review, idx) => (
-                    <div key={review.id !== undefined && review.id !== null ? review.id : `h-review-${idx}`} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
+                    <div key={review.id || `h-review-${idx}`} className="p-6 rounded-2xl border border-gray-50 bg-slate-50/30">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map(s => (
@@ -2990,15 +2896,64 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <p className="text-sm text-slate-500 mt-1">{isIncharge ? 'Manage roles and access for your facility.' : 'View staff associated with your facility.'}</p>
               </div>
               {isIncharge && (
-                <div className="flex gap-2">
+                <div className="flex items-center">
                   <button 
-                    onClick={handleOpenAddStaff}
-                    className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
+                    onClick={() => {
+                      toast((t) => (
+                        <div className="flex flex-col gap-3">
+                          <p className="text-sm font-medium">Use this button only to attach an employee</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => { handleOpenAddStaff(); toast.dismiss(t.id); }} className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Ok, I want to Attach</button>
+                            <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold">No Go Back</button>
+                          </div>
+                        </div>
+                      ));
+                    }}
+                    className="bg-slate-900 text-white px-5 py-2.5 rounded-l-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
                   >
                     <Plus size={16} /> Attach existing staff
                   </button>
+                  
+                  <button 
+                    onClick={() => {
+                      toast((t) => (
+                        <div className="flex flex-col gap-3">
+                          <p className="text-sm font-medium">Are you sure, You want to create a new employee?</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => { setIsAddEmployeeModalOpen(true); toast.dismiss(t.id); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Yes</button>
+                            <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold">No Go back</button>
+                          </div>
+                        </div>
+                      ));
+                    }}
+                    className="bg-emerald-600 text-white px-5 py-2.5 rounded-r-xl font-bold text-sm hover:bg-emerald-700 transition-all flex items-center gap-2 border-l border-emerald-700"
+                  >
+                    <Plus size={16} /> Add New Employee
+                  </button>
                 </div>
               )}
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8">
+              <h3 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-widest">Instructions</h3>
+              <ul className="space-y-3 text-sm text-slate-600">
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>किसी अन्य चिकित्सालय में मूल रूप से तैनात कार्मिक को अपने चिकित्सालय में तैनात अटैच करने के लिए <strong>Attach Existing Staff</strong> बटन का प्रयोग करें।</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>किसी नए कार्मिक को अपने चिकित्सालय में जोड़ने हेतु <strong>Add New Employee</strong> बटन का प्रयोग करें।</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>किसी अटैच कर्मचारी को अपने चिकित्सालय से हटाने के लिए कर्मचारी के सामने वाली रो में <strong>Delete</strong> का आइकॉन दबायें।</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>किसी कर्मचारी का स्थानांतरण होने पर उस कर्मचारी को लॉगिन करके सबसे ऊपर की लाइन में लिखे अस्पताल के नाम पर क्लिक करते हुए <strong>Change Hospital</strong> पर क्लिक करने हेतु निर्देशित करें, जिसके पश्चात नवीन चिकित्सालय जहाँ तैनाती हुई है, उस जिले के DAUO के अनुमोदन के उपरांत उक्त कार्मिक स्वतः ही आपके चिकित्सालय में जुड़ जायेंगे।</span>
+                </li>
+              </ul>
             </div>
 
             {staffSubTab === 'list' ? (
@@ -3019,8 +2974,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {staffList.map(staff => (
-                      <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
+                    {staffList.map((staff, index) => (
+                      <tr key={staff.id || `staff-tr-${index}`} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
@@ -3182,8 +3137,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         onChange={e => setStaffForm({...staffForm, role: e.target.value})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       >
-                        {roles.map(role => (
-                          <option key={role} value={role}>{role}</option>
+                        {roles.map((role, index) => (
+                          <option key={role + index} value={role}>{role}</option>
                         ))}
                       </select>
                     </div>
@@ -3206,11 +3161,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                     </div>
 
                     {/* Dynamic Modules */}
-                    {AVAILABLE_MODULES.map(module => {
+                    {AVAILABLE_MODULES.map((module, index) => {
                       const isChecked = selectedModules.includes(module.id);
                       return (
                         <div
-                          key={module.id}
+                          key={module.id || `mod-${index}`}
                           onClick={() => handleToggleModule(module.id)}
                           className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                             isChecked 
@@ -3302,8 +3257,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 mb-8">
                 {staffSearchResults.length > 0 ? (
-                  staffSearchResults.map(staff => (
-                    <div key={staff.id} className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50 flex justify-between items-center">
+                  staffSearchResults.map((staff, index) => (
+                    <div key={staff.id || `staff-div-${index}`} className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50 flex justify-between items-center">
                       <div>
                         <h4 className="font-bold text-slate-900">{staff.full_name}</h4>
                         <p className="text-xs text-slate-500">{staff.role} • {staff.employee_id || 'No ID'}</p>
@@ -3341,6 +3296,12 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             onClose={() => setIsActualHospitalChangeModalOpen(false)} 
             currentHospitalId={profile.hospitalConnectedId} 
             staffId={session.id}
+            onConfirm={(newHospitalId: string, newHospitalName: string) => {
+              // Handle hospital change confirmation
+              console.log('Hospital changed to:', newHospitalName, newHospitalId);
+              setIsActualHospitalChangeModalOpen(false);
+            }}
+            hospitals={hospitals}
           />
         )}
         {isHospitalChangeModalOpen && (
@@ -3429,8 +3390,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {isUnsavedChangesModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div key="unsaved-changes-modal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm">
               <h2 className="text-xl font-bold mb-4">Unsaved Changes</h2>
               <p className="mb-6">You have unsaved changes in your Profile. Please save before switching.</p>
@@ -3455,9 +3419,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </div>
           </div>
         )}
+      </AnimatePresence>
 
+      <AnimatePresence>
         {isSaveSuccessModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div key="save-success-modal" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm text-center">
               <CheckCircle className="text-emerald-500 mx-auto mb-4" size={48} />
               <h2 className="text-xl font-bold mb-2">Profile Saved Successfully!</h2>
@@ -3468,7 +3434,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       {/* Unsaved Changes Modal */}
       <AnimatePresence>
         {showUnsavedModal && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div key="show-unsaved-modal" className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -3506,34 +3472,50 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             </motion.div>
           </div>
         )}
-        {/* Staff Deletion Confirmation Modal */}
-        <StaffDeleteConfirmationModal 
-          isOpen={isDeleteModalOpen} 
-          onClose={() => setIsDeleteModalOpen(false)} 
-          onConfirm={confirmRemoveAttachment} 
-        />
-        {/* Posting Deletion Confirmation Modal */}
-        <PostingDeleteConfirmationModal 
-          isOpen={!!postingToDelete} 
-          onClose={() => setPostingToDelete(null)} 
-          onConfirm={() => {
-            if (postingToDelete) {
-              removePosting(postingToDelete);
-              setPostingToDelete(null);
-            }
-          }} 
-        />
-        {/* Add Employee Modal */}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div key="staff-delete">
+            <StaffDeleteConfirmationModal 
+              isOpen={isDeleteModalOpen} 
+              onClose={() => setIsDeleteModalOpen(false)} 
+              onConfirm={confirmRemoveAttachment} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!!postingToDelete && (
+          <div key="posting-delete">
+            <PostingDeleteConfirmationModal 
+              isOpen={!!postingToDelete} 
+              onClose={() => setPostingToDelete(null)} 
+              onConfirm={() => {
+                if (postingToDelete) {
+                  removePosting(postingToDelete);
+                  setPostingToDelete(null);
+                }
+              }} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {isAddEmployeeModalOpen && (
-          <AddEmployeeModal 
-            isOpen={isAddEmployeeModalOpen} 
-            onClose={() => setIsAddEmployeeModalOpen(false)} 
-            onAdd={() => {
-              setIsAddEmployeeModalOpen(false);
-              // Optionally refresh staff list
-            }}
-            hospitals={hospitals || []}
-          />
+          <div key="add-employee">
+            <AddEmployeeModal 
+              isOpen={isAddEmployeeModalOpen} 
+              onClose={() => setIsAddEmployeeModalOpen(false)} 
+              onAdd={() => {
+                setIsAddEmployeeModalOpen(false);
+                // Optionally refresh staff list
+              }}
+              hospitals={hospitals || []}
+            />
+          </div>
         )}
       </AnimatePresence>
     </div>

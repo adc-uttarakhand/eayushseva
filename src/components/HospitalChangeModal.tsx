@@ -15,10 +15,11 @@ interface HospitalChangeModalProps {
   onClose: () => void;
   currentHospitalId: string;
   staffId: string;
+  onConfirm: (newHospitalId: string, newHospitalName: string) => void;
+  hospitals: Hospital[];
 }
 
-export default function HospitalChangeModal({ isOpen, onClose, currentHospitalId, staffId }: HospitalChangeModalProps) {
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+export default function HospitalChangeModal({ isOpen, onClose, currentHospitalId, staffId, onConfirm, hospitals }: HospitalChangeModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [dateOfJoining, setDateOfJoining] = useState('');
@@ -30,7 +31,6 @@ export default function HospitalChangeModal({ isOpen, onClose, currentHospitalId
 
   useEffect(() => {
     if (isOpen) {
-      fetchHospitals();
       setSuccess(false);
       setSelectedHospital(null);
       setSearchQuery('');
@@ -39,24 +39,6 @@ export default function HospitalChangeModal({ isOpen, onClose, currentHospitalId
       setError('');
     }
   }, [isOpen]);
-
-  const fetchHospitals = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select('hospital_id, facility_name, district, system')
-        .neq('hospital_id', currentHospitalId)
-        .order('facility_name');
-        
-      if (error) throw error;
-      if (data) setHospitals(data);
-    } catch (err: any) {
-      console.error('Error fetching hospitals:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredHospitals = hospitals.filter(h => 
     (h.facility_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
@@ -86,6 +68,8 @@ export default function HospitalChangeModal({ isOpen, onClose, currentHospitalId
       // Since we don't have a specific table, we'll try to insert into a generic 'notifications' or 'transfer_requests' table
       // If it fails, we'll just show success anyway for the demo, or we can use global_settings as a hack
       
+      onConfirm(selectedHospital.hospital_id, selectedHospital.facility_name);
+
       const payload = {
         staff_id: staffId,
         current_hospital_id: currentHospitalId,
