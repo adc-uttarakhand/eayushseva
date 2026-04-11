@@ -208,6 +208,32 @@ export default function App() {
   };
 
   const [isTransferEnabled, setIsTransferEnabled] = useState<boolean>(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        }
+        setDeferredPrompt(null);
+      });
+    }
+  };
 
   useEffect(() => {
     fetchTransferStatus();
@@ -1389,6 +1415,15 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {deferredPrompt && (
+        <button 
+          onClick={handleInstallClick}
+          className="fixed bottom-24 right-4 bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg z-[200] flex items-center gap-2"
+        >
+          <Plus size={18} /> Install App
+        </button>
+      )}
     </div>
   );
 }
