@@ -60,30 +60,36 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
 
   const fetchStaff = async () => {
     setLoading(true);
-    console.log('Fetching staff. District Admin Access Districts:', session?.access_districts);
-    
-    if (!session?.access_districts || session.access_districts.length === 0) {
-      console.warn('Warning: District Admin has no access_districts defined!');
-    }
-    
-    // Join staff with hospitals to filter by district and system
-    let query = supabase
-      .from('staff')
-      .select('*')
-      .range(0, 5000);
+    let allStaff: Staff[] = [];
+    let from = 0;
+    let to = 999;
+    let hasMore = true;
 
-    console.log('Executing Supabase query...');
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('Supabase fetch error:', error);
-    } else {
-      console.log('Supabase fetch successful. Staff count:', data?.length);
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .range(from, to);
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allStaff = [...allStaff, ...data];
+        if (data.length < 1000) {
+          hasMore = false;
+        } else {
+          from += 1000;
+          to += 1000;
+        }
+      } else {
+        hasMore = false;
+      }
     }
     
-    if (data) {
-      setStaff(data);
-    }
+    setStaff(allStaff);
     setLoading(false);
   };
 

@@ -89,24 +89,43 @@ export default function TransferModule({ session, activeSubTab = 'hospitals' }: 
   };
 
   const fetchEmployees = async () => {
-    let query = supabase.from('staff').select('*');
-    
-    if (session.role === 'DISTRICT_ADMIN') {
-      if (session.access_districts && session.access_districts.length > 0) {
-        query = query.in('present_district', session.access_districts);
-      } else if (session.district) {
-        query = query.eq('present_district', session.district);
+    let allEmployees: any[] = [];
+    let from = 0;
+    let to = 999;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = supabase.from('staff').select('*').range(from, to);
+      
+      if (session.role === 'DISTRICT_ADMIN') {
+        if (session.access_districts && session.access_districts.length > 0) {
+          query = query.in('present_district', session.access_districts);
+        } else if (session.district) {
+          query = query.eq('present_district', session.district);
+        } else {
+          query = query.eq('present_district', '___NONE___');
+        }
+      }
+      
+      const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching employees:', error);
+        break;
+      }
+      
+      if (data && data.length > 0) {
+        allEmployees = [...allEmployees, ...data];
+        if (data.length < 1000) {
+          hasMore = false;
+        } else {
+          from += 1000;
+          to += 1000;
+        }
       } else {
-        query = query.eq('present_district', '___NONE___');
+        hasMore = false;
       }
     }
-    
-    const { data, error } = await query;
-    if (error) {
-      console.error('Error fetching employees:', error);
-    } else {
-      setEmployees(data || []);
-    }
+    setEmployees(allEmployees);
   };
 
   const handleSync = async (employee: any) => {

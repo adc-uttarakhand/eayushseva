@@ -13,16 +13,45 @@ export default function StaffDistributionSummary() {
   const fetchData = async () => {
     setLoading(true);
     console.log('Fetching staff and roles data...');
-    // Fetch all staff
-    const { data: staffData, error: staffError } = await supabase.from('staff').select('*');
+    
+    // Fetch all staff recursively
+    let allStaff: any[] = [];
+    let from = 0;
+    let to = 999;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .range(from, to);
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allStaff = [...allStaff, ...data];
+        if (data.length < 1000) {
+          hasMore = false;
+        } else {
+          from += 1000;
+          to += 1000;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+    
     // Fetch all roles
     const { data: rolesData, error: rolesError } = await supabase.from('roles').select('*');
     
-    console.log('Fetch results:', { staffData, staffError, rolesData, rolesError });
+    console.log('Fetch results:', { staffCount: allStaff.length, rolesData, rolesError });
 
-    if (staffData && rolesData) {
+    if (allStaff && rolesData) {
       // Group staff by role and count unique aadhar
-      const staffCounts = staffData.reduce((acc: any, staff: any) => {
+      const staffCounts = allStaff.reduce((acc: any, staff: any) => {
         const role = staff.role;
         if (!role) return acc;
         if (!acc[role]) acc[role] = new Set();
@@ -40,7 +69,7 @@ export default function StaffDistributionSummary() {
       }));
       setSummary(summaryData);
     } else {
-      console.error('Failed to fetch data:', { staffError, rolesError });
+      console.error('Failed to fetch data:', { rolesError });
     }
     setLoading(false);
   };
