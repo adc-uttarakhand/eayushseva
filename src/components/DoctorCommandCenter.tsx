@@ -658,10 +658,16 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     // Process all postings (including current)
     const allPostings = [...postings];
     if (currentJoiningDate) {
+      const today = new Date();
+      const dd = today.getDate().toString().padStart(2, '0');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const mm = months[today.getMonth()];
+      const yyyy = today.getFullYear();
+      const todayStr = `${dd}-${mm}-${yyyy}`; // DD-MMM-YYYY format, same as parseDateStr expects
       allPostings.push({
         isAuto: true,
         fromDate: currentJoiningDate,
-        toDate: new Date().toISOString().split('T')[0], // Simplified for now
+        toDate: todayStr,
         status: currentPostingType,
         above7000: currentPostingAbove7000
       });

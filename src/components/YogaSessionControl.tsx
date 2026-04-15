@@ -5,12 +5,13 @@ import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 
 export default function YogaSessionControl({ session, onSwitchToInstructor }: { session: any, onSwitchToInstructor: () => void }) {
-  const [activeTab, setActiveTab] = useState<'roster' | 'monitoring'>('roster');
+  const [activeTab, setActiveTab] = useState<'plan' | 'roster' | 'monitoring'>('plan');
   const [instructorType, setInstructorType] = useState<'male' | 'female'>('male');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [gpsMandatory, setGpsMandatory] = useState(true);
   const [sessionRows, setSessionRows] = useState<{ locationType: 'Hospital' | 'School' | 'Community', name: string, sessions: number }[]>([]);
+  const [existingRosters, setExistingRosters] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newSession, setNewSession] = useState<{ locationType: 'Hospital' | 'School' | 'Community', name: string, sessions: number }>({ locationType: 'Hospital', name: '', sessions: 0 });
   const [staff, setStaff] = useState<any[]>([]);
@@ -20,6 +21,12 @@ export default function YogaSessionControl({ session, onSwitchToInstructor }: { 
     fetchStaff();
   }, [session.hospitalId]);
 
+  useEffect(() => {
+    if (selectedInstructor) {
+      fetchExistingRosters();
+    }
+  }, [selectedInstructor, selectedMonth, selectedYear]);
+
   const fetchStaff = async () => {
     const { data } = await supabase
       .from('staff')
@@ -28,6 +35,16 @@ export default function YogaSessionControl({ session, onSwitchToInstructor }: { 
       .ilike('role', '%Yoga Instructor%');
     
     if (data) setStaff(data);
+  };
+
+  const fetchExistingRosters = async () => {
+    const { data } = await supabase
+      .from('yoga_roster')
+      .select('*')
+      .eq('staff_id', selectedInstructor.id)
+      .eq('month_year', `${selectedMonth}-${selectedYear}`);
+    
+    if (data) setExistingRosters(data);
   };
 
   const filteredStaff = staff.filter(s => 
@@ -134,7 +151,7 @@ export default function YogaSessionControl({ session, onSwitchToInstructor }: { 
         </div>
 
         <div className="bg-white p-1 rounded-2xl border border-slate-200 flex gap-1">
-          {(['roster', 'monitoring'] as const).map((tab) => (
+          {(['plan', 'roster', 'monitoring'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -151,7 +168,7 @@ export default function YogaSessionControl({ session, onSwitchToInstructor }: { 
       </div>
 
       <main className="px-4">
-        {activeTab === 'roster' && (
+        {activeTab === 'plan' && (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">Monthly Roster Planning</h3>
@@ -256,6 +273,28 @@ export default function YogaSessionControl({ session, onSwitchToInstructor }: { 
                 </button>
               )}
             </div>
+          </div>
+        )}
+        {activeTab === 'roster' && (
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">Existing Roster</h3>
+            {existingRosters.length > 0 ? (
+              <div className="space-y-3">
+                {existingRosters.map((roster, index) => (
+                  <div key={index} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{roster.planned_location}: {roster.location_details}</p>
+                      <p className="text-[10px] text-slate-500">Sessions: {roster.sessions_count}</p>
+                    </div>
+                    <div className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg text-[10px] font-bold">
+                      {roster.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 text-center py-4">No roster planned for this month.</p>
+            )}
           </div>
         )}
         {activeTab === 'monitoring' && (
