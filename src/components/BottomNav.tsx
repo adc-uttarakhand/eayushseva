@@ -1,16 +1,17 @@
-import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown } from 'lucide-react';
+import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma';
 
 interface BottomNavProps {
   active: TabId;
   setActive: (id: TabId) => void;
   role: string | null;
   isTransferEnabled: boolean;
+  hasPanchakarma?: boolean;
 }
 
-export default function BottomNav({ active, setActive, role, isTransferEnabled }: BottomNavProps) {
+export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma }: BottomNavProps) {
   const publicTabs = [
     { id: 'dashboard' as TabId, label: 'AYUSH Network', icon: Building2 },
     { id: 'stats' as TabId, label: 'Statistics', icon: BarChart3 },
@@ -24,6 +25,7 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled }
     ...(role === 'DISTRICT_ADMIN' ? [{ id: 'district_supply' as TabId, label: 'District Supply', icon: Truck }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
     ...(isTransferEnabled ? [{ id: 'transfer_module' as TabId, label: 'Transfers', icon: ArrowUpDown }] : []),
+    ...(hasPanchakarma ? [{ id: 'panchakarma' as TabId, label: 'Panchakarma', icon: Activity }] : []),
     { id: 'registrations' as TabId, label: 'Registrations', icon: ShieldCheck },
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'tools' as TabId, label: 'Tools', icon: Wrench }] : []),
     { id: 'profile' as TabId, label: 'Profile', icon: User },

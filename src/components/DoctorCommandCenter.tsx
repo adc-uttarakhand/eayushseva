@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2 } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
@@ -16,6 +16,8 @@ import InventoryManager from './InventoryManager';
 import MedicineDemandSystem from './MedicineDemandSystem';
 import HospitalSupplyPull from './HospitalSupplyPull';
 import RegistrationRequests from './RegistrationRequests';
+import PanchakarmaModule from './PanchakarmaModule';
+import YogaModule from './YogaModule';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -38,9 +40,11 @@ const AVAILABLE_MODULES = [
   { id: 'inventory', label: 'Inventory Management' },
   { id: 'medicine_demand', label: 'Medicine Demand' },
   { id: 'equipment_demand', label: 'Equipment / Furniture Demand' },
-  { id: 'yoga_management', label: 'Yoga Session Management' },
+  { id: 'yoga_instructor', label: 'Yoga Instructor' },
+  { id: 'yoga_control', label: 'Yoga Session Control' },
   { id: 'suggestion_module', label: 'Suggestion Module' },
   { id: 'communication_module', label: 'Communication Module' },
+  { id: 'panchakarma', label: 'Panchakarma Management' },
 ];
 
 const UTTARAKHAND_DISTRICTS = [
@@ -143,8 +147,8 @@ let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -173,37 +177,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const maskDate = (value: string) => {
-    // Remove all characters that are not digits or letters
-    const clean = value.replace(/[^a-zA-Z0-9]/g, '');
-    
-    let result = '';
-    
-    // Day (first 2 digits)
-    const day = clean.slice(0, 2).replace(/\D/g, '');
-    result += day;
-    
-    if (clean.length > 2) {
-      result += '-';
-      // Month (next 3 letters)
-      let month = clean.slice(2, 5).replace(/[0-9]/g, '');
-      if (month.length > 0) {
-        // Capitalize first letter, lowercase others
-        month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
-      }
-      result += month;
-      
-      if (clean.length > 5) {
-        result += '-';
-        // Year (next 4 digits)
-        const year = clean.slice(5, 9).replace(/\D/g, '');
-        result += year;
-      }
-    }
-    
-    return result;
-  };
-
+  
   // Profile State
   const [postingToDelete, setPostingToDelete] = useState<string | null>(null);
   const [hospitalToDelete, setHospitalToDelete] = useState<any>(null);
@@ -564,9 +538,13 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
           return {
             id: s.id,
             name: s.full_name,
+            full_name: s.full_name,
             role: s.role,
             employee_id: s.employee_id,
             mobile: s.mobile_number,
+            mobile_number: s.mobile_number,
+            hospital_id: s.hospital_id,
+            secondary_hospitals: s.secondary_hospitals,
             isActive: s.is_active,
             roleColor: s.role === 'Nurse' ? 'bg-pink-100 text-pink-700' : s.role === 'Pharmacist' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
             assigned_modules: modules,
@@ -586,23 +564,32 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const parseDateStr = (d: string) => {
     if (!d) return new Date(NaN);
     
-    // Handle DD-MMM-YYYY
-    if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(d)) {
-      const [day, monthStr, year] = d.split('-');
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
-      if (monthIndex !== -1) {
-        return new Date(parseInt(year), monthIndex, parseInt(day));
-      }
+    const trimmed = d.trim();
+    
+    // Strict DD-MMM-YYYY format (e.g., 12-Mar-2024)
+    const match = trimmed.match(/^(\d{2})-([a-zA-Z]{3})-(\d{4})$/);
+    if (!match) return new Date(NaN);
+    
+    const [_, dayStr, monthStr, yearStr] = match;
+    const day = parseInt(dayStr, 10);
+    const year = parseInt(yearStr, 10);
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+    
+    if (monthIndex === -1) return new Date(NaN);
+    
+    // Validate day range
+    const date = new Date(year, monthIndex, day);
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== monthIndex ||
+      date.getDate() !== day
+    ) {
+      return new Date(NaN);
     }
     
-    // Handle DD-MM-YYYY
-    if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
-      const [day, month, year] = d.split('-');
-      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    }
-    
-    return new Date(d);
+    return date;
   };
 
   const formatDate = (date: Date) => {
@@ -611,6 +598,40 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     const month = months[date.getMonth()];
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
+  };
+
+  const safeTime = (dateStr: string): number => {
+    const date = parseDateStr(dateStr);
+    return isNaN(date.getTime()) ? -Infinity : date.getTime();
+  };
+
+  const getAutoToDate = (postings: any[], id: string, currentPostingJoiningDate: string) => {
+    const sorted = [...postings].sort((a, b) => safeTime(b.fromDate) - safeTime(a.fromDate));
+    const index = sorted.findIndex(p => p.id === id);
+    
+    if (index === -1) return 'Pending';
+    
+    if (index === 0) {
+      // 1 day before currentPostingJoiningDate
+      const start = parseDateStr(currentPostingJoiningDate);
+      if (!isNaN(start.getTime())) {
+        const d = new Date(start);
+        d.setDate(d.getDate() - 1);
+        return formatDate(d);
+      }
+    } else {
+      // 1 day before next posting's fromDate
+      const nextPosting = sorted[index - 1]; // sorted descending, so index-1 is the one before it (more recent)
+      if (nextPosting.fromDate) {
+        const start = parseDateStr(nextPosting.fromDate);
+        if (!isNaN(start.getTime())) {
+          const d = new Date(start);
+          d.setDate(d.getDate() - 1);
+          return formatDate(d);
+        }
+      }
+    }
+    return 'Pending';
   };
 
   const formatDaysToYMD = (totalDays: number) => {
@@ -1027,36 +1048,22 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   };
 
   const addPosting = () => {
-    setProfile(prev => {
-      const newPosting = { 
-        id: Date.now().toString() + Math.random().toString(36), 
-        hospitalName: '', 
-        hospital_id: '', 
-        fromDate: '', 
-        toDate: '', 
-        status: 'Sugam', 
-        above7000: 'No', 
-        days: 0 
-      };
-
-      // If there are existing postings, auto-fill the new posting's To Date
-      if (prev.postings.length > 0) {
-        const lastPosting = prev.postings[prev.postings.length - 1];
-        if (lastPosting.fromDate) {
-          const fromDate = parseDateStr(lastPosting.fromDate);
-          if (!isNaN(fromDate.getTime())) {
-            const toDate = new Date(fromDate);
-            toDate.setDate(toDate.getDate() - 1);
-            newPosting.toDate = `${toDate.getDate().toString().padStart(2, '0')}-${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][toDate.getMonth()]}-${toDate.getFullYear()}`;
-          }
+    setProfile(prev => ({
+      ...prev,
+      postings: [
+        ...prev.postings,
+        { 
+          id: Date.now().toString() + Math.random().toString(36), 
+          hospitalName: '', 
+          hospital_id: '', 
+          fromDate: '', 
+          toDate: '', 
+          status: 'Sugam', 
+          above7000: 'No', 
+          days: 0 
         }
-      }
-
-      return {
-        ...prev,
-        postings: [...prev.postings, newPosting]
-      };
-    });
+      ]
+    }));
   };
 
   const removePosting = (id: string) => {
@@ -1103,40 +1110,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         return p;
       });
 
-      // Recalculate To Dates
-      const sorted = [...updatedPostings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
-      
-      const recalculatedPostings = updatedPostings.map(p => {
-        const index = sorted.findIndex(s => s.id === p.id);
-        let toDate = '';
-        if (index === 0) {
-          // 1 day before currentPostingJoiningDate
-           const start = parseDateStr(prev.currentPostingJoiningDate);
-           if (!isNaN(start.getTime())) {
-              const d = new Date(start);
-              d.setDate(d.getDate() - 1);
-              toDate = formatDate(d);
-           }
-        } else {
-          // 1 day before sorted[index-1].fromDate
-          const prevPosting = sorted[index-1];
-          if (!prevPosting.fromDate) {
-              toDate = 'Pending';
-          } else {
-              const start = parseDateStr(prevPosting.fromDate);
-              if (!isNaN(start.getTime())) {
-                  const d = new Date(start);
-                  d.setDate(d.getDate() - 1);
-                  toDate = formatDate(d);
-              } else {
-                  toDate = 'Pending';
-              }
-          }
-        }
-        return { ...p, toDate: toDate || 'Pending' };
-      });
-
-      return { ...prev, postings: recalculatedPostings };
+      return { ...prev, postings: updatedPostings };
     });
   };
 
@@ -1257,25 +1231,44 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     });
 
     const currentHospitalId = session.activeHospitalId || session.hospitalId;
+    console.log('Loading modules for staff:', staff.id, 'at hospital:', currentHospitalId);
     let modules = ['profile'];
 
     if (staff.hospital_id === currentHospitalId) {
       modules = staff.assigned_modules || ['profile'];
+      console.log('Primary hospital assignment found:', modules);
     } else if (staff.secondary_hospitals && Array.isArray(staff.secondary_hospitals)) {
       const secAssignment = staff.secondary_hospitals.find((h: any) => h.hospital_id === currentHospitalId);
       if (secAssignment && secAssignment.assigned_modules) {
         modules = secAssignment.assigned_modules;
+        console.log('Secondary hospital assignment found:', modules);
+      } else {
+        console.log('No assignment found for this hospital');
       }
     }
 
     if (modules.includes('eparchi_consultation') && !modules.includes('eparchi_queue')) {
       modules = [...modules, 'eparchi_queue'];
     }
+
+    // Auto-include modules based on role
+    if (staff.role === 'Panchkarma Sahayak (Male)' || staff.role === 'Panchkarma Sahayak (Female)') {
+      if (!modules.includes('panchakarma')) {
+        modules = [...modules, 'panchakarma'];
+      }
+    }
+    if (staff.role === 'Yoga Instructor (Male)' || staff.role === 'Yoga Instructor (Female)') {
+      if (!modules.includes('yoga_instructor')) {
+        modules = [...modules, 'yoga_instructor'];
+      }
+    }
+
     setSelectedModules(modules);
     setIsStaffModalOpen(true);
   };
 
   const handleToggleModule = (moduleId: string) => {
+    console.log('Toggling module:', moduleId);
     if (moduleId === 'profile') return; // Cannot toggle default module
     setSelectedModules(prev => {
       let next;
@@ -1327,6 +1320,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       is_active: true
     };
 
+    console.log('Saving staff with modules:', selectedModules);
     if (editingStaffId) {
       const currentHospitalId = session.activeHospitalId || session.hospitalId;
       
@@ -1349,6 +1343,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             assigned_modules: selectedModules
           }
         ];
+        console.log('Updating secondary_hospitals with:', newSecondaryHospitals);
 
         const { error } = await supabase
           .from('staff')
@@ -1361,7 +1356,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         }
       } else {
         // Staff belongs primarily to THIS hospital. Update their main details.
-        const { error } = await supabase.from('staff').update(payload).eq('id', editingStaffId);
+        const updatePayload = {
+          full_name: staffForm.fullName,
+          mobile_number: staffForm.mobile.trim(),
+          role: staffForm.role,
+          assigned_modules: selectedModules,
+          is_active: true
+        };
+        console.log('Sending update payload to Supabase:', updatePayload);
+        const { error } = await supabase.from('staff').update(updatePayload).eq('id', editingStaffId);
         if (error) {
           if (error.code === '23505' || error.message?.includes('unique constraint')) {
             setIsMobileRegistered(true);
@@ -1432,37 +1435,87 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const userRole = session?.role;
   const assignedModules = session?.modules || [];
-
   const isHospital = userRole === 'HOSPITAL';
   const isIncharge = userRole === 'STAFF' && session.isIncharge;
   const isAssignedStaff = userRole === 'STAFF' && !isIncharge;
+  const [activeModules, setActiveModules] = useState<string[]>(session.activeModules || []);
 
-  const showDashboard = isHospital || isIncharge || (isAssignedStaff && assignedModules.includes('e_parchi'));
-  const showProfile = !isHospital && (isIncharge || (isAssignedStaff && assignedModules.includes('profile')));
+  useEffect(() => {
+    const fetchMyModules = async () => {
+      if (!isAssignedStaff) return;
+
+      const { data } = await supabase
+        .from('staff')
+        .select('hospital_id, assigned_modules, secondary_hospitals, role')
+        .eq('id', session.id)
+        .single();
+
+      if (!data) return;
+
+      const currentHospitalId = session.activeHospitalId || session.hospitalId;
+      let modules: string[] = ['profile'];
+
+      if (data.hospital_id === currentHospitalId) {
+        // Main Posting staff — use assigned_modules directly
+        modules = data.assigned_modules || ['profile'];
+      } else if (data.secondary_hospitals && Array.isArray(data.secondary_hospitals)) {
+        // Attachment staff — find modules from secondary_hospitals
+        const match = data.secondary_hospitals.find(
+          (h: any) => h.hospital_id === currentHospitalId
+        );
+        modules = (match && match.assigned_modules) ? match.assigned_modules : ['profile'];
+      }
+
+      // Auto-assign panchakarma
+      if (data.role === 'Panchkarma Sahayak (Male)' || data.role === 'Panchkarma Sahayak (Female)') {
+        if (!modules.includes('panchakarma')) {
+          modules = [...modules, 'panchakarma'];
+        }
+      }
+
+      // Auto-assign yoga_instructor
+      if (data.role === 'Yoga Instructor (Male)' || data.role === 'Yoga Instructor (Female)') {
+        if (!modules.includes('yoga_instructor')) {
+          modules = [...modules, 'yoga_instructor'];
+        }
+      }
+      
+      setActiveModules(modules);
+    };
+    fetchMyModules();
+  }, [isAssignedStaff, session.id]);
+
+  const showDashboard = isHospital || isIncharge || (isAssignedStaff && activeModules.includes('e_parchi'));
+  const showProfile = !isHospital && (isIncharge || (isAssignedStaff && activeModules.includes('profile')));
   const showStaff = isHospital || isIncharge;
   const showHospitalProfile = isIncharge;
   const showEParchi = isHospital || isIncharge || (isAssignedStaff && (
-    assignedModules.includes('e_parchi') || 
-    assignedModules.includes('eparchi_registration') || 
-    assignedModules.includes('eparchi_consultation') || 
-    assignedModules.includes('eparchi_queue') || 
-    assignedModules.includes('eparchi_pharmacy')
+    activeModules.includes('e_parchi') || 
+    activeModules.includes('eparchi_registration') || 
+    activeModules.includes('eparchi_consultation') || 
+    activeModules.includes('eparchi_queue') || 
+    activeModules.includes('eparchi_pharmacy')
   ));
   const showPatients = isHospital || isIncharge || (isAssignedStaff && (
-    assignedModules.includes('e_parchi') || 
-    assignedModules.includes('eparchi_registration') || 
-    assignedModules.includes('eparchi_consultation') || 
-    assignedModules.includes('eparchi_queue') || 
-    assignedModules.includes('eparchi_pharmacy')
+    activeModules.includes('e_parchi') || 
+    activeModules.includes('eparchi_registration') || 
+    activeModules.includes('eparchi_consultation') || 
+    activeModules.includes('eparchi_queue') || 
+    activeModules.includes('eparchi_pharmacy')
   ));
-  const showMedicineManagement = !isHospital && (isIncharge || (isAssignedStaff && assignedModules.includes('inventory')));
-  const showMedicineDemand = (isIncharge || (isAssignedStaff && assignedModules.includes('medicine_demand'))) && isModuleActive;
+  const showMedicineManagement = !isHospital && (isIncharge || (isAssignedStaff && activeModules.includes('inventory')));
+  const showMedicineDemand = (isIncharge || (isAssignedStaff && activeModules.includes('medicine_demand'))) && isModuleActive;
+  const currentHospitalId = session.activeHospitalId || session.hospitalId;
+  const currentHospitalInfo = hospitals.find(h => h.hospital_id === currentHospitalId);
+  const showPanchakarma = (isIncharge || (isAssignedStaff && activeModules.includes('panchakarma'))) 
+    && (hospitalDetails?.panchakarma_centre || currentHospitalInfo?.panchakarma_centre);
+  const showYoga = isIncharge || (isAssignedStaff && (activeModules.includes('yoga_instructor') || activeModules.includes('yoga_control')));
   const showDistrictSupply = userRole === 'DISTRICT_ADMIN';
 
-  const canRegister = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_registration');
-  const canConsult = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_consultation');
-  const canViewQueue = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_queue');
-  const canDispense = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_pharmacy');
+  const canRegister = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_registration');
+  const canConsult = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_consultation');
+  const canViewQueue = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_queue');
+  const canDispense = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_pharmacy');
 
   // Set default active tab based on permissions
   React.useEffect(() => {
@@ -1610,6 +1663,16 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               <Package size={16} /> {activeTab === 'inventory' && 'Inventory'}
             </button>
           )}
+          {showPanchakarma && (
+            <button onClick={() => setActiveTab('panchakarma')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'panchakarma' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <Hand size={16} /> {activeTab === 'panchakarma' && 'Panchakarma'}
+            </button>
+          )}
+          {showYoga && (
+            <button onClick={() => setActiveTab('yoga')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'yoga' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <Sun size={16} /> {activeTab === 'yoga' && 'Yoga'}
+            </button>
+          )}
         </div>
         
         {/* Sub-Tabs Container */}
@@ -1701,6 +1764,16 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             {showMedicineManagement && (
               <button onClick={() => setActiveTab('inventory')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'inventory' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
                 <Package size={18} /> {activeTab === 'inventory' && 'Medicine Management'}
+              </button>
+            )}
+            {showPanchakarma && (
+              <button onClick={() => setActiveTab('panchakarma')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'panchakarma' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <Hand size={18} /> {activeTab === 'panchakarma' && 'Panchakarma Centre'}
+              </button>
+            )}
+            {showYoga && (
+              <button onClick={() => setActiveTab('yoga')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'yoga' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <Sun size={18} /> {activeTab === 'yoga' && 'Yoga Session'}
               </button>
             )}
           </div>
@@ -2163,7 +2236,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dateOfFirstAppointment} 
-                        onChange={e => setProfile({...profile, dateOfFirstAppointment: maskDate(e.target.value)})} 
+                        onChange={e => setProfile({...profile, dateOfFirstAppointment: e.target.value})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2173,7 +2246,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dateOfFirstJoiningDepartment} 
-                        onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} 
+                        onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: e.target.value})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2228,7 +2301,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dob} 
-                        onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
+                        onChange={e => setProfile({...profile, dob: e.target.value})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2281,7 +2354,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                           value={profile.postings[0]?.fromDate || ''}
                           onChange={e => {
                             const newPostings = [...profile.postings];
-                            newPostings[0] = { ...newPostings[0], fromDate: maskDate(e.target.value) };
+                            newPostings[0] = { ...newPostings[0], fromDate: e.target.value };
                             setProfile({ ...profile, postings: newPostings });
                           }}
                           className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -2366,7 +2439,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                                     type="text"
                                     placeholder="DD-MMM-YYYY"
                                     value={posting.fromDate} 
-                                    onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
+                                    onChange={e => updatePosting(posting.id, 'fromDate', e.target.value)} 
                                     className={`w-full bg-white border ${isInvalidDate ? 'border-red-500' : 'border-gray-200'} rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} 
                                   />
                                   {isInvalidDate && (
@@ -2382,7 +2455,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                                 <input 
                                   type="text"
                                   placeholder="Pending"
-                                  value={posting.toDate} 
+                                  value={getAutoToDate(profile.postings, posting.id, profile.currentPostingJoiningDate)} 
                                   readOnly
                                   className="w-full bg-slate-50 border border-gray-200 rounded-xl py-2 px-3 text-slate-500 font-bold" 
                                 />
@@ -2453,7 +2526,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={leave.fromDate} 
-                            onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} 
+                            onChange={e => updateLongLeave(leave.id, 'fromDate', e.target.value)} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2463,7 +2536,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={leave.toDate} 
-                            onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} 
+                            onChange={e => updateLongLeave(leave.id, 'toDate', e.target.value)} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2544,7 +2617,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={att.from} 
-                            onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
+                            onChange={e => updateAttachment(att.id, 'from', e.target.value)} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2554,7 +2627,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={att.to} 
-                            onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
+                            onChange={e => updateAttachment(att.id, 'to', e.target.value)} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -3076,6 +3149,16 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <MedicineDemandSystem session={session} />
           </div>
         )}
+        {activeTab === 'panchakarma' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <PanchakarmaModule session={session} />
+          </div>
+        )}
+        {activeTab === 'yoga' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <YogaModule session={session} />
+          </div>
+        )}
       </motion.div>
 
       {/* Add / Edit Staff Modal */}
@@ -3134,7 +3217,18 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Role</label>
                       <select 
                         value={staffForm.role} 
-                        onChange={e => setStaffForm({...staffForm, role: e.target.value})} 
+                        onChange={e => {
+                          const newRole = e.target.value;
+                          setStaffForm({...staffForm, role: newRole});
+                          
+                          let newModules = [...selectedModules];
+                          if (newRole === 'Panchkarma Sahayak (Male)' || newRole === 'Panchkarma Sahayak (Female)') {
+                            if (!newModules.includes('panchakarma')) newModules.push('panchakarma');
+                          } else if (newRole === 'Yoga Instructor (Male)' || newRole === 'Yoga Instructor (Female)') {
+                            if (!newModules.includes('yoga_instructor')) newModules.push('yoga_instructor');
+                          }
+                          setSelectedModules(newModules);
+                        }}
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       >
                         {roles.map((role, index) => (

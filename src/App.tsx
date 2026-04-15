@@ -35,6 +35,7 @@ import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
 import RoleManagement from './components/RoleManagement';
 import StaffDistributionSummary from './components/StaffDistributionSummary';
+import PanchakarmaModule from './components/PanchakarmaModule';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -71,6 +72,7 @@ interface Hospital {
   last_edited_on?: string;
   verified_at?: string;
   is_verified?: boolean;
+  panchakarma_centre?: boolean;
 }
 
 export default function App() {
@@ -1214,6 +1216,11 @@ export default function App() {
           </motion.div>
         )}
         {activeTab === 'profile' && renderProfile()}
+        {activeTab === 'panchakarma' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
+          <motion.div key="panchakarma" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <PanchakarmaModule session={session} />
+          </motion.div>
+        )}
         {(activeTab === 'doctors' || activeTab === 'tools' || activeTab === 'staff' || activeTab === 'stats') && (
           <motion.div 
             key="placeholder"
@@ -1262,6 +1269,7 @@ export default function App() {
           setActive={setActiveTab} 
           role={session?.role || null} 
           isTransferEnabled={isTransferEnabled}
+          hasPanchakarma={currentHospital?.panchakarma_centre}
         />
       )}
       {/* Unsaved Changes Modal */}
