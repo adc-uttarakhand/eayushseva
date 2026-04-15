@@ -594,7 +594,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const parseDateStr = (d: string) => {
     if (!d) return new Date(NaN);
     
-    // Handle DD-MMM-YYYY
+    // Handle DD-MMM-YYYY (strict: year must be exactly 4 digits)
     if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(d)) {
       const [day, monthStr, year] = d.split('-');
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -604,13 +604,17 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       }
     }
     
-    // Handle DD-MM-YYYY
+    // Handle DD-MM-YYYY (strict: year must be exactly 4 digits)
     if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
       const [day, month, year] = d.split('-');
       return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     }
     
-    return new Date(d);
+    // IMPORTANT: Do NOT use new Date(d) fallback here.
+    // Incomplete dates like "01-Jan-20" (2-digit year being typed)
+    // would be parsed as valid dates by JS and trigger unwanted
+    // recalculation of all posting toDate values while user is still typing.
+    return new Date(NaN);
   };
 
   const formatDate = (date: Date) => {
