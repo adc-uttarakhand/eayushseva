@@ -177,7 +177,37 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
 
   const [showPassword, setShowPassword] = useState(false);
 
-  
+  const maskDate = (value: string) => {
+    // Remove all characters that are not digits or letters
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '');
+    
+    let result = '';
+    
+    // Day (first 2 digits)
+    const day = clean.slice(0, 2).replace(/\D/g, '');
+    result += day;
+    
+    if (clean.length > 2) {
+      result += '-';
+      // Month (next 3 letters)
+      let month = clean.slice(2, 5).replace(/[0-9]/g, '');
+      if (month.length > 0) {
+        // Capitalize first letter, lowercase others
+        month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+      }
+      result += month;
+      
+      if (clean.length > 5) {
+        result += '-';
+        // Year (next 4 digits)
+        const year = clean.slice(5, 9).replace(/\D/g, '');
+        result += year;
+      }
+    }
+    
+    return result;
+  };
+
   // Profile State
   const [postingToDelete, setPostingToDelete] = useState<string | null>(null);
   const [hospitalToDelete, setHospitalToDelete] = useState<any>(null);
@@ -564,32 +594,23 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const parseDateStr = (d: string) => {
     if (!d) return new Date(NaN);
     
-    const trimmed = d.trim();
-    
-    // Strict DD-MMM-YYYY format (e.g., 12-Mar-2024)
-    const match = trimmed.match(/^(\d{2})-([a-zA-Z]{3})-(\d{4})$/);
-    if (!match) return new Date(NaN);
-    
-    const [_, dayStr, monthStr, yearStr] = match;
-    const day = parseInt(dayStr, 10);
-    const year = parseInt(yearStr, 10);
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
-    
-    if (monthIndex === -1) return new Date(NaN);
-    
-    // Validate day range
-    const date = new Date(year, monthIndex, day);
-    if (
-      date.getFullYear() !== year ||
-      date.getMonth() !== monthIndex ||
-      date.getDate() !== day
-    ) {
-      return new Date(NaN);
+    // Handle DD-MMM-YYYY
+    if (/^\d{2}-[a-zA-Z]{3}-\d{4}$/.test(d)) {
+      const [day, monthStr, year] = d.split('-');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIndex = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+      if (monthIndex !== -1) {
+        return new Date(parseInt(year), monthIndex, parseInt(day));
+      }
     }
     
-    return date;
+    // Handle DD-MM-YYYY
+    if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
+      const [day, month, year] = d.split('-');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    return new Date(d);
   };
 
   const formatDate = (date: Date) => {
@@ -598,40 +619,6 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     const month = months[date.getMonth()];
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
-  };
-
-  const safeTime = (dateStr: string): number => {
-    const date = parseDateStr(dateStr);
-    return isNaN(date.getTime()) ? -Infinity : date.getTime();
-  };
-
-  const getAutoToDate = (postings: any[], id: string, currentPostingJoiningDate: string) => {
-    const sorted = [...postings].sort((a, b) => safeTime(b.fromDate) - safeTime(a.fromDate));
-    const index = sorted.findIndex(p => p.id === id);
-    
-    if (index === -1) return 'Pending';
-    
-    if (index === 0) {
-      // 1 day before currentPostingJoiningDate
-      const start = parseDateStr(currentPostingJoiningDate);
-      if (!isNaN(start.getTime())) {
-        const d = new Date(start);
-        d.setDate(d.getDate() - 1);
-        return formatDate(d);
-      }
-    } else {
-      // 1 day before next posting's fromDate
-      const nextPosting = sorted[index - 1]; // sorted descending, so index-1 is the one before it (more recent)
-      if (nextPosting.fromDate) {
-        const start = parseDateStr(nextPosting.fromDate);
-        if (!isNaN(start.getTime())) {
-          const d = new Date(start);
-          d.setDate(d.getDate() - 1);
-          return formatDate(d);
-        }
-      }
-    }
-    return 'Pending';
   };
 
   const formatDaysToYMD = (totalDays: number) => {
@@ -1048,22 +1035,36 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   };
 
   const addPosting = () => {
-    setProfile(prev => ({
-      ...prev,
-      postings: [
-        ...prev.postings,
-        { 
-          id: Date.now().toString() + Math.random().toString(36), 
-          hospitalName: '', 
-          hospital_id: '', 
-          fromDate: '', 
-          toDate: '', 
-          status: 'Sugam', 
-          above7000: 'No', 
-          days: 0 
+    setProfile(prev => {
+      const newPosting = { 
+        id: Date.now().toString() + Math.random().toString(36), 
+        hospitalName: '', 
+        hospital_id: '', 
+        fromDate: '', 
+        toDate: '', 
+        status: 'Sugam', 
+        above7000: 'No', 
+        days: 0 
+      };
+
+      // If there are existing postings, auto-fill the new posting's To Date
+      if (prev.postings.length > 0) {
+        const lastPosting = prev.postings[prev.postings.length - 1];
+        if (lastPosting.fromDate) {
+          const fromDate = parseDateStr(lastPosting.fromDate);
+          if (!isNaN(fromDate.getTime())) {
+            const toDate = new Date(fromDate);
+            toDate.setDate(toDate.getDate() - 1);
+            newPosting.toDate = `${toDate.getDate().toString().padStart(2, '0')}-${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][toDate.getMonth()]}-${toDate.getFullYear()}`;
+          }
         }
-      ]
-    }));
+      }
+
+      return {
+        ...prev,
+        postings: [...prev.postings, newPosting]
+      };
+    });
   };
 
   const removePosting = (id: string) => {
@@ -1110,7 +1111,40 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         return p;
       });
 
-      return { ...prev, postings: updatedPostings };
+      // Recalculate To Dates
+      const sorted = [...updatedPostings].sort((a, b) => parseDateStr(b.fromDate).getTime() - parseDateStr(a.fromDate).getTime());
+      
+      const recalculatedPostings = updatedPostings.map(p => {
+        const index = sorted.findIndex(s => s.id === p.id);
+        let toDate = '';
+        if (index === 0) {
+          // 1 day before currentPostingJoiningDate
+           const start = parseDateStr(prev.currentPostingJoiningDate);
+           if (!isNaN(start.getTime())) {
+              const d = new Date(start);
+              d.setDate(d.getDate() - 1);
+              toDate = formatDate(d);
+           }
+        } else {
+          // 1 day before sorted[index-1].fromDate
+          const prevPosting = sorted[index-1];
+          if (!prevPosting.fromDate) {
+              toDate = 'Pending';
+          } else {
+              const start = parseDateStr(prevPosting.fromDate);
+              if (!isNaN(start.getTime())) {
+                  const d = new Date(start);
+                  d.setDate(d.getDate() - 1);
+                  toDate = formatDate(d);
+              } else {
+                  toDate = 'Pending';
+              }
+          }
+        }
+        return { ...p, toDate: toDate || 'Pending' };
+      });
+
+      return { ...prev, postings: recalculatedPostings };
     });
   };
 
@@ -2236,7 +2270,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dateOfFirstAppointment} 
-                        onChange={e => setProfile({...profile, dateOfFirstAppointment: e.target.value})} 
+                        onChange={e => setProfile({...profile, dateOfFirstAppointment: maskDate(e.target.value)})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2246,7 +2280,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dateOfFirstJoiningDepartment} 
-                        onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: e.target.value})} 
+                        onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2301,7 +2335,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                         type="text"
                         placeholder="DD-MMM-YYYY"
                         value={profile.dob} 
-                        onChange={e => setProfile({...profile, dob: e.target.value})} 
+                        onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} 
                         className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                       />
                     </div>
@@ -2354,7 +2388,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                           value={profile.postings[0]?.fromDate || ''}
                           onChange={e => {
                             const newPostings = [...profile.postings];
-                            newPostings[0] = { ...newPostings[0], fromDate: e.target.value };
+                            newPostings[0] = { ...newPostings[0], fromDate: maskDate(e.target.value) };
                             setProfile({ ...profile, postings: newPostings });
                           }}
                           className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -2439,7 +2473,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                                     type="text"
                                     placeholder="DD-MMM-YYYY"
                                     value={posting.fromDate} 
-                                    onChange={e => updatePosting(posting.id, 'fromDate', e.target.value)} 
+                                    onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} 
                                     className={`w-full bg-white border ${isInvalidDate ? 'border-red-500' : 'border-gray-200'} rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} 
                                   />
                                   {isInvalidDate && (
@@ -2455,7 +2489,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                                 <input 
                                   type="text"
                                   placeholder="Pending"
-                                  value={getAutoToDate(profile.postings, posting.id, profile.currentPostingJoiningDate)} 
+                                  value={posting.toDate} 
                                   readOnly
                                   className="w-full bg-slate-50 border border-gray-200 rounded-xl py-2 px-3 text-slate-500 font-bold" 
                                 />
@@ -2526,7 +2560,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={leave.fromDate} 
-                            onChange={e => updateLongLeave(leave.id, 'fromDate', e.target.value)} 
+                            onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2536,7 +2570,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={leave.toDate} 
-                            onChange={e => updateLongLeave(leave.id, 'toDate', e.target.value)} 
+                            onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2617,7 +2651,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={att.from} 
-                            onChange={e => updateAttachment(att.id, 'from', e.target.value)} 
+                            onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
@@ -2627,7 +2661,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                             type="text"
                             placeholder="DD-MMM-YYYY"
                             value={att.to} 
-                            onChange={e => updateAttachment(att.id, 'to', e.target.value)} 
+                            onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} 
                             className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
                           />
                         </div>
