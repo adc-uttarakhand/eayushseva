@@ -41,7 +41,7 @@ const DISTRICT_ALIASES: { [key: string]: string[] } = {
   'DEHRADUN': ['DEHRADUN'],
   'HARIDWAR': ['HARIDWAR'],
   'NAINITAL': ['NAINITAL'],
-  'PAURI': ['PAURI', 'PAURI GARHWAL'],
+  'PAURI': ['PAURI', 'PAURI GARHWAL', 'PAURIGARHWAL'],
   'PITHORAGARH': ['PITHORAGARH'],
   'RUDRAPRAYAG': ['RUDRAPRAYAG'],
   'TEHRI': ['TEHRI', 'TEHRI GARHWAL'],
@@ -66,6 +66,10 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
   const [activeTab, setActiveTab] = useState<'receiving' | 'received' | 'returns' | 'dispatch' | 'confirmations' | 'logs'>('receiving');
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  
+  const [receivingPage, setReceivingPage] = useState(0);
+  const [receivedPage, setReceivedPage] = useState(0);
+  const PAGE_SIZE = 1000;
   
   const [stateOrders, setStateOrders] = useState<any[]>([]);
   const [districtInventory, setDistrictInventory] = useState<any[]>([]);
@@ -212,7 +216,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
         const { data } = await supabase
           .from('hospitals')
           .select('hospital_id, facility_name')
-          .ilike('district', district.toUpperCase());
+          .or(`district.ilike.%${district.toUpperCase()}%,district.ilike.%${rawDistrict.toUpperCase()}%`);
         setDistrictHospitals(data || []);
         console.log("Hospitals Found:", data?.length || 0);
       } catch (err) {
@@ -308,7 +312,8 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
         console.log(`Fetching Dispatched orders for district: ${district}`);
         let query = supabase
           .from('state_supply_orders')
-          .select('*, medicine_master(*)');
+          .select('*, medicine_master(*)')
+          .range(receivingPage * PAGE_SIZE, (receivingPage + 1) * PAGE_SIZE - 1);
         
         if (district !== 'ALL') {
           query = query.ilike('district_name', district.toUpperCase());
@@ -348,7 +353,8 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
             .from('district_inventory')
             .select('*, medicine_master(medicine_name, unit_type, packing_size)')
             .ilike('district', district.toUpperCase())
-            .order('receiving_date', { ascending: false }),
+            .order('receiving_date', { ascending: false })
+            .range(receivedPage * PAGE_SIZE, (receivedPage + 1) * PAGE_SIZE - 1),
           supabase
             .from('hospital_dispatches')
             .select('medicine_id, batch_no, order_number, quantity')
