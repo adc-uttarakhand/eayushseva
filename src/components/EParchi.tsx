@@ -1621,28 +1621,50 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {registrationList
-                  .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.mobile.includes(searchQuery))
-                  .map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
-                      <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleString()}</td>
-                      <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.hospital_yearly_serial}</td>
-                      <td className="py-4 px-4 text-sm text-slate-600">{p.is_new ? 'New' : 'Old'} ({p.revisit_count})</td>
-                      <td className="py-4 px-4 text-sm text-slate-900">{p.name} ({p.age}/{p.gender})</td>
-                      <td className="py-4 px-4 text-sm text-slate-600">{p.mobile} / {p.aadhar ? p.aadhar.replace(/.(?=.{4})/g, '*') : '---'}</td>
-                      <td className="py-4 px-4 text-right flex justify-end gap-2">
-                        <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100">
-                          <Eye size={16} />
-                        </button>
-                        <button onClick={() => {
-  setShowPreviewModal(p);
-  setTimeout(() => window.print(), 500);
-}} className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200">
-                          <Download size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <Loader2 className="animate-spin mx-auto text-emerald-600 mb-2" size={32} />
+                      <p className="text-slate-500 font-medium">Loading registrations...</p>
+                    </td>
+                  </tr>
+                ) : registrationList.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FileText className="text-slate-300" size={32} />
+                      </div>
+                      <p className="text-slate-500 font-medium">No registrations found for this date.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  registrationList
+                    .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.mobile.includes(searchQuery))
+                    .map(p => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
+                        <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleString()}</td>
+                        <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.hospital_yearly_serial}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.is_new ? 'New' : 'Old'} ({p.revisit_count})</td>
+                        <td className="py-4 px-4 text-sm text-slate-900">{p.name} ({p.age}/{p.gender})</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.mobile} / {p.aadhar ? p.aadhar.replace(/.(?=.{4})/g, '*') : '---'}</td>
+                        <td className="py-4 px-4 text-right flex justify-end gap-2">
+                          <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100" title="Preview">
+                            <Eye size={16} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setShowPreviewModal(p);
+                              setTimeout(() => window.print(), 500);
+                            }} 
+                            className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"
+                            title="Print Parchi"
+                          >
+                            <Printer size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                )}
               </tbody>
             </table>
           </div>
@@ -2396,20 +2418,29 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
       <AnimatePresence>
         {showPreviewModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm print:bg-white print:p-0 print:block">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-white/20"
+              className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-white/20 print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full"
             >
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-6 print:hidden">
                 <h2 className="text-xl font-bold text-slate-900">Parchi Preview</h2>
-                <button onClick={() => setShowPreviewModal(null)} className="text-slate-400 hover:text-slate-600">
-                  <X size={24} />
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => window.print()}
+                    className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"
+                    title="Print Parchi"
+                  >
+                    <Printer size={20} />
+                  </button>
+                  <button onClick={() => setShowPreviewModal(null)} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-center">
+              <div className="flex justify-center print:block">
                 {renderA4Preview(showPreviewModal)}
               </div>
             </motion.div>
