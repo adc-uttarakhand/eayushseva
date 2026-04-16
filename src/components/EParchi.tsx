@@ -1634,7 +1634,10 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                         <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100">
                           <Eye size={16} />
                         </button>
-                        <button onClick={() => {/* Download PDF logic */}} className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200">
+                        <button onClick={() => {
+  setShowPreviewModal(p);
+  setTimeout(() => window.print(), 500);
+}} className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200">
                           <Download size={16} />
                         </button>
                       </td>
