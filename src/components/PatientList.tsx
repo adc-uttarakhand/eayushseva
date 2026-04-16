@@ -15,6 +15,7 @@ interface PatientRecord {
   daily_opd_number: string;
   created_at: string;
   is_new: boolean;
+  consultation_mode?: string;
 }
 
 interface PatientListProps {
@@ -27,6 +28,7 @@ export default function PatientList({ hospitalId }: PatientListProps) {
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
+  const [activeTab, setActiveTab] = useState<'opd' | 'teleconsultation'>('opd');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +50,7 @@ export default function PatientList({ hospitalId }: PatientListProps) {
 
   useEffect(() => {
     fetchPatients();
-  }, [hospitalId, timeRange, startDate, endDate]);
+  }, [hospitalId, timeRange, startDate, endDate, activeTab]);
 
   const fetchPatients = async () => {
     setLoading(true);
@@ -58,6 +60,10 @@ export default function PatientList({ hospitalId }: PatientListProps) {
         .select('*')
         .eq('hospital_id', hospitalId)
         .order('created_at', { ascending: false });
+
+      if (activeTab === 'teleconsultation') {
+        query = query.eq('consultation_mode', 'Teleconsultation');
+      }
 
       const now = new Date();
       let start = new Date();
@@ -136,6 +142,19 @@ export default function PatientList({ hospitalId }: PatientListProps) {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <div className="flex bg-neutral-100 p-1 rounded-xl">
+            {(['opd', 'teleconsultation'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  activeTab === tab ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {tab === 'opd' ? 'OPD Patients' : 'Teleconsultation'}
+              </button>
+            ))}
+          </div>
           <div className="flex bg-neutral-100 p-1 rounded-xl">
             {(['today', 'month', 'quarter', 'year', 'custom'] as TimeRange[]).map((range) => (
               <button

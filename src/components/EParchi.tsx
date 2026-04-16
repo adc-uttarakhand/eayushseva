@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X } from 'lucide-react';
+import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { PrescriptionMedicine, IndentStock } from '../types/inventory';
 import DiseaseCombobox from './DiseaseCombobox';
@@ -215,9 +215,10 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const canViewQueue = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_queue');
   const canDispense = isIncharge || isHospital || assignedModules.includes('e_parchi') || assignedModules.includes('eparchi_pharmacy');
 
-  const [activeTab, setActiveTab] = useState<'queue' | 'dispensing'>(
-    (canViewQueue || canConsult ? 'queue' : 'dispensing')
+  const [activeTab, setActiveTab] = useState<'registration' | 'queue' | 'dispensing'>(
+    'registration'
   );
+  const [activeRegistrationSubTab, setActiveRegistrationSubTab] = useState<'registration' | 'list'>('registration');
   const [activeDispensingTab, setActiveDispensingTab] = useState<'auto' | 'manual'>('auto');
 
   useEffect(() => {
@@ -228,10 +229,19 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [isNew, setIsNew] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [diseaseMaster, setDiseaseMaster] = useState<any[]>([]);
+  const [registrationList, setRegistrationList] = useState<Patient[]>([]);
+  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [showPreviewModal, setShowPreviewModal] = useState<Patient | null>(null);
 
   useEffect(() => {
     fetchDiseases();
   }, []);
+
+  useEffect(() => {
+    if (activeRegistrationSubTab === 'list') {
+      fetchRegistrationList();
+    }
+  }, [activeRegistrationSubTab, filterDate]);
 
   const fetchDiseases = async () => {
     try {
@@ -244,6 +254,27 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       if (data) setDiseaseMaster(data);
     } catch (err) {
       console.error('Unexpected error fetching diseases:', err);
+    }
+  };
+
+  const fetchRegistrationList = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('patients')
+        .select('*')
+        .eq('hospital_id', hospitalId)
+        .gte('created_at', `${filterDate}T00:00:00Z`)
+        .lte('created_at', `${filterDate}T23:59:59Z`)
+        .order('created_at', { ascending: false });
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setRegistrationList(data || []);
+    } catch (err) {
+      console.error('Error fetching registration list:', err);
+    } finally {
+      setLoading(false);
     }
   };
   const [loading, setLoading] = useState(false);
@@ -396,10 +427,10 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         .from('patients')
         .select('*')
         .eq('hospital_id', hospitalId)
-        .eq('status', 'Completed')
+        .in('status', ['Completed', 'Consultation Completed'])
         .gte('created_at', `${today}T00:00:00Z`)
         .lte('created_at', `${today}T23:59:59Z`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setDispensingQueue(data || []);
@@ -686,6 +717,47 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     }
   };
 
+  const handleOfflineParchi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        ...formData,
+        global_serial: globalSerial,
+        hospital_yearly_serial: hospitalYearlySerial,
+        daily_opd_number: dailyOpdNumber,
+        hospital_id: hospitalId,
+        revisit_count: revisitCount,
+        is_new: isNew,
+        created_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        status: 'Completed',
+        consultation_mode: 'Offline',
+        queue_time: null,
+        assigned_doctor_id: null,
+      };
+
+      const { error } = await supabase.from('patients').insert([payload]);
+      if (error) throw error;
+      
+      window.print();
+
+      alert('Offline Parchi recorded and PDF generated!');
+      setFormData({
+        name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
+        complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
+        mutra: '', mala: '', jivha: '', netra: '', nidra: '', agni: '',
+        ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: ''
+      });
+      generateSerials();
+      setIsNew(true);
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Error saving patient data');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSelectQueuePatient = async (patient: Patient) => {
     setSelectedPatient(patient);
     setFormData(patient);
@@ -892,7 +964,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       history: 'History',
       nadi: 'Nadi',
       prakruti: 'Prakruti',
-      save: 'Send for Online Consultation',
+      save: 'Online Parchi',
       globalSerial: 'Global Serial',
       hospitalSerial: 'Hospital Yearly Serial',
       dailyOpd: 'Daily OPD No.',
@@ -1001,11 +1073,26 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     }
   };
 
-  const handleDispensingComplete = () => {
-    setSelectedPatient(null);
-    setCurrentPrescription([]);
-    setSearchQuery('');
-    setPatients([]);
+  const handleDispensingComplete = async () => {
+    if (!selectedPatient) return;
+    
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .update({ status: 'Dispensing Completed' })
+        .eq('id', selectedPatient.id);
+      
+      if (error) throw error;
+      
+      setSelectedPatient(null);
+      setCurrentPrescription([]);
+      setSearchQuery('');
+      setPatients([]);
+      fetchDispensingQueue(); // Refresh queue
+    } catch (err) {
+      console.error('Error updating patient status:', err);
+      alert('Error updating patient status');
+    }
   };
 
   const cur = t[language];
@@ -1040,11 +1127,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
           <h3 className="text-[11px] font-bold uppercase leading-none">{hospitalName || 'AYUSH HEALTH CENTRE'}</h3>
           <p className="text-[7px] font-medium uppercase leading-none mt-0.5">{hospitalType} • {district}</p>
           <div className="absolute top-2 right-2 border border-slate-900 px-1.5 py-0.5 rounded text-[6px] font-bold">
-            {isNoFeeHospital ? (
-              `Centralized No: ${patientData.global_serial || '---'}`
-            ) : (
-              `Fee: ₹${feeAmount.toString().padStart(2, '0')}`
-            )}
+            {`Fee: ₹${feeAmount.toString().padStart(2, '0')}`}
           </div>
         </div>
 
@@ -1052,7 +1135,6 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         <div className="h-[5%] flex justify-between items-center px-3 border-b border-gray-200 text-[7px] bg-white">
           <div className="flex gap-3">
             <p><span className="font-bold">Date:</span> {new Date(patientData.created_at || new Date()).toLocaleDateString()}</p>
-            <p><span className="font-bold">Global:</span> {patientData.global_serial || globalSerial}</p>
             <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial || hospitalYearlySerial}</p>
             <p><span className="font-bold">Daily OPD:</span> {patientData.daily_opd_number || dailyOpdNumber}</p>
           </div>
@@ -1254,12 +1336,28 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
       {/* Tab Navigation */}
       <div className="flex gap-4 mb-8 print:hidden">
+        {canRegister && (
+          <button onClick={() => setActiveTab('registration')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'registration' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Registration</button>
+        )}
+        {canViewQueue && (
+          <button onClick={() => setActiveTab('queue')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'queue' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Queue</button>
+        )}
+        {canDispense && (
+          <button onClick={() => setActiveTab('dispensing')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'dispensing' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Dispensing</button>
+        )}
       </div>
 
       {activeTab === 'registration' && (
-        <div className="flex flex-col lg:flex-row gap-8 print:hidden">
-          {/* Left Side: Form */}
-          <div className="flex-1 space-y-8">
+        <div className="space-y-6">
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-full w-fit">
+            <button onClick={() => setActiveRegistrationSubTab('registration')} className={`px-6 py-2 rounded-full font-bold ${activeRegistrationSubTab === 'registration' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Patient Registration</button>
+            <button onClick={() => setActiveRegistrationSubTab('list')} className={`px-6 py-2 rounded-full font-bold ${activeRegistrationSubTab === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Registration List</button>
+          </div>
+
+          {activeRegistrationSubTab === 'registration' && (
+            <div className="flex flex-col lg:flex-row gap-8 print:hidden">
+              {/* Left Side: Form */}
+              <div className="flex-1 space-y-8">
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">{cur.title}</h1>
@@ -1441,16 +1539,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                       className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </div>
-                  {isNoFeeHospital && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Centralized Serial No.</label>
-                      <input 
-                        value={formData.global_serial || ''}
-                        onChange={e => setFormData({...formData, global_serial: e.target.value})}
-                        className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      />
-                    </div>
-                  )}
+                  {/* Removed Centralized Serial No. input */}
                 </div>
               </div>
 
@@ -1476,14 +1565,25 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                 </div>
               </div>
 
-              <button 
-                type="submit"
-                disabled={saving}
-                className="w-full bg-emerald-600 text-white font-bold py-6 rounded-[2.5rem] text-xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
-              >
-                {saving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />}
-                {cur.save}
-              </button>
+              <div className="flex gap-4">
+                <button 
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 bg-emerald-600 text-white font-bold py-4 rounded-[2rem] text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  {cur.save}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleOfflineParchi}
+                  disabled={saving}
+                  className="flex-1 bg-amber-500 text-white font-bold py-4 rounded-[2rem] text-lg shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+                  Offline Parchi
+                </button>
+              </div>
             </form>
           </div>
           
@@ -1499,6 +1599,67 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
           </div>
         </div>
       )}
+
+      {activeRegistrationSubTab === 'list' && (
+        <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-slate-900">Registration List</h2>
+            <div className="flex gap-2">
+              <input 
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-4"
+              />
+              <input 
+                type="text"
+                placeholder="Search by Name/Mobile..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-4"
+              />
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Timestamp</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Hospital Serial</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Type</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Patient Details</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Identity</th>
+                  <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {registrationList
+                  .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.mobile.includes(searchQuery))
+                  .map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
+                      <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleString()}</td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.hospital_yearly_serial}</td>
+                      <td className="py-4 px-4 text-sm text-slate-600">{p.is_new ? 'New' : 'Old'} ({p.revisit_count})</td>
+                      <td className="py-4 px-4 text-sm text-slate-900">{p.name} ({p.age}/{p.gender})</td>
+                      <td className="py-4 px-4 text-sm text-slate-600">{p.mobile} / {p.aadhar ? p.aadhar.replace(/.(?=.{4})/g, '*') : '---'}</td>
+                      <td className="py-4 px-4 text-right flex justify-end gap-2">
+                        <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100">
+                          <Eye size={16} />
+                        </button>
+                        <button onClick={() => {/* Download PDF logic */}} className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200">
+                          <Download size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
 
       {activeTab === 'fees' && (
         <FeesModule hospitalId={hospitalId} />
@@ -2244,6 +2405,26 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       )}
 
       <AnimatePresence>
+        {showPreviewModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-white/20"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Parchi Preview</h2>
+                <button onClick={() => setShowPreviewModal(null)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="flex justify-center">
+                {renderA4Preview(showPreviewModal)}
+              </div>
+            </motion.div>
+          </div>
+        )}
         {showConsultationCompletePopup && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
             <motion.div 
