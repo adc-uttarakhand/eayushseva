@@ -1334,19 +1334,6 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-4 mb-8 print:hidden">
-        {canRegister && (
-          <button onClick={() => setActiveTab('registration')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'registration' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Registration</button>
-        )}
-        {canViewQueue && (
-          <button onClick={() => setActiveTab('queue')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'queue' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Queue</button>
-        )}
-        {canDispense && (
-          <button onClick={() => setActiveTab('dispensing')} className={`px-6 py-3 rounded-full font-bold ${activeTab === 'dispensing' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'}`}>Dispensing</button>
-        )}
-      </div>
-
       {activeTab === 'registration' && (
         <div className="space-y-6">
           <div className="flex gap-2 bg-slate-100 p-1 rounded-full w-fit">
