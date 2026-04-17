@@ -38,6 +38,8 @@ export interface PrescriptionMedicine {
   frequency: string; // e.g., After Food
   duration_days: number;
   total_quantity: number; // Calculated: (dosage sum) * duration
+  quantity: number;
+  instruction?: string[];
   is_market_purchase: boolean;
   unit_label: string; // Tablet, Gram, ml
 }

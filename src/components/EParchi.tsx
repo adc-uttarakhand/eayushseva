@@ -1,7 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye } from 'lucide-react';
+import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2 } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import { supabase } from '../lib/supabase';
+import { toast } from 'react-hot-toast';
+
+const PDF_STYLES = `
+  .pdf-print-container {
+    font-family: 'Inter', sans-serif !important;
+    color: #0f172a !important;
+    --tw-text-opacity: 1 !important;
+    --tw-bg-opacity: 1 !important;
+    --tw-border-opacity: 1 !important;
+    background-color: #ffffff !important;
+  }
+  .pdf-print-container * {
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+  .pdf-print-container .bg-emerald-600 { background-color: #059669 !important; }
+  .pdf-print-container .text-emerald-700 { color: #047857 !important; }
+  .pdf-print-container .text-emerald-600 { color: #059669 !important; }
+  .pdf-print-container .bg-emerald-50 { background-color: #ecfdf5 !important; }
+  .pdf-print-container .text-emerald-800 { color: #065f46 !important; }
+  .pdf-print-container .bg-slate-50 { background-color: #f8fafc !important; }
+  .pdf-print-container .bg-neutral-50 { background-color: #fafafa !important; }
+  .pdf-print-container .text-slate-500 { color: #64748b !important; }
+  .pdf-print-container .text-slate-400 { color: #94a3b8 !important; }
+  .pdf-print-container .text-slate-900 { color: #0f172a !important; }
+  .pdf-print-container .border-slate-900 { border-color: #0f172a !important; }
+  .pdf-print-container .border-gray-200 { border-color: #e5e7eb !important; }
+  .pdf-print-container .border-gray-100 { border-color: #f3f4f6 !important; }
+  .pdf-print-container .border-gray-300 { border-color: #d1d5db !important; }
+  .pdf-print-container .bg-white { background-color: #ffffff !important; }
+`;
 import { PrescriptionMedicine, IndentStock } from '../types/inventory';
 import DiseaseCombobox from './DiseaseCombobox';
 import PrescriptionTable from './PrescriptionTable';
@@ -188,6 +222,125 @@ const AsyncMultiSelect = ({
   );
 };
 
+const MedicineSearch = ({ 
+  value, 
+  onChange, 
+  onSelect,
+  indentStock, 
+  mainInventory,
+  masterMedicines
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  onSelect?: (val: string) => void;
+  indentStock: any[]; 
+  mainInventory: any[]; 
+  masterMedicines: string[];
+}) => {
+  const [query, setQuery] = useState(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync internal query with parent value
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!query || query.length < 1) return [];
+    
+    const normalizedQuery = normalizeForSearch(query);
+    const optionsMap = new Map<string, { name: string; type: 'green' | 'red' | 'slate' }>();
+
+    // 1. Check Indent Stock (Green)
+    indentStock.forEach(item => {
+      if (normalizeForSearch(item.medicine_name).includes(normalizedQuery)) {
+        optionsMap.set(item.medicine_name, { name: item.medicine_name, type: 'green' });
+      }
+    });
+
+    // 2. Check Main Inventory (Red)
+    mainInventory.forEach(item => {
+      if (normalizeForSearch(item.medicine_name).includes(normalizedQuery) && !optionsMap.has(item.medicine_name)) {
+        optionsMap.set(item.medicine_name, { name: item.medicine_name, type: 'red' });
+      }
+    });
+
+    // 3. Check All Master Medicines (Slate/Default)
+    masterMedicines.forEach(name => {
+      if (normalizeForSearch(name).includes(normalizedQuery) && !optionsMap.has(name)) {
+        optionsMap.set(name, { name: name, type: 'slate' });
+      }
+    });
+
+    return Array.from(optionsMap.values()).slice(0, 50);
+  }, [query, indentStock, mainInventory, masterMedicines]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          onChange(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        placeholder="Search medicine..."
+        className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
+      />
+      
+      <AnimatePresence>
+        {isOpen && filteredOptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto overflow-x-hidden"
+          >
+            {filteredOptions.map((opt, idx) => (
+              <div
+                key={idx}
+                onClick={() => {
+                  onChange(opt.name);
+                  setQuery(opt.name);
+                  setIsOpen(false);
+                  if (onSelect) onSelect(opt.name);
+                }}
+                className={`flex items-center justify-between p-3 hover:bg-slate-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0`}
+              >
+                <span className={`text-sm font-bold ${
+                  opt.type === 'green' ? 'text-emerald-600' : 
+                  opt.type === 'red' ? 'text-red-600' : 'text-slate-600'
+                }`}>
+                  {opt.name}
+                </span>
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                  opt.type === 'green' ? 'bg-emerald-50 text-emerald-700' : 
+                  opt.type === 'red' ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'
+                }`}>
+                  {opt.type === 'green' ? 'In Stock' : opt.type === 'red' ? 'Main Store Only' : 'Master List'}
+                </span>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 interface EParchiProps {
   hospitalId: string;
   hospitalName?: string;
@@ -232,6 +385,9 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [registrationList, setRegistrationList] = useState<Patient[]>([]);
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showPreviewModal, setShowPreviewModal] = useState<Patient | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
+  const [pdfData, setPdfData] = useState<Patient | null>(null);
 
   useEffect(() => {
     fetchDiseases();
@@ -277,6 +433,80 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       setLoading(false);
     }
   };
+
+const handleDownloadPDF = async (patient: Patient) => {
+  setIsGeneratingPDF(true);
+  setPdfData(patient);
+  
+  setTimeout(async () => {
+    const element = document.getElementById('parchi-preview-content');
+    if (!element) {
+      setIsGeneratingPDF(false);
+      return;
+    }
+
+    const opt = {
+      margin: 0,
+      filename: `${patient.name}_${patient.hospital_yearly_serial}.pdf`,
+      image: { type: 'jpeg', quality: 1.0 },
+      html2canvas: { 
+        scale: 3,
+        useCORS: true, 
+        logging: false,
+        letterRendering: true,
+        windowWidth: 794,
+        windowHeight: 1123,
+        onclone: (clonedDoc: Document) => {
+          // Centering fix for the cloned document
+          clonedDoc.body.style.display = 'flex';
+          clonedDoc.body.style.justifyContent = 'center';
+          clonedDoc.body.style.alignItems = 'flex-start';
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+
+          const elements = clonedDoc.getElementsByTagName('*');
+          for (let i = 0; i < elements.length; i++) {
+            const el = elements[i] as HTMLElement;
+            try {
+              if (!el.style) continue;
+              const computed = window.getComputedStyle(el);
+              if (computed.color && computed.color.includes('oklch')) el.style.color = '#0f172a';
+              if (computed.backgroundColor && computed.backgroundColor.includes('oklch')) el.style.backgroundColor = '#ffffff';
+              if (computed.borderColor && computed.borderColor.includes('oklch')) el.style.borderColor = '#cbd5e1';
+              if (computed.fill && computed.fill.includes('oklch')) el.style.fill = '#0f172a';
+              if (computed.stroke && computed.stroke.includes('oklch')) el.style.stroke = '#0f172a';
+              el.style.fontFamily = "'Inter', sans-serif";
+            } catch (e) {}
+          }
+          const previewEl = clonedDoc.getElementById('parchi-preview-content');
+          if (previewEl) {
+            previewEl.style.width = '794px';
+            previewEl.style.height = '1123px';
+            previewEl.style.overflow = 'hidden';
+            previewEl.style.borderRadius = '0';
+            previewEl.style.boxShadow = 'none';
+            previewEl.style.margin = '0 auto';
+          }
+        }
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait'
+      }
+    };
+
+    try {
+      // @ts-ignore
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+    } finally {
+      setIsGeneratingPDF(false);
+      setPdfData(null);
+    }
+  }, 600);
+};
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -312,13 +542,14 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [indentStock, setIndentStock] = useState<IndentStock[]>([]);
   const [mainInventory, setMainInventory] = useState<any[]>([]);
   const [availableMedicines, setAvailableMedicines] = useState<string[]>([]);
+  const [medicineUnits, setMedicineUnits] = useState<Record<string, string>>({});
   const [newMedicine, setNewMedicine] = useState<Partial<PrescriptionMedicine>>({
     medicine_name: '',
     dosage: '1-0-1',
-    frequency: 'After Food',
+    frequency: '2',
+    instruction: 'After Food',
     duration_days: 5,
-    is_market_purchase: false,
-    unit_label: 'Tablet'
+    unit_label: 'tab'
   });
 
   const [availableDoctors, setAvailableDoctors] = useState<Staff[]>([]);
@@ -334,6 +565,8 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [lastConsumption, setLastConsumption] = useState<{ date: string, medicines: string } | null>(null);
   const [consumptionHistory, setConsumptionHistory] = useState<{ date: string, medicines: string }[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showIndentModal, setShowIndentModal] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [dispensedQty, setDispensedQty] = useState<string>('');
   const [showConsultationCompletePopup, setShowConsultationCompletePopup] = useState(false);
   const [dispensedMedicines, setDispensedMedicines] = useState<string[]>([]);
@@ -449,24 +682,49 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       
       if (stockData) setIndentStock(stockData);
 
-      // Fetch Main Inventory for Yellow status check
+      // Fetch Main Inventory with units
       const { data: invData } = await supabase
         .from('medicine_inventory')
-        .select('medicine_name, quantity')
+        .select('medicine_name:medicine_master(medicine_name, unit_type), quantity')
         .eq('hospital_id', hospitalId);
       
       if (invData) {
-        const names = Array.from(new Set(invData.map(i => i.medicine_name)));
-        setAvailableMedicines(names);
-        setMainInventory(invData);
+        const units: Record<string, string> = {};
+        // Aggregate quantities by medicine_name
+        const aggregatedInventory = invData.reduce((acc, item) => {
+          const med = (item.medicine_name as any);
+          const name = med?.medicine_name || 'Unknown';
+          if (med?.unit_type) units[name] = med.unit_type;
+          acc[name] = (acc[name] || 0) + (item.quantity || 0);
+          return acc;
+        }, {} as Record<string, number>);
+
+        setMedicineUnits(prev => ({ ...prev, ...units }));
+
+        const formattedInventory = Object.entries(aggregatedInventory).map(([name, qty]) => ({
+          medicine_name: name,
+          quantity: qty
+        }));
+
+        setAvailableMedicines(Object.keys(aggregatedInventory));
+        setMainInventory(formattedInventory);
       }
 
       // Fetch Master Medicine
-      const { data: masterData } = await supabase
-        .from('master_medicine')
-        .select('medicine_name');
+      const { data: masterData, error: masterError } = await supabase
+        .from('medicine_master')
+        .select('medicine_name, unit_type');
+      
+      if (masterError) {
+        console.error('Error fetching master_medicine:', masterError);
+      }
       
       if (masterData) {
+        const units: Record<string, string> = {};
+        masterData.forEach(m => {
+          if (m.unit_type) units[m.medicine_name] = m.unit_type;
+        });
+        setMedicineUnits(prev => ({ ...prev, ...units }));
         setMasterMedicines(masterData.map(m => m.medicine_name));
       }
     } catch (err) {
@@ -657,7 +915,10 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       setRevisitCount(visitCount);
       setIsNew(false);
     } else {
-      alert('Patient last visit was more than 15 days ago. They will be registered as a New Patient, but personal details have been auto-filled.');
+      toast('Patient last visit was more than 15 days ago. They will be registered as a New Patient, but personal details have been auto-filled.', {
+        icon: 'ℹ️',
+        duration: 5000
+      });
       setFormData({
         ...patient,
         complaints: '',
@@ -676,7 +937,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.assigned_doctor_id) {
-      alert('Please select a doctor or Teleconsultation.');
+      toast.error('Please select a doctor or Teleconsultation.');
       return;
     }
     setSaving(true);
@@ -699,7 +960,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       const { error } = await supabase.from('patients').insert([payload]);
       if (error) throw error;
       
-      alert(formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation recorded successfully!' : 'Patient registered and sent for consultation successfully!');
+      toast.success(formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation recorded successfully!' : 'Patient registered and sent for consultation successfully!');
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
@@ -711,7 +972,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       setIsNew(true);
     } catch (err) {
       console.error('Save error:', err);
-      alert('Error saving patient data');
+      toast.error('Error saving patient data');
     } finally {
       setSaving(false);
     }
@@ -719,8 +980,16 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
   const handleOfflineParchi = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation: Patient Name, Age, Gender, and Assigned Doctor must be filled
+    if (!formData.name || !formData.age || !formData.gender || !formData.assigned_doctor_id) {
+      toast.error('Please fill in Patient Name, Age, Gender, and assign a Doctor before submitting.');
+      return;
+    }
+
     setSaving(true);
     try {
+      const isTeleconsultation = formData.assigned_doctor_id === 'teleconsultation';
       const payload = {
         ...formData,
         global_serial: globalSerial,
@@ -731,9 +1000,9 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         is_new: isNew,
         created_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
         status: 'Completed',
-        consultation_mode: 'Offline',
+        consultation_mode: isTeleconsultation ? 'Teleconsultation' : 'Offline',
         queue_time: null,
-        assigned_doctor_id: null,
+        assigned_doctor_id: isTeleconsultation ? null : formData.assigned_doctor_id,
       };
 
       const { error } = await supabase.from('patients').insert([payload]);
@@ -741,7 +1010,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       
       window.print();
 
-      alert('Offline Parchi recorded and PDF generated!');
+      toast.success('Offline Parchi recorded and PDF generated!');
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
@@ -752,7 +1021,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       setIsNew(true);
     } catch (err) {
       console.error('Save error:', err);
-      alert('Error saving patient data');
+      toast.error('Error saving patient data');
     } finally {
       setSaving(false);
     }
@@ -798,32 +1067,40 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   };
 
   const addMedicine = () => {
-    if (!newMedicine.medicine_name) return;
+    if (!newMedicine.medicine_name || !newMedicine.quantity || !newMedicine.duration_days || !newMedicine.frequency) {
+      toast.error('Please fill all required fields, including frequency');
+      return;
+    }
 
     // Calculate total quantity
-    const dosageParts = newMedicine.dosage?.split('-').map(Number) || [0, 0, 0];
-    const dailyTotal = dosageParts.reduce((a, b) => a + b, 0);
-    const total = dailyTotal * (newMedicine.duration_days || 0);
+    const qty = Number(newMedicine.quantity?.toString() || '0');
+    const freq = Number(newMedicine.frequency?.toString() || '0') || 0;
+    const days = newMedicine.duration_days || 0;
+    const total = qty * freq * days;
 
     const medicine: PrescriptionMedicine = {
       id: Date.now().toString(),
-      medicine_name: newMedicine.medicine_name,
+      medicine_name: newMedicine.medicine_name!,
       dosage: newMedicine.dosage || '1-0-1',
-      frequency: newMedicine.frequency || 'After Food',
+      frequency: newMedicine.frequency || '2',
+      instruction: newMedicine.instruction || [],
       duration_days: newMedicine.duration_days || 5,
       total_quantity: total,
-      is_market_purchase: newMedicine.is_market_purchase || false,
-      unit_label: newMedicine.unit_label || 'Tablet'
+      quantity: qty,
+      unit_label: newMedicine.unit_label || 'tab',
+      is_market_purchase: newMedicine.is_market_purchase || false
     };
 
     setPrescribedMedicines([...prescribedMedicines, medicine]);
     setNewMedicine({
       medicine_name: '',
       dosage: '1-0-1',
-      frequency: 'After Food',
+      frequency: '2',
+      quantity: 0,
+      instruction: [],
       duration_days: 5,
       is_market_purchase: false,
-      unit_label: 'Tablet'
+      unit_label: 'tab'
     });
   };
 
@@ -1117,10 +1394,15 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     return doc ? doc.full_name : '---';
   };
 
-  const renderA4Preview = (patientData: Partial<Patient>) => {
+  const renderA4Preview = (patientData: Partial<Patient>, isForPDF = false) => {
     const doctorName = getAssignedDoctorName(patientData.assigned_doctor_id);
     return (
-    <div className="bg-white border border-gray-200 shadow-2xl rounded-lg overflow-hidden aspect-[1/1.414] w-[400px] flex flex-col relative text-[10px] p-[5%] print:shadow-none print:w-full print:h-screen print:border-none print:p-0">
+    <div 
+      id={isForPDF ? "parchi-preview-content" : undefined}
+      className={`pdf-print-container bg-white border border-gray-300 shadow-2xl rounded-lg overflow-hidden ${isForPDF ? '' : 'aspect-[1/1.414] w-[400px]'} flex flex-col relative text-[10px] p-[5%] print:shadow-none print:w-full print:h-screen print:border-none print:p-0`}
+      style={isForPDF ? { width: '794px', height: '1123px', overflow: 'hidden', fontSize: '10px', padding: '5%' } : undefined}
+    >
+      <style>{PDF_STYLES}</style>
       <div className="w-full h-full flex flex-col border border-slate-900">
         {/* 5% Hospital Details */}
         <div className="h-[7%] flex flex-col items-center justify-center border-b-2 border-slate-900 bg-slate-50 relative">
@@ -1132,7 +1414,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         </div>
 
         {/* 5% Date, Visit Details */}
-        <div className="h-[5%] flex justify-between items-center px-3 border-b border-gray-200 text-[7px] bg-white">
+        <div className="h-[5%] flex justify-between items-center px-3 text-[7px] bg-white">
           <div className="flex gap-3">
             <p><span className="font-bold">Date:</span> {new Date(patientData.created_at || new Date()).toLocaleDateString()}</p>
             <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial || hospitalYearlySerial}</p>
@@ -1145,7 +1427,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
         </div>
 
         {/* 10% Patient Personal Details */}
-        <div className="h-[8%] px-3 py-1.5 border-b border-gray-200 flex flex-col justify-center bg-white">
+        <div className="h-[8%] px-3 py-1.5 flex flex-col justify-center bg-white">
           <p className="text-[7px] font-bold uppercase mb-1 text-emerald-700">Patient Details</p>
           <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[8px]">
             <p><span className="font-bold text-slate-500">Name:</span> {patientData.name || '---'}</p>
@@ -1165,7 +1447,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
             </div>
             <div className="flex flex-col">
               <p className="text-[7px] font-bold text-slate-500">Diagnosis:</p>
-              <p className="text-[7px] line-clamp-2 font-bold leading-tight bg-emerald-50 text-emerald-800 px-1 rounded">{patientData.diagnosis || '---'}</p>
+              <p className="text-[7px] line-clamp-2 font-bold leading-tight text-slate-800 px-1 rounded">{patientData.diagnosis || '---'}</p>
             </div>
             <div className="flex flex-col">
               <p className="text-[7px] font-bold text-slate-500">History:</p>
@@ -1218,52 +1500,64 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
           {/* Right Side: Prescription & Therapies (80% width) */}
           <div className="w-[80%] p-3 flex flex-col relative">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg font-serif font-bold italic">Rx</span>
+            <div className="flex items-center gap-2 mb-0.5">
               <p className="text-[8px] font-bold uppercase text-emerald-700">Prescription</p>
             </div>
             
-            <div className="flex-1 overflow-hidden flex flex-col gap-2">
+            <div className="flex-1 overflow-hidden flex flex-col gap-0.5">
               {/* Medicines */}
               <div className="flex-shrink-0">
-                {patientData.prescription && patientData.prescription.startsWith('[') ? (
-                  <table className="w-full text-[7px] border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="text-left py-1 font-bold text-slate-500">Medicine</th>
-                        <th className="text-left py-1 font-bold text-slate-500">Dosage</th>
-                        <th className="text-left py-1 font-bold text-slate-500">Days</th>
-                        <th className="text-right py-1 font-bold text-slate-500">Qty</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {JSON.parse(patientData.prescription).map((med: any, i: number) => (
-                        <tr key={i} className="border-b border-slate-100">
-                          <td className="py-1">
-                            <p className="font-bold">{med.medicine_name}</p>
-                            <p className="text-[6px] text-slate-400">{med.frequency}</p>
-                          </td>
-                          <td className="py-1">{med.dosage}</td>
-                          <td className="py-1">{med.duration_days}</td>
-                          <td className="py-1 text-right font-bold">{med.total_quantity}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-[9px] font-mono whitespace-pre-wrap leading-relaxed">
-                    {patientData.prescription || '---'}
-                  </p>
-                )}
+                {(() => {
+                  try {
+                    if (patientData.prescription && patientData.prescription.startsWith('[')) {
+                      const medicines = JSON.parse(patientData.prescription);
+                      if (Array.isArray(medicines) && medicines.length > 0) {
+                        return (
+                          <table className="w-full text-[7px] border-collapse">
+                            <tbody>
+                              {medicines.map((med: any, i: number) => (
+                                <tr key={i} className="align-top">
+                                  <td className="py-0.5 min-w-[30%]">
+                                    <p className="font-bold leading-tight">{med.medicine_name}</p>
+                                    {med.instruction && (
+                                      <p className="text-[6px] italic text-slate-500 leading-none mt-0">
+                                        {Array.isArray(med.instruction) ? med.instruction.join(', ') : (typeof med.instruction === 'string' ? med.instruction : JSON.stringify(med.instruction).replace(/[\[\]"]/g, '').split(',').join(', '))}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="py-0.5">{med.quantity}</td>
+                                  <td className="py-0.5">{med.unit_label}</td>
+                                  <td className="py-0.5">
+                                    <div className="flex items-center gap-0.5">
+                                      <span className="font-medium">{med.frequency || med.dosage}</span>
+                                      <span className="text-[5px] text-slate-400">times/day</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-0.5">{med.duration_days} Days</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        );
+                      }
+                    }
+                  } catch (e) {}
+                  
+                  return (
+                    <p className="text-[9px] font-mono whitespace-pre-wrap leading-relaxed">
+                      {patientData.prescription || '---'}
+                    </p>
+                  );
+                })()}
               </div>
 
               {/* Panchkarma & Special Therapy */}
               {selectedTherapies.length > 0 && (
-                <div className="flex-shrink-0 border-t border-slate-100 pt-2">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-1">Therapies (Panchkarma & Special)</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
+                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Therapies (Panchkarma & Special)</p>
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {selectedTherapies.map((t, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-1">
+                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {t.days && t.days > 1 ? `${t.therapy_name} (${t.days} Days)` : t.therapy_name}
                       </div>
@@ -1274,11 +1568,11 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
               {/* Yogasan & Lifestyle Advice */}
               {patientData.lifestyle_advice && (
-                <div className="flex-shrink-0 border-t border-slate-100 pt-2">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-1">Yogasan & Lifestyle Advice</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
+                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Yogasan & Lifestyle Advice</p>
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {patientData.lifestyle_advice.split('\n').filter(Boolean).map((advice, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-1">
+                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {advice.trim()}
                       </div>
@@ -1289,11 +1583,11 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
 
               {/* Marma Chikitsa */}
               {patientData.marma_points && (
-                <div className="flex-shrink-0 border-t border-slate-100 pt-2">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-1">Marma Chikitsa</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
+                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Marma Chikitsa</p>
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {patientData.marma_points.split('\n').filter(Boolean).map((point, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-1">
+                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {point.trim()}
                       </div>
@@ -1305,8 +1599,8 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
             
             {/* History Section if old patient */}
             
-            <div className="absolute bottom-3 right-3 text-center">
-              <div className="w-32 h-8 border-b border-slate-400 mb-1 flex items-end justify-center pb-1">
+            <div className="absolute bottom-1 right-3 text-center">
+              <div className="mb-0 text-center flex items-end justify-center pb-0">
                 <span className="text-[8px] font-bold text-slate-800">{doctorName !== '---' ? doctorName : ''}</span>
               </div>
               <p className="text-[6px] font-bold uppercase tracking-wider text-slate-500">Medical Officer</p>
@@ -1581,7 +1875,12 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                 <FileText className="text-emerald-600" size={20} />
                 {cur.preview}
               </h2>
-              {renderA4Preview({ ...formData, lifestyle_advice: lifestyleAdvice, marma_points: marmaPoints })}
+              {renderA4Preview({ 
+                ...formData, 
+                prescription: JSON.stringify(prescribedMedicines),
+                lifestyle_advice: lifestyleAdvice, 
+                marma_points: marmaPoints 
+              })}
             </div>
           </div>
         </div>
@@ -1660,6 +1959,13 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                             title="Print Parchi"
                           >
                             <Printer size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDownloadPDF(p)} 
+                            className="p-2 bg-blue-50 rounded-lg text-blue-600 hover:bg-blue-100"
+                            title="Download PDF"
+                          >
+                            <Download size={16} />
                           </button>
                         </td>
                       </tr>
@@ -1939,88 +2245,152 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <FileText className="text-emerald-600" size={20} />
+                  <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="text-emerald-600" size={18} />
                         {cur.prescription}
                       </h2>
-                      <div className="flex gap-2">
-                        <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Structured Form</span>
+                      <div className="flex gap-1">
+                        <button type="button" onClick={() => setShowIndentModal(true)} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-emerald-100 transition-all">Indent Stock</button>
+                        <button type="button" onClick={() => { fetchInventoryData(); setShowInventoryModal(true); }} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-emerald-100 transition-all">Inventory Stock</button>
                       </div>
                     </div>
 
                     {/* Medicine Input Form */}
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-gray-100 mb-8">
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <div className="lg:col-span-2 space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Medicine Name</label>
-                          <div className="relative">
-                            <input 
-                              list="medicines-list"
-                              value={newMedicine.medicine_name}
-                              onChange={e => setNewMedicine({...newMedicine, medicine_name: e.target.value})}
-                              placeholder="Type medicine name..."
-                              className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                            />
-                            <datalist id="medicines-list">
-                              {availableMedicines.map(m => <option key={m} value={m} />)}
-                            </datalist>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Dosage</label>
-                          <input 
-                            value={newMedicine.dosage}
-                            onChange={e => setNewMedicine({...newMedicine, dosage: e.target.value})}
-                            placeholder="1-0-1"
-                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-gray-100 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-2">
+                        <div className="lg:col-span-2 space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Medicine Name</label>
+                          <MedicineSearch 
+                            value={newMedicine.medicine_name || ''}
+                            onChange={(val) => {
+                              setNewMedicine({...newMedicine, medicine_name: val});
+                            }}
+                            onSelect={(name) => {
+                              if (medicineUnits[name]) {
+                                setNewMedicine(prev => ({ 
+                                  ...prev, 
+                                  medicine_name: name, 
+                                  unit_label: medicineUnits[name] 
+                                }));
+                              }
+                            }}
+                            indentStock={indentStock}
+                            mainInventory={mainInventory}
+                            masterMedicines={masterMedicines}
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Quantity</label>
                           <input 
                             type="number"
-                            value={newMedicine.duration_days}
-                            onChange={e => setNewMedicine({...newMedicine, duration_days: parseInt(e.target.value) || 0})}
-                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            value={newMedicine.quantity ?? ''}
+                            onChange={e => setNewMedicine({...newMedicine, quantity: e.target.value ? Number(e.target.value) : 0})}
+                            placeholder="Qty"
+                            className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Unit</label>
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Unit</label>
                           <select 
-                            value={newMedicine.unit_label}
+                            value={newMedicine.unit_label ?? ''}
                             onChange={e => setNewMedicine({...newMedicine, unit_label: e.target.value})}
-                            className="w-full bg-white border border-gray-100 rounded-xl py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
                           >
-                            <option value="">Select Unit</option>
-                            <option value="Gram">Gram</option>
-                            <option value="Milligram">Milligram</option>
-                            <option value="Tablet">Tablet</option>
-                            <option value="Capsule">Capsule</option>
+                            <option value="tab">tab</option>
+                            <option value="cap">cap</option>
+                            <option value="mg">mg</option>
+                            <option value="gm">gm</option>
                             <option value="ml">ml</option>
                           </select>
                         </div>
-                        <div className="flex items-end">
-                          <button 
-                            type="button"
-                            onClick={addMedicine}
-                            className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Plus size={18} /> Add
-                          </button>
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Frequency</label>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <input 
+                              type="number"
+                              min="1"
+                              max="9"
+                              value={newMedicine.frequency ?? ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 9)) {
+                                  setNewMedicine({...newMedicine, frequency: val});
+                                }
+                              }}
+                              placeholder="1"
+                              className="w-12 bg-white border border-gray-100 rounded-lg py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm italic"
+                            />
+                            <span className="text-[10px] font-medium text-slate-500 whitespace-nowrap">times/day</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-4 flex items-center gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Days</label>
                           <input 
-                            type="checkbox"
-                            checked={newMedicine.is_market_purchase}
-                            onChange={e => setNewMedicine({...newMedicine, is_market_purchase: e.target.checked})}
-                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            type="number"
+                            value={newMedicine.duration_days ?? ''}
+                            onChange={e => setNewMedicine({...newMedicine, duration_days: parseInt(e.target.value) || 0})}
+                            className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
                           />
-                          <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Market Purchase (No Stock Impact)</span>
-                        </label>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Total</label>
+                          <div className="w-full bg-slate-100 border border-slate-200 rounded-lg py-1.5 px-3 font-bold text-slate-700 text-sm">
+                            {
+                              (() => {
+                                const qty = Number(newMedicine.quantity?.toString() || '0');
+                                const freq = Number(newMedicine.frequency?.toString() || '0') || 0;
+                                const days = newMedicine.duration_days || 0;
+                                let total = qty * freq * days;
+                                let unit = newMedicine.unit_label || '';
+                                if (unit === 'mg') {
+                                  total = total / 1000;
+                                  unit = 'gm';
+                                }
+                                return `${total} ${unit}`;
+                              })()
+                            }
+                          </div>
+                        </div>
+
+
+                        {/* Tags and Manual Instruction - Full width row below grid */}
+                        <div className="lg:col-span-full space-y-2 mt-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Instructions</label>
+                          <div className="flex flex-wrap gap-1">
+                            {['After Food', 'Before food', 'Mixed in food', 'Empty stomach', 'With honey', 'with water', 'with ghee', 'with milk'].map(inst => (
+                              <button
+                                key={inst}
+                                type="button"
+                                onClick={() => {
+                                  const current = Array.isArray(newMedicine.instruction) ? newMedicine.instruction : [];
+                                  if (current.includes(inst)) setNewMedicine({...newMedicine, instruction: current.filter(i => i !== inst)});
+                                  else setNewMedicine({...newMedicine, instruction: [...current, inst]});
+                                }}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all ${newMedicine.instruction?.includes(inst) ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                              >
+                                {inst}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Add manual instruction..."
+                              className="text-[10px] font-bold px-2 py-1.5 rounded-lg flex-grow border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              onBlur={(e) => {
+                                if (e.target.value) {
+                                  const val = e.target.value;
+                                  const current = Array.isArray(newMedicine.instruction) ? newMedicine.instruction : [];
+                                  setNewMedicine({...newMedicine, instruction: [...current, val]});
+                                  e.target.value = '';
+                                }
+                              }}
+                            />
+                            <button type="button" onClick={addMedicine} className="bg-emerald-600 text-white rounded-lg px-6 py-1.5 font-bold hover:bg-emerald-700 text-xs">Add Medicine</button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -2029,59 +2399,66 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-100">
-                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Medicine</th>
-                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Dosage</th>
-                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</th>
-                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Total Qty</th>
-                            <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Stock Status</th>
-                            <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Medicine</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Qty</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Unit</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Frequency</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Days</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</th>
+                            <th className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                            <th className="text-right py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {prescribedMedicines.map(med => {
                             const stock = checkStock(med.medicine_name, med.total_quantity);
                             return (
-                              <tr key={med.id} className="group hover:bg-slate-50/50 transition-all">
-                                <td className="py-4 px-4">
+                              <tr key={med.id} className="group hover:bg-slate-50/50 transition-all text-sm">
+                                <td className="py-2 px-3">
                                   <div className="flex items-center gap-2">
                                     <span className="font-bold text-slate-900">{med.medicine_name}</span>
                                     {med.is_market_purchase && (
                                       <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest">Market</span>
                                     )}
                                   </div>
-                                  <p className="text-[10px] text-slate-400">{med.frequency}</p>
                                 </td>
-                                <td className="py-4 px-4 text-sm font-medium text-slate-600">{med.dosage}</td>
-                                <td className="py-4 px-4 text-sm font-medium text-slate-600">{med.duration_days} Days</td>
-                                <td className="py-4 px-4">
-                                  <span className="font-bold text-slate-900">{med.total_quantity}</span>
-                                  <span className="text-[10px] text-slate-400 ml-1">{med.unit_label}s</span>
+                                <td className="py-2 px-3 font-bold text-slate-900">{med.quantity}</td>
+                                <td className="py-2 px-3 text-slate-500 font-medium">{med.unit_label}</td>
+                                <td className="py-2 px-3">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-slate-800 italic">{med.frequency || med.dosage}</span>
+                                    <span className="text-[10px] text-slate-400 italic">t/d</span>
+                                  </div>
                                 </td>
-                                <td className="py-4 px-4">
+                                <td className="py-2 px-3 font-medium text-slate-600">{med.duration_days} Days</td>
+                                <td className="py-2 px-3 font-bold text-emerald-700">
+                                  {med.unit_label === 'mg' ? `${(med.total_quantity || 0) / 1000} gm` : `${med.total_quantity || 0} ${med.unit_label}`}
+                                </td>
+                                <td className="py-2 px-3">
                                   {med.is_market_purchase ? (
                                     <span className="flex items-center gap-1 text-blue-600 text-[10px] font-bold uppercase tracking-widest">
                                       <ShoppingCart size={12} /> External
                                     </span>
                                   ) : stock.status === 'green' ? (
                                     <span className="flex items-center gap-1 text-emerald-600 text-[10px] font-bold uppercase tracking-widest">
-                                      <CheckCircle size={12} /> {stock.message} ({stock.current})
+                                      <CheckCircle size={12} /> OK
                                     </span>
                                   ) : stock.status === 'yellow' ? (
                                     <span className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase tracking-widest">
-                                      <AlertTriangle size={12} /> {stock.message}
+                                      <AlertTriangle size={12} /> Low
                                     </span>
                                   ) : (
-                                    <span className="flex items-center gap-1 text-red-500 text-[10px] font-bold uppercase tracking-widest">
-                                      <AlertTriangle size={12} /> {stock.message}
+                                    <span className="flex items-center gap-1 text-red-500 text-[10px] font-black uppercase tracking-widest">
+                                      <AlertTriangle size={12} /> Out
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-4 px-4 text-right">
+                                <td className="py-2 px-3 text-right">
                                   <button 
                                     onClick={() => removeMedicine(med.id)}
-                                    className="p-2 text-slate-300 hover:text-red-500 transition-all"
+                                    className="p-1.5 text-slate-300 hover:text-red-500 transition-all"
                                   >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                   </button>
                                 </td>
                               </tr>
@@ -2089,7 +2466,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                           })}
                           {prescribedMedicines.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400 italic text-sm">
+                              <td colSpan={7} className="py-12 text-center text-slate-400 italic text-sm">
                                 No medicines prescribed yet. Use the form above to add.
                               </td>
                             </tr>
@@ -2147,7 +2524,13 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                     <FileText className="text-emerald-600" size={20} />
                     {cur.preview}
                   </h2>
-                  {renderA4Preview({ ...selectedPatient, ...formData, lifestyle_advice: lifestyleAdvice, marma_points: marmaPoints })}
+                  {renderA4Preview({ 
+                    ...selectedPatient, 
+                    ...formData, 
+                    prescription: JSON.stringify(prescribedMedicines),
+                    lifestyle_advice: lifestyleAdvice, 
+                    marma_points: marmaPoints 
+                  })}
                 </div>
               </div>
             </div>
@@ -2239,24 +2622,35 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                         <tbody className="divide-y divide-gray-50">
                           {prescribedMedicines.map((med, idx) => {
                             const stock = checkStock(med.medicine_name, med.total_quantity);
+                            let rowClass = 'bg-slate-100';
+                            let statusIcon = <X size={14} />;
+                            let statusColor = 'text-slate-700';
+
+                            if (stock.status === 'green') {
+                              rowClass = 'bg-emerald-50';
+                              statusIcon = <CheckCircle2 size={14} />;
+                              statusColor = 'text-emerald-700';
+                            } else if (stock.status === 'dark_yellow') {
+                              rowClass = 'bg-red-50';
+                              statusIcon = <ArrowLeftRight size={14} />;
+                              statusColor = 'text-red-700';
+                            }
+
                             return (
-                              <tr key={idx} className="group hover:bg-slate-50/50 transition-all">
+                              <tr key={idx} className={`${rowClass} group hover:bg-opacity-80 transition-all`}>
                                 <td className="py-4 px-4">
                                   <p className="font-bold text-slate-900">{med.medicine_name}</p>
                                   <p className="text-[10px] text-slate-400">{med.dosage} • {med.duration_days} Days</p>
                                 </td>
                                 <td className="py-4 px-4">
-                                  <span className="font-bold text-slate-900">{med.total_quantity}</span>
+                                  <span className="font-bold text-slate-900">{med.quantity}</span>
                                   <span className="text-[10px] text-slate-400 ml-1">{med.unit_label}s</span>
                                 </td>
                                 <td className="py-4 px-4">
-                                  <span className={`font-bold ${
-                                    stock.status === 'green' ? 'text-emerald-600' : 
-                                    stock.status === 'dark_yellow' ? 'text-yellow-600' : 
-                                    stock.status === 'red' ? 'text-red-500' : 'text-slate-500'
-                                  }`}>
+                                  <div className={`flex items-center gap-1 font-bold ${statusColor}`}>
+                                    {statusIcon}
                                     {stock.status === 'green' ? `${stock.current} ${med.unit_label}s` : stock.message}
-                                  </span>
+                                  </div>
                                 </td>
                                 <td className="py-4 px-4 text-right">
                                   {!med.is_market_purchase ? (
@@ -2309,7 +2703,13 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
                       <FileText className="text-emerald-600" size={20} />
                       {cur.preview}
                     </h2>
-                    {renderA4Preview({ ...selectedPatient, ...formData, lifestyle_advice: lifestyleAdvice, marma_points: marmaPoints })}
+                    {renderA4Preview({ 
+                      ...selectedPatient, 
+                      ...formData, 
+                      prescription: JSON.stringify(prescribedMedicines),
+                      lifestyle_advice: lifestyleAdvice, 
+                      marma_points: marmaPoints 
+                    })}
                   </div>
                 </div>
               </div>
@@ -2543,6 +2943,56 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
               </div>
             </motion.div>
           </div>
+        )}
+        {showIndentModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-[2.5rem] p-8 w-full max-w-lg shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Indent Stock</h2>
+                <button onClick={() => setShowIndentModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                {indentStock.filter(m => Number(m.remaining_loose_quantity) > 0).map((m, i) => <div key={i} className="p-3 border rounded-xl flex justify-between"><span>{m.medicine_name}</span><span className="font-bold text-emerald-600">{m.remaining_loose_quantity} {m.unit_type}</span></div>)}
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {showInventoryModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-[2.5rem] p-8 w-full max-w-lg shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Inventory Stock</h2>
+                <button onClick={() => setShowInventoryModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                {mainInventory.map((m, i) => <div key={i} className="p-3 border rounded-xl flex justify-between"><span>{m.medicine_name}</span><span className="font-bold text-emerald-600">{m.quantity}</span></div>)}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden PDF Content */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <div ref={pdfContentRef}>
+          {pdfData && renderA4Preview(pdfData, true)}
+        </div>
+      </div>
+
+      {/* PDF Generation Overlay */}
+      <AnimatePresence>
+        {isGeneratingPDF && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]"
+          >
+            <div className="bg-white px-8 py-6 rounded-3xl shadow-2xl flex items-center gap-4 border border-gray-100">
+              <Loader2 className="animate-spin text-emerald-600" size={24} />
+              <span className="font-bold text-slate-700">Generating PDF...</span>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

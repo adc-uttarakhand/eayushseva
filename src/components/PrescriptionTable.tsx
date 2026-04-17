@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, AlertCircle, CheckCircle2, Loader2, Package } from 'lucide-react';
+import { Search, Plus, X, AlertCircle, CheckCircle2, Loader2, Package, ArrowLeftRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Medicine {
@@ -23,6 +23,7 @@ interface PrescriptionRow {
   status: 'In Stock' | 'In Inventory/Indent Required' | 'Out of Stock' | 'Checking...';
   warning?: string;
   dispensed?: boolean;
+  availabilityType?: 'indent' | 'inventory' | 'master';
 }
 
 interface PrescriptionTableProps {
@@ -221,14 +222,18 @@ export default function PrescriptionTable({ hospitalId, patientId, patientName, 
       const invQty = inventory?.quantity || 0;
 
       let status: PrescriptionRow['status'] = 'Out of Stock';
+      let availabilityType: PrescriptionRow['availabilityType'] = 'master';
       let warning: string | undefined;
 
       if (looseQty >= requiredQty && requiredQty > 0) {
         status = 'In Stock';
+        availabilityType = 'indent';
       } else if (invQty > 0) {
         status = 'In Inventory/Indent Required';
+        availabilityType = 'inventory';
       } else {
         status = 'Out of Stock';
+        availabilityType = 'master';
       }
 
       if (requiredQty > looseQty) {
@@ -239,6 +244,7 @@ export default function PrescriptionTable({ hospitalId, patientId, patientName, 
         const newRows = [...prev];
         if (newRows[index]) {
           newRows[index].status = status;
+          newRows[index].availabilityType = availabilityType;
           newRows[index].available_quantity = looseQty;
           newRows[index].unit = unitType || newRows[index].unit;
           newRows[index].warning = warning;
@@ -308,81 +314,86 @@ export default function PrescriptionTable({ hospitalId, patientId, patientName, 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.map((row, index) => (
-                <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-4">
-                    <p className="font-bold text-slate-900">{row.medicine_name}</p>
-                    <p className="text-[10px] font-bold text-slate-500">Available: {row.available_quantity} {row.unit}</p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <input 
-                      type="number"
-                      value={row.loose_quantity}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 0;
-                        const updatedRows = [...rows];
-                        updatedRows[index].loose_quantity = val;
-                        setRows(updatedRows);
-                        if (val > 0) {
-                          checkStock(row.medicine_id, val, index);
-                        } else {
-                          updatedRows[index].status = 'Checking...';
-                          updatedRows[index].warning = undefined;
+              {rows.map((row, index) => {
+                const rowClass = row.availabilityType === 'indent' ? 'bg-emerald-50' : 
+                                  row.availabilityType === 'inventory' ? 'bg-red-50' : 'bg-slate-100';
+                return (
+                  <tr key={row.id} className={`${rowClass} hover:bg-opacity-80 transition-colors`}>
+                    <td className="px-4 py-4">
+                      <p className="font-bold text-slate-900">{row.medicine_name}</p>
+                      <p className="text-[10px] font-bold text-slate-500">Available: {row.available_quantity} {row.unit}</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <input 
+                        type="number"
+                        value={row.loose_quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          const updatedRows = [...rows];
+                          updatedRows[index].loose_quantity = val;
                           setRows(updatedRows);
-                        }
-                      }}
-                      className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-sm font-bold text-slate-600">{row.unit}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    {row.status !== 'Checking...' && (
-                      <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
-                        row.status === 'In Stock' ? 'text-emerald-600' : 
-                        row.status === 'Out of Stock' ? 'text-red-500' : 'text-amber-600'
-                      }`}>
-                        {row.status === 'In Stock' ? <CheckCircle2 size={14} /> : 
-                         row.status === 'Out of Stock' ? <AlertCircle size={14} /> : <Package size={14} />}
-                        {row.status}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {row.loose_quantity > row.available_quantity ? (
+                          if (val > 0) {
+                            checkStock(row.medicine_id, val, index);
+                          } else {
+                            updatedRows[index].status = 'Checking...';
+                            updatedRows[index].availabilityType = 'master';
+                            updatedRows[index].warning = undefined;
+                            setRows(updatedRows);
+                          }
+                        }}
+                        className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-sm font-bold text-slate-600">{row.unit}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      {row.status !== 'Checking...' && (
+                        <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
+                          row.availabilityType === 'indent' ? 'text-emerald-700' : 
+                          row.availabilityType === 'inventory' ? 'text-red-700' : 'text-slate-700'
+                        }`}>
+                          {row.availabilityType === 'indent' ? <CheckCircle2 size={14} /> : 
+                           row.availabilityType === 'inventory' ? <ArrowLeftRight size={14} /> : <X size={14} />}
+                          {row.status}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {row.loose_quantity > row.available_quantity ? (
+                        <button 
+                          onClick={() => onNavigateToIndent?.()}
+                          className="bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-700"
+                        >
+                          Indent
+                        </button>
+                      ) : row.dispensed ? (
+                        <button 
+                          disabled
+                          className="bg-gray-300 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold cursor-not-allowed"
+                        >
+                          Dispensed
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => dispenseMedicine(row, index)}
+                          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700"
+                        >
+                          Dispense
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
                       <button 
-                        onClick={() => onNavigateToIndent?.()}
-                        className="bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-700"
+                        onClick={() => removeRow(row.id)}
+                        className="text-slate-300 hover:text-red-500 transition-colors"
                       >
-                        Indent
+                        <X size={18} />
                       </button>
-                    ) : row.dispensed ? (
-                      <button 
-                        disabled
-                        className="bg-gray-300 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold cursor-not-allowed"
-                      >
-                        Dispensed
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => dispenseMedicine(row, index)}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700"
-                      >
-                        Dispense
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    <button 
-                      onClick={() => removeRow(row.id)}
-                      className="text-slate-300 hover:text-red-500 transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -38,6 +38,7 @@ import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { Toaster } from 'react-hot-toast';
 
 interface Notification {
   id: string;
@@ -750,7 +751,7 @@ export default function App() {
       )}
       {hospitalSubTab === 'employees' && (
         selectedStaffId ? (
-          <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
+          <ServiceRecordTab hospitals={hospitals} targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
         ) : (
           <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
         )
@@ -1133,7 +1134,7 @@ export default function App() {
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="employees" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {selectedStaffId ? (
-              <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
+              <ServiceRecordTab hospitals={hospitals} targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
             ) : (
               <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
             )}
@@ -1315,6 +1316,7 @@ export default function App() {
         )}
       </AnimatePresence>
       <InstallPrompt />
+      <Toaster position="top-center" reverseOrder={false} />
     </div>
   );
 }

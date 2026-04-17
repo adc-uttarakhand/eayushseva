@@ -453,7 +453,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
 
         {activeTab === 'employees' && session && (
           selectedStaffId ? (
-            <ServiceRecordTab targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
+            <ServiceRecordTab hospitals={hospitals} targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
           ) : (
             <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
           )
