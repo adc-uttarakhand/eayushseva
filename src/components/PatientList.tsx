@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface PatientRecord {
@@ -16,19 +16,24 @@ interface PatientRecord {
   created_at: string;
   is_new: boolean;
   consultation_mode?: string;
+  fee_amount?: number;
+  complaints?: string;
+  diagnosis?: string;
 }
 
 interface PatientListProps {
   hospitalId: string;
+  hospitalName?: string;
 }
 
 type TimeRange = 'today' | 'month' | 'quarter' | 'year' | 'custom';
 
-export default function PatientList({ hospitalId }: PatientListProps) {
+export default function PatientList({ hospitalId, hospitalName: initialHospitalName }: PatientListProps) {
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<PatientRecord[]>([]);
+  const [hospitalName, setHospitalName] = useState<string>(initialHospitalName || 'AYUSH HEALTH CENTRE');
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
-  const [activeTab, setActiveTab] = useState<'opd' | 'teleconsultation'>('opd');
+  const [activeTab, setActiveTab] = useState<'all' | 'opd' | 'teleconsultation'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +54,22 @@ export default function PatientList({ hospitalId }: PatientListProps) {
   });
 
   useEffect(() => {
+    if (initialHospitalName) {
+      setHospitalName(initialHospitalName);
+      return;
+    }
+    const fetchHospitalName = async () => {
+      try {
+        const { data } = await supabase.from('hospitals').select('facility_name').eq('id', hospitalId).single();
+        if (data?.facility_name) {
+          setHospitalName(data.facility_name);
+        }
+      } catch (err) {}
+    };
+    fetchHospitalName();
+  }, [hospitalId, initialHospitalName]);
+
+  useEffect(() => {
     fetchPatients();
   }, [hospitalId, timeRange, startDate, endDate, activeTab]);
 
@@ -63,6 +84,8 @@ export default function PatientList({ hospitalId }: PatientListProps) {
 
       if (activeTab === 'teleconsultation') {
         query = query.eq('consultation_mode', 'Teleconsultation');
+      } else if (activeTab === 'opd') {
+        query = query.neq('consultation_mode', 'Teleconsultation');
       }
 
       const now = new Date();
@@ -127,6 +150,55 @@ export default function PatientList({ hospitalId }: PatientListProps) {
     }
   };
 
+  const handleDownloadCSV = async () => {
+    if (filteredPatients.length === 0) return;
+
+    let finalHospitalName = hospitalName;
+    try {
+      const { data } = await supabase.from('hospitals').select('facility_name').eq('id', hospitalId).single();
+      if (data?.facility_name) {
+        finalHospitalName = data.facility_name;
+        setHospitalName(data.facility_name);
+      }
+    } catch (err) {}
+
+    // First row: Hospital Name
+    const row1 = `"${finalHospitalName}"`;
+    // Second row: Headers
+    const headers = ['Date', 'Time', 'Patient Name', 'Age', 'Gender', 'Mobile', 'Aadhar', 'Daily OPD', 'Yearly Serial', 'Global Serial', 'Type', 'Consultation', 'Fee Collected', 'Complaints', 'Diagnosis'];
+    const row2 = headers.map(h => `"${h}"`).join(',');
+
+    const csvRows = filteredPatients.map(p => {
+      const d = new Date(p.created_at);
+      return [
+        `"${d.toLocaleDateString()}"`,
+        `"${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}"`,
+        `"${p.name || ''}"`,
+        `"${p.age || ''}"`,
+        `"${p.gender || ''}"`,
+        `"${p.mobile || ''}"`,
+        `"${p.aadhar || ''}"`,
+        `"${p.daily_opd_number || ''}"`,
+        `"${p.hospital_yearly_serial || ''}"`,
+        `"${p.global_serial || ''}"`,
+        `"${p.is_new ? 'New' : 'Revisit'}"`,
+        `"${p.consultation_mode || 'OPD'}"`,
+        `"₹${p.fee_amount || 0}"`,
+        `"${(p.complaints || '').replace(/"/g, '""')}"`,
+        `"${(p.diagnosis || '').replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    const csvContent = [row1, row2, ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Patient_List_${finalHospitalName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredPatients = patients.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.mobile.includes(searchQuery) ||
@@ -141,9 +213,9 @@ export default function PatientList({ hospitalId }: PatientListProps) {
           <p className="text-slate-500 mt-1">Manage and track patient visits</p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
           <div className="flex bg-neutral-100 p-1 rounded-xl">
-            {(['opd', 'teleconsultation'] as const).map((tab) => (
+            {(['all', 'opd', 'teleconsultation'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -151,7 +223,7 @@ export default function PatientList({ hospitalId }: PatientListProps) {
                   activeTab === tab ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
-                {tab === 'opd' ? 'OPD Patients' : 'Teleconsultation'}
+                {tab === 'all' ? 'All Patients' : tab === 'opd' ? 'OPD Patients' : 'Teleconsultation'}
               </button>
             ))}
           </div>
@@ -187,6 +259,15 @@ export default function PatientList({ hospitalId }: PatientListProps) {
               />
             </div>
           )}
+
+          <button 
+            onClick={handleDownloadCSV}
+            disabled={filteredPatients.length === 0}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors shadow-sm"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -249,6 +330,7 @@ export default function PatientList({ hospitalId }: PatientListProps) {
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Patient Details</th>
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Serial Numbers</th>
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Contact</th>
+                  <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Fee Collected</th>
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                 </tr>
               </thead>
@@ -273,6 +355,9 @@ export default function PatientList({ hospitalId }: PatientListProps) {
                     <td className="px-8 py-6">
                       <p className="text-sm font-medium text-slate-700">{patient.mobile || 'N/A'}</p>
                       <p className="text-[10px] text-slate-400">Aadhar: {patient.aadhar ? `****${patient.aadhar.slice(-4)}` : 'Not Seeded'}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="font-bold text-slate-900">₹{patient.fee_amount || 0}</p>
                     </td>
                     <td className="px-8 py-6">
                       <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${

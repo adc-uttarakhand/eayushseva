@@ -1,7 +1,7 @@
 import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests';
 
 interface BottomNavProps {
   active: TabId;
@@ -9,9 +9,11 @@ interface BottomNavProps {
   role: string | null;
   isTransferEnabled: boolean;
   hasPanchakarma?: boolean;
+  modules: string[];
+  isIncharge: boolean;
 }
 
-export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma }: BottomNavProps) {
+export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma, modules, isIncharge }: BottomNavProps) {
   const publicTabs = [
     { id: 'dashboard' as TabId, label: 'AYUSH Network', icon: Building2 },
     { id: 'stats' as TabId, label: 'Statistics', icon: BarChart3 },
@@ -26,6 +28,7 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
     ...(isTransferEnabled ? [{ id: 'transfer_module' as TabId, label: 'Transfers', icon: ArrowUpDown }] : []),
     ...(hasPanchakarma ? [{ id: 'panchakarma' as TabId, label: 'Panchakarma', icon: Activity }] : []),
+    ...(isIncharge || modules.includes('rapid_tests') ? [{ id: 'rapid_tests' as TabId, label: 'Rapid Tests', icon: Activity }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'tools' as TabId, label: 'Tools', icon: Wrench }] : []),
     { id: 'profile' as TabId, label: 'Profile', icon: User },
   ];

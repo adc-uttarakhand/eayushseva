@@ -83,6 +83,7 @@ interface Patient {
   prescribed_panchakarma?: string;
   prescribed_special_therapy?: string;
   prescribed_tests?: string;
+  fee_amount?: number;
 }
 
 interface Staff {
@@ -993,6 +994,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         consultation_mode: formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation' : 'Online',
         queue_time: formData.assigned_doctor_id === 'teleconsultation' ? null : new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
         assigned_doctor_id: formData.assigned_doctor_id === 'teleconsultation' ? null : formData.assigned_doctor_id,
+        fee_amount: feeAmount,
       };
 
       const { error } = await supabase.from('patients').insert([payload]);
@@ -1041,6 +1043,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         consultation_mode: isTeleconsultation ? 'Teleconsultation' : 'Offline',
         queue_time: null,
         assigned_doctor_id: isTeleconsultation ? null : formData.assigned_doctor_id,
+        fee_amount: feeAmount,
       };
 
       const { error } = await supabase.from('patients').insert([payload]);
@@ -1412,14 +1415,8 @@ const handleDownloadPNG = async (patient: Patient) => {
 
   const cur = t[language];
 
-  const noFeeHospitalTypes = [
-    'AYUSH Wing -CHC',
-    'AYUSH Wing- PHC',
-    'AYUSH Wing at District Hospital',
-    'MOCH- CHC',
-    'MOCH - PHC'
-  ];
-  const isNoFeeHospital = hospitalType && noFeeHospitalTypes.some(t => t.toLowerCase().replace(/\s+/g, '') === hospitalType.toLowerCase().replace(/\s+/g, ''));
+  const normalizedHospitalType = hospitalType ? hospitalType.toLowerCase().replace(/\s+/g, '') : '';
+  const isNoFeeHospital = normalizedHospitalType.includes('ayushwing') || normalizedHospitalType.includes('moch');
 
   let feeAmount = 0;
   if (!isNoFeeHospital && isNew) {

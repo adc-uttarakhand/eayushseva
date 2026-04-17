@@ -27,6 +27,7 @@ import DistrictSupplyManager from './components/DistrictSupplyManager';
 import ProfilePage from './components/ProfilePage';
 import LoginDirectory from './components/LoginDirectory';
 import InchargeManagement from './components/InchargeManagement';
+import RapidTests from './components/RapidTests';
 import HospitalDetailsModal from './components/HospitalDetailsModal';
 import TransferRequests from './components/TransferRequests';
 import TransferModule from './components/TransferModule';
@@ -1097,6 +1098,9 @@ export default function App() {
         )}
         {activeTab === 'tools' && renderTools()}
         {activeTab === 'disease_management' && renderDiseaseManagement()}
+        {activeTab === 'rapid_tests' && session && (
+          <RapidTests hospitalId={session.hospitalId || (currentHospital?.hospital_id || session.id)} staffId={session.id} />
+        )}
         {activeTab === 'role_management' && renderRoleManagement()}
         {activeTab === 'staff_distribution' && renderStaffDistributionSummary()}
         {activeTab === 'nearby' && renderNearbyHospitals()}
@@ -1134,7 +1138,10 @@ export default function App() {
         )}
         {activeTab === 'patients' && (session?.role === 'HOSPITAL' || session?.role === 'STAFF') && (
           <motion.div key="patients" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <PatientList hospitalId={session.activeHospitalId || session.hospitalId || session.id} />
+            <PatientList 
+              hospitalId={session.activeHospitalId || session.hospitalId || session.id} 
+              hospitalName={currentHospital?.facility_name}
+            />
           </motion.div>
         )}
         {activeTab === 'employees' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
@@ -1277,6 +1284,8 @@ export default function App() {
           role={session?.role || null} 
           isTransferEnabled={isTransferEnabled}
           hasPanchakarma={currentHospital?.panchakarma_centre}
+          modules={session?.modules || []}
+          isIncharge={currentHospital ? currentHospital.incharge_staff_id === session?.id : false}
         />
       )}
       {/* Unsaved Changes Modal */}

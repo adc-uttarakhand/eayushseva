@@ -19,6 +19,7 @@ import HospitalSupplyPull from './HospitalSupplyPull';
 import RegistrationRequests from './RegistrationRequests';
 import PanchakarmaModule from './PanchakarmaModule';
 import YogaModule from './YogaModule';
+import RapidTests from './RapidTests';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -148,8 +149,8 @@ let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -275,6 +276,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [isCheckingMobile, setIsCheckingMobile] = useState(false);
   const [selectedModules, setSelectedModules] = useState<string[]>(session.activeModules || ['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
+
+  // Dashboard Stats State
+  const [todayOpd, setTodayOpd] = useState<number | null>(null);
+  const [activeStaffCount, setActiveStaffCount] = useState<number | null>(null);
+  const [feeGeneratedThisMonth, setFeeGeneratedThisMonth] = useState<number | null>(null);
 
   useEffect(() => {
     const checkMobile = async () => {
@@ -586,6 +592,62 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     };
     if (activeTab === 'staff' || activeTab === 'dashboard') fetchStaff();
   }, [session?.hospitalId, activeTab, profile.mobile, session?.id, session?.role]);
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      const targetHospitalId = session?.role === 'HOSPITAL' ? session.id : session?.hospitalId;
+      if (!targetHospitalId) return;
+
+      const today = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+      const todayDateObj = new Date(today);
+      todayDateObj.setHours(0, 0, 0, 0);
+      const startOfDay = todayDateObj.toISOString();
+      const endOfDayObj = new Date(todayDateObj);
+      endOfDayObj.setHours(23, 59, 59, 999);
+      const endOfDay = endOfDayObj.toISOString();
+
+      const startOfMonthObj = new Date(todayDateObj);
+      startOfMonthObj.setDate(1);
+      const startOfMonth = startOfMonthObj.toISOString();
+
+      try {
+        // Fetch Today's OPD count
+        const { count: opdCount } = await supabase
+          .from('patients')
+          .select('*', { count: 'exact', head: true })
+          .eq('hospital_id', targetHospitalId)
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay);
+        setTodayOpd(opdCount || 0);
+
+        // Fetch Active Staff count
+        const { count: activeStaff } = await supabase
+          .from('staff')
+          .select('*', { count: 'exact', head: true })
+          .eq('hospital_id', targetHospitalId)
+          .eq('is_active', true);
+        setActiveStaffCount(activeStaff || 0);
+
+        // Fetch Fee Generated this Month
+        const { data: monthPatients } = await supabase
+          .from('patients')
+          .select('fee_amount')
+          .eq('hospital_id', targetHospitalId)
+          .gte('created_at', startOfMonth)
+          .lte('created_at', endOfDay);
+        
+        const feeGenerated = monthPatients?.reduce((sum, p) => sum + (p.fee_amount || 0), 0) || 0;
+        setFeeGeneratedThisMonth(feeGenerated);
+
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+      }
+    };
+
+    if (activeTab === 'dashboard') {
+      fetchDashboardStats();
+    }
+  }, [session?.role, session?.id, session?.hospitalId, activeTab]);
 
   const toggleStaffStatus = async (staffId: number, currentStatus: boolean) => {
     await supabase.from('staff').update({ is_active: !currentStatus }).eq('id', staffId);
@@ -1555,6 +1617,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const showPanchakarma = (isIncharge || (isAssignedStaff && activeModules.includes('panchakarma'))) 
     && (hospitalDetails?.panchakarma_centre || currentHospitalInfo?.panchakarma_centre);
   const showYoga = isIncharge || (isAssignedStaff && (activeModules.includes('yoga_instructor') || activeModules.includes('yoga_control')));
+  const showRapidTests = isIncharge || (isAssignedStaff && activeModules.includes('rapid_tests'));
   const showDistrictSupply = userRole === 'DISTRICT_ADMIN';
 
   const canRegister = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_registration');
@@ -1821,6 +1884,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <Sun size={18} /> {activeTab === 'yoga' && 'Yoga Session'}
               </button>
             )}
+            {showRapidTests && (
+              <button onClick={() => setActiveTab('rapid_tests')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'rapid_tests' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <Activity size={18} /> {activeTab === 'rapid_tests' && 'Rapid Tests'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1834,14 +1902,14 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       >
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
                 <div className="bg-emerald-50 w-14 h-14 rounded-2xl flex items-center justify-center text-emerald-600">
                   <Activity size={24} />
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Today's OPD</p>
-                  <p className="text-3xl font-bold text-slate-900">--</p>
+                  <p className="text-3xl font-bold text-slate-900">{todayOpd !== null ? todayOpd : '--'}</p>
                 </div>
               </div>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -1850,7 +1918,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Active Staff</p>
-                  <p className="text-3xl font-bold text-slate-900">--</p>
+                  <p className="text-3xl font-bold text-slate-900">{activeStaffCount !== null ? activeStaffCount : '--'}</p>
                 </div>
               </div>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -1862,6 +1930,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                   <p className="text-3xl font-bold text-slate-900">3</p>
                 </div>
               </div>
+              <button className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4 hover:bg-slate-50 transition-colors text-left">
+                <div className="bg-purple-50 w-14 h-14 rounded-2xl flex items-center justify-center text-purple-600">
+                  <ClipboardList size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Total Fee</p>
+                  <p className="text-3xl font-bold text-slate-900">₹{feeGeneratedThisMonth !== null ? feeGeneratedThisMonth : '--'}</p>
+                </div>
+              </button>
             </div>
 
               {/* CTA Bento */}
@@ -2350,6 +2427,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'yoga' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
             <YogaModule session={session} />
+          </div>
+        )}
+        {activeTab === 'rapid_tests' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <RapidTests hospitalId={session.selectedHospitalId || session.hospitalId || session.id} staffId={session.id} />
           </div>
         )}
       </motion.div>
