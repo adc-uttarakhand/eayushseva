@@ -26,7 +26,6 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
     ...(isTransferEnabled ? [{ id: 'transfer_module' as TabId, label: 'Transfers', icon: ArrowUpDown }] : []),
     ...(hasPanchakarma ? [{ id: 'panchakarma' as TabId, label: 'Panchakarma', icon: Activity }] : []),
-    { id: 'registrations' as TabId, label: 'Registrations', icon: ShieldCheck },
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'tools' as TabId, label: 'Tools', icon: Wrench }] : []),
     { id: 'profile' as TabId, label: 'Profile', icon: User },
   ];

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 
 interface SearchEmployeeModalProps {
   onClose: () => void;
+  key?: string;
 }
 
 export default function SearchEmployeeModal({ onClose }: SearchEmployeeModalProps) {

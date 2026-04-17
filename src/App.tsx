@@ -313,7 +313,8 @@ export default function App() {
           }
           
           if (session.access_systems && session.access_systems.length > 0 && !session.access_systems.includes('All')) {
-            query = query.in('system', session.access_systems);
+            const systems = session.access_systems.join(',');
+            query = query.or(`system.in.(${systems}),type.eq.Office`);
           }
         }
 
@@ -501,7 +502,12 @@ export default function App() {
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">Facilities</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-600">{new Set(hospitals.map(h => h.district)).size}</div>
+                <div className="text-4xl font-bold text-emerald-600">
+                  {new Set(hospitals
+                    .map(h => h.district)
+                    .filter(d => d && d !== 'Outside Uttarakhand' && d !== 'Uttarakhand')
+                  ).size}
+                </div>
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mt-1">Districts</div>
               </div>
             </div>

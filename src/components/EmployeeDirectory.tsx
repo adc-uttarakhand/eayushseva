@@ -27,6 +27,7 @@ interface Hospital {
   facility_name: string;
   district: string;
   system: string;
+  type: string;
 }
 
 interface EmployeeDirectoryProps {
@@ -122,7 +123,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     // Access Control
     const hasAccess = !session || (
       (!session.access_districts || session.access_districts.includes('All') || (hospital && session.access_districts.includes(hospital.district))) &&
-      (!session.access_systems || session.access_systems.includes('All') || (hospital && session.access_systems.includes(hospital.system)))
+      (!session.access_systems || session.access_systems.includes('All') || (hospital && (session.access_systems.includes(hospital.system) || hospital.type === 'Office')))
     );
 
     const matchesSearch = s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 

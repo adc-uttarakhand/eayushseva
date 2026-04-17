@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2, FileImage } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 
@@ -29,6 +30,7 @@ const PDF_STYLES = `
   .pdf-print-container .bg-neutral-50 { background-color: #fafafa !important; }
   .pdf-print-container .text-slate-500 { color: #64748b !important; }
   .pdf-print-container .text-slate-400 { color: #94a3b8 !important; }
+  .pdf-print-container .text-slate-800 { color: #1e293b !important; }
   .pdf-print-container .text-slate-900 { color: #0f172a !important; }
   .pdf-print-container .border-slate-900 { border-color: #0f172a !important; }
   .pdf-print-container .border-gray-200 { border-color: #e5e7eb !important; }
@@ -388,6 +390,8 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const pdfContentRef = useRef<HTMLDivElement>(null);
   const [pdfData, setPdfData] = useState<Patient | null>(null);
+  const [pngData, setPngData] = useState<Patient | null>(null);
+  const pngContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDiseases();
@@ -434,6 +438,39 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     }
   };
 
+const removeOklch = (clonedDoc: Document) => {
+  const elements = clonedDoc.getElementsByTagName('*');
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i] as HTMLElement;
+    try {
+      if (!el.style) continue;
+      
+      const computed = window.getComputedStyle(el);
+      
+      // Specifically check properties that might have oklch
+      const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
+      props.forEach(prop => {
+        // @ts-ignore
+        const val = computed[prop];
+        if (val && val.includes('oklch')) {
+          if (prop === 'backgroundColor') el.style.backgroundColor = '#ffffff';
+          else if (prop === 'borderColor') el.style.borderColor = '#cbd5e1';
+          else el.style[prop as any] = '#0f172a';
+        }
+      });
+
+      // Also check inline styles
+      for (let j = 0; j < el.style.length; j++) {
+        const prop = el.style[j];
+        const value = el.style.getPropertyValue(prop);
+        if (value && value.includes('oklch')) {
+          el.style.setProperty(prop, 'inherit');
+        }
+      }
+    } catch (e) {}
+  }
+};
+
 const handleDownloadPDF = async (patient: Patient) => {
   setIsGeneratingPDF(true);
   setPdfData(patient);
@@ -452,59 +489,12 @@ const handleDownloadPDF = async (patient: Patient) => {
       html2canvas: { 
         scale: 3,
         useCORS: true, 
-        logging: false,
-        letterRendering: true,
-        windowWidth: 794,
-        windowHeight: 1123,
+        backgroundColor: '#ffffff',
         onclone: (clonedDoc: Document) => {
-          // Centering fix for the cloned document
-          clonedDoc.body.style.display = 'flex';
-          clonedDoc.body.style.justifyContent = 'center';
-          clonedDoc.body.style.alignItems = 'flex-start';
-          clonedDoc.body.style.margin = '0';
-          clonedDoc.body.style.padding = '0';
-
-          const elements = clonedDoc.getElementsByTagName('*');
-          for (let i = 0; i < elements.length; i++) {
-            const el = elements[i] as HTMLElement;
-            try {
-              if (!el.style) continue;
-              
-              // Helper to check and replace oklch
-              for (let j = 0; j < el.style.length; j++) {
-                const prop = el.style[j];
-                const value = el.style.getPropertyValue(prop);
-                if (value && value.includes('oklch')) {
-                   el.style.setProperty(prop, 'transparent'); 
-                }
-              }
-
-              // Keep existing specific overrides
-              const computed = window.getComputedStyle(el);
-              if (computed.color && computed.color.includes('oklch')) el.style.color = '#0f172a';
-              if (computed.backgroundColor && computed.backgroundColor.includes('oklch')) el.style.backgroundColor = '#ffffff';
-              if (computed.borderColor && computed.borderColor.includes('oklch')) el.style.borderColor = '#cbd5e1';
-              if (computed.fill && computed.fill.includes('oklch')) el.style.fill = '#0f172a';
-              if (computed.stroke && computed.stroke.includes('oklch')) el.style.stroke = '#0f172a';
-              el.style.fontFamily = "'Inter', sans-serif";
-            } catch (e) {}
-          }
-          const previewEl = clonedDoc.getElementById('parchi-preview-content');
-          if (previewEl) {
-            previewEl.style.width = '794px';
-            previewEl.style.height = '1123px';
-            previewEl.style.overflow = 'hidden';
-            previewEl.style.borderRadius = '0';
-            previewEl.style.boxShadow = 'none';
-            previewEl.style.margin = '0 auto';
-          }
+          removeOklch(clonedDoc);
         }
       },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait'
-      }
+      jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait', hotfixes: ["px_scaling"] }
     };
 
     try {
@@ -516,7 +506,44 @@ const handleDownloadPDF = async (patient: Patient) => {
       setIsGeneratingPDF(false);
       setPdfData(null);
     }
-  }, 600);
+  }, 500);
+};
+
+const handleDownloadPNG = async (patient: Patient) => {
+  setIsGeneratingPDF(true);
+  setPngData(patient);
+  
+  setTimeout(async () => {
+    const element = document.getElementById('parchi-preview-content');
+    if (!element) {
+      setIsGeneratingPDF(false);
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: 794,
+        height: 1123,
+        onclone: (clonedDoc: Document) => {
+          removeOklch(clonedDoc);
+        }
+      });
+      
+      const link = document.createElement('a');
+      link.download = `${patient.name}_${patient.hospital_yearly_serial}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('PNG Generation Error:', error);
+      toast.error('Failed to generate PNG');
+    } finally {
+      setIsGeneratingPDF(false);
+      setPngData(null);
+    }
+  }, 500);
 };
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1405,27 +1432,36 @@ const handleDownloadPDF = async (patient: Patient) => {
     return doc ? doc.full_name : '---';
   };
 
-  const renderA4Preview = (patientData: Partial<Patient>, isForPDF = false) => {
+  const renderA4Preview = (patientData: Partial<Patient>, isForExport = false) => {
     const doctorName = getAssignedDoctorName(patientData.assigned_doctor_id);
-    return (
+    const content = (
     <div 
-      id={isForPDF ? "parchi-preview-content" : "parchi-preview-modal"}
-      className={`pdf-print-container bg-white border border-gray-300 shadow-2xl rounded-lg overflow-hidden ${isForPDF ? '' : 'aspect-[1/1.414] w-[400px]'} flex flex-col relative text-[10px] p-[5%] print:shadow-none print:w-full print:h-screen print:border-none print:p-0`}
-      style={isForPDF ? { width: '794px', height: '1123px', overflow: 'hidden', fontSize: '10px', padding: '5%' } : undefined}
+      id={isForExport ? "parchi-preview-content" : undefined}
+      className="pdf-print-container bg-white border border-gray-300 shadow-2xl overflow-visible flex flex-col relative text-[15px] p-[5%]"
+      style={{ width: '794px', height: '1123px', minWidth: '794px', minHeight: '1123px', margin: '0 auto', backgroundColor: '#ffffff' }}
     >
       <style>{PDF_STYLES}</style>
       <div className="w-full h-full flex flex-col border border-slate-900">
         {/* 5% Hospital Details */}
-        <div className="h-[7%] flex flex-col items-center justify-center border-b-2 border-slate-900 bg-slate-50 relative">
-          <h3 className="text-[11px] font-bold uppercase leading-none">{hospitalName || 'AYUSH HEALTH CENTRE'}</h3>
-          <p className="text-[7px] font-medium uppercase leading-none mt-0.5">{hospitalType} • {district}</p>
-          <div className="absolute top-2 right-2 border border-slate-900 px-1.5 py-0.5 rounded text-[6px] font-bold">
+        <div className="h-[5%] flex flex-col items-center justify-center border-b-2 border-slate-900 bg-slate-50 relative px-4">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 h-[80%] flex items-center justify-center">
+            <img 
+              src="https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/Uttarakhand%20logo.png" 
+              alt="Uttarakhand Govt" 
+              className="h-full object-contain mix-blend-multiply"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <h3 className="text-[16.5px] font-bold uppercase leading-none text-center px-12">{hospitalName || 'AYUSH HEALTH CENTRE'}</h3>
+          <p className="text-[10.5px] font-medium uppercase leading-none mt-0.5 text-center px-12">{hospitalType} • {district}</p>
+          <div className="absolute top-2 right-2 border border-slate-900 px-1.5 py-0.5 rounded text-[9px] font-bold">
             {`Fee: ₹${feeAmount.toString().padStart(2, '0')}`}
           </div>
         </div>
 
-        {/* 5% Date, Visit Details */}
-        <div className="h-[5%] flex justify-between items-center px-3 text-[7px] bg-white">
+        {/* 2.0625% Date, Visit Details */}
+        <div className="h-[2.0625%] flex justify-between items-center px-3 text-[10.5px] bg-white">
           <div className="flex gap-3">
             <p><span className="font-bold">Date:</span> {new Date(patientData.created_at || new Date()).toLocaleDateString()}</p>
             <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial || hospitalYearlySerial}</p>
@@ -1437,10 +1473,10 @@ const handleDownloadPDF = async (patient: Patient) => {
           </div>
         </div>
 
-        {/* 10% Patient Personal Details */}
-        <div className="h-[8%] px-3 py-1.5 flex flex-col justify-center bg-white">
-          <p className="text-[7px] font-bold uppercase mb-1 text-emerald-700">Patient Details</p>
-          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[8px]">
+        {/* 6% Patient Personal Details */}
+        <div className="h-[6%] px-3 py-1.5 flex flex-col justify-center bg-white">
+          <p className="text-[10.5px] font-bold uppercase mb-1 text-emerald-700">Patient Details</p>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[12px]">
             <p><span className="font-bold text-slate-500">Name:</span> {patientData.name || '---'}</p>
             <p><span className="font-bold text-slate-500">Age/Sex:</span> {patientData.age || '--'} / {patientData.gender?.charAt(0)}</p>
             <p><span className="font-bold text-slate-500">Mobile:</span> {patientData.mobile || '---'}</p>
@@ -1448,35 +1484,35 @@ const handleDownloadPDF = async (patient: Patient) => {
           </div>
         </div>
 
-        {/* 10% Clinical Assessment */}
-        <div className="h-[15%] px-3 py-1.5 border-b-2 border-slate-900 flex flex-col justify-center bg-white">
-          <p className="text-[7px] font-bold uppercase mb-1 text-emerald-700">Clinical Assessment</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 h-full overflow-hidden">
+        {/* 11.25% Clinical Assessment */}
+        <div className="min-h-[11.25%] px-3 py-1.5 border-b-2 border-slate-900 flex flex-col justify-center bg-white">
+          <p className="text-[10.5px] font-bold uppercase mb-1 text-emerald-700">Clinical Assessment</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 h-full overflow-visible">
             <div className="flex flex-col">
-              <p className="text-[7px] font-bold text-slate-500">Complaints:</p>
-              <p className="text-[7px] line-clamp-2 italic leading-tight">{patientData.complaints || '---'}</p>
+              <p className="text-[10.5px] font-bold text-slate-500">Complaints:</p>
+              <p className="text-[10.5px] whitespace-pre-wrap break-words italic leading-tight">{patientData.complaints || '---'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[7px] font-bold text-slate-500">Diagnosis:</p>
-              <p className="text-[7px] line-clamp-2 font-bold leading-tight text-slate-800 px-1 rounded">{patientData.diagnosis || '---'}</p>
+              <p className="text-[10.5px] font-bold text-slate-500">Diagnosis:</p>
+              <p className="text-[10.5px] whitespace-pre-wrap break-words font-bold leading-tight text-slate-800 px-1 rounded">{patientData.diagnosis || '---'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[7px] font-bold text-slate-500">History:</p>
-              <p className="text-[7px] line-clamp-2 italic leading-tight">{patientData.history || '---'}</p>
+              <p className="text-[10.5px] font-bold text-slate-500">History:</p>
+              <p className="text-[10.5px] whitespace-pre-wrap break-words italic leading-tight">{patientData.history || '---'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[7px] font-bold text-slate-500">Investigations:</p>
-              <p className="text-[7px] line-clamp-2 italic leading-tight">{patientData.investigations || '---'}</p>
+              <p className="text-[10.5px] font-bold text-slate-500">Investigations:</p>
+              <p className="text-[10.5px] whitespace-pre-wrap break-words italic leading-tight">{patientData.investigations || '---'}</p>
             </div>
           </div>
         </div>
 
-        {/* 70% Remaining Page */}
-        <div className="h-[65%] flex flex-row bg-white">
+        {/* 75.6875% Remaining Page */}
+        <div className="h-[75.6875%] flex flex-row bg-white">
           {/* Left Side: Ayurvedic Parameters & Tests (20% width) */}
-          <div className="w-[20%] border-r-2 border-slate-900 p-2 flex flex-col gap-1.5 overflow-hidden bg-neutral-50">
-            <p className="text-[7px] font-bold uppercase text-emerald-700 mb-1 border-b border-slate-200 pb-1">Parameters</p>
-            <div className="grid grid-cols-1 gap-0.5">
+          <div className="w-[20%] border-r-2 border-slate-900 p-2 flex flex-col gap-1.5 overflow-visible bg-neutral-50">
+            <p className="text-[10.5px] font-bold uppercase text-emerald-700 mb-1 border-b border-slate-200 pb-1">Parameters</p>
+            <div className="grid grid-cols-1 gap-1">
               {[
                 { id: 'nadi', label: 'Nadi' },
                 { id: 'prakruti', label: 'Prakruti' },
@@ -1490,17 +1526,17 @@ const handleDownloadPDF = async (patient: Patient) => {
                 { id: 'satva', label: 'Satva' },
                 { id: 'vyayam_shakti', label: 'Vyayam' },
               ].map(field => (
-                <div key={field.id} className="text-[6px] leading-tight flex justify-between">
-                  <span className="font-bold text-slate-600">{field.label}:</span> 
-                  <span className="truncate text-slate-900 text-right max-w-[60%]">{(patientData as any)[field.id] || '-'}</span>
+                <div key={field.id} className="text-[9px] leading-tight flex justify-between gap-1">
+                  <span className="font-bold text-slate-600 shrink-0">{field.label}:</span> 
+                  <span className="break-words whitespace-pre-wrap text-right">{(patientData as any)[field.id] || '-'}</span>
                 </div>
               ))}
             </div>
 
             {selectedTests.length > 0 && (
               <div className="mt-2">
-                <p className="text-[7px] font-bold uppercase text-emerald-700 mb-1 border-b border-slate-200 pb-1">Investigations</p>
-                <ul className="list-disc pl-3 text-[6px] text-slate-800 space-y-0.5">
+                <p className="text-[10.5px] font-bold uppercase text-emerald-700 mb-1 border-b border-slate-200 pb-1">Investigations</p>
+                <ul className="list-disc pl-3 text-[9px] text-slate-800 space-y-0.5">
                   {selectedTests.map((t, idx) => (
                     <li key={idx}>{t.test_name}</li>
                   ))}
@@ -1512,10 +1548,10 @@ const handleDownloadPDF = async (patient: Patient) => {
           {/* Right Side: Prescription & Therapies (80% width) */}
           <div className="w-[80%] p-3 flex flex-col relative">
             <div className="flex items-center gap-2 mb-0.5">
-              <p className="text-[8px] font-bold uppercase text-emerald-700">Prescription</p>
+              <p className="text-[12px] font-bold uppercase text-emerald-700">Prescription</p>
             </div>
             
-            <div className="flex-1 overflow-hidden flex flex-col gap-0.5">
+            <div className="flex-1 overflow-visible flex flex-col gap-0.5">
               {/* Medicines */}
               <div className="flex-shrink-0">
                 {(() => {
@@ -1524,14 +1560,14 @@ const handleDownloadPDF = async (patient: Patient) => {
                       const medicines = JSON.parse(patientData.prescription);
                       if (Array.isArray(medicines) && medicines.length > 0) {
                         return (
-                          <table className="w-full text-[7px] border-collapse">
+                          <table className="w-full text-[10.5px] border-collapse">
                             <tbody>
                               {medicines.map((med: any, i: number) => (
                                 <tr key={i} className="align-top">
                                   <td className="py-0.5 min-w-[30%]">
                                     <p className="font-bold leading-tight">{med.medicine_name}</p>
                                     {med.instruction && (
-                                      <p className="text-[6px] italic text-slate-500 leading-none mt-0">
+                                      <p className="text-[9px] italic text-slate-500 leading-none mt-0">
                                         {Array.isArray(med.instruction) ? med.instruction.join(', ') : (typeof med.instruction === 'string' ? med.instruction : JSON.stringify(med.instruction).replace(/[\[\]"]/g, '').split(',').join(', '))}
                                       </p>
                                     )}
@@ -1541,7 +1577,7 @@ const handleDownloadPDF = async (patient: Patient) => {
                                   <td className="py-0.5">
                                     <div className="flex items-center gap-0.5">
                                       <span className="font-medium">{med.frequency || med.dosage}</span>
-                                      <span className="text-[5px] text-slate-400">times/day</span>
+                                      <span className="text-[7.5px] text-slate-400">times/day</span>
                                     </div>
                                   </td>
                                   <td className="py-0.5">{med.duration_days} Days</td>
@@ -1555,7 +1591,7 @@ const handleDownloadPDF = async (patient: Patient) => {
                   } catch (e) {}
                   
                   return (
-                    <p className="text-[9px] font-mono whitespace-pre-wrap leading-relaxed">
+                    <p className="text-[13.5px] font-mono whitespace-pre-wrap leading-relaxed">
                       {patientData.prescription || '---'}
                     </p>
                   );
@@ -1565,10 +1601,10 @@ const handleDownloadPDF = async (patient: Patient) => {
               {/* Panchkarma & Special Therapy */}
               {selectedTherapies.length > 0 && (
                 <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Therapies (Panchkarma & Special)</p>
+                  <p className="text-[10.5px] font-bold uppercase text-emerald-700 mb-0.5">Therapies (Panchkarma & Special)</p>
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {selectedTherapies.map((t, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
+                      <div key={idx} className="text-[10.5px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {t.days && t.days > 1 ? `${t.therapy_name} (${t.days} Days)` : t.therapy_name}
                       </div>
@@ -1580,10 +1616,10 @@ const handleDownloadPDF = async (patient: Patient) => {
               {/* Yogasan & Lifestyle Advice */}
               {patientData.lifestyle_advice && (
                 <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Yogasan & Lifestyle Advice</p>
+                  <p className="text-[10.5px] font-bold uppercase text-emerald-700 mb-0.5">Yogasan & Lifestyle Advice</p>
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {patientData.lifestyle_advice.split('\n').filter(Boolean).map((advice, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
+                      <div key={idx} className="text-[10.5px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {advice.trim()}
                       </div>
@@ -1595,10 +1631,10 @@ const handleDownloadPDF = async (patient: Patient) => {
               {/* Marma Chikitsa */}
               {patientData.marma_points && (
                 <div className="flex-shrink-0 border-t border-slate-100 pt-0.5">
-                  <p className="text-[7px] font-bold uppercase text-emerald-700 mb-0.5">Marma Chikitsa</p>
+                  <p className="text-[10.5px] font-bold uppercase text-emerald-700 mb-0.5">Marma Chikitsa</p>
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                     {patientData.marma_points.split('\n').filter(Boolean).map((point, idx) => (
-                      <div key={idx} className="text-[7px] text-slate-800 flex items-center gap-0.5">
+                      <div key={idx} className="text-[10.5px] text-slate-800 flex items-center gap-0.5">
                         <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                         {point.trim()}
                       </div>
@@ -1612,18 +1648,28 @@ const handleDownloadPDF = async (patient: Patient) => {
             
             <div className="absolute bottom-1 right-3 text-center">
               <div className="mb-0 text-center flex items-end justify-center pb-0">
-                <span className="text-[8px] font-bold text-slate-800">{doctorName !== '---' ? doctorName : ''}</span>
+                <span className="text-[12px] font-bold text-slate-800">{doctorName !== '---' ? doctorName : ''}</span>
               </div>
-              <p className="text-[6px] font-bold uppercase tracking-wider text-slate-500">Medical Officer</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Medical Officer</p>
             </div>
             
-            <div className="absolute bottom-2 left-3 text-[5px] text-slate-300 uppercase tracking-widest">
+            <div className="absolute bottom-2 left-3 text-[7.5px] text-slate-300 uppercase tracking-widest">
               Generated via e-AYUSH Seva
             </div>
           </div>
         </div>
       </div>
     </div>
+    );
+
+    if (isForExport) return content;
+
+    return (
+      <div className="w-full flex justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/30 print:block print:overflow-visible print:border-none print:bg-transparent">
+        <div className="print:scale-100 print:m-0" style={{ transform: 'scale(0.48)', transformOrigin: 'top center', width: '794px', height: '1123px', marginBottom: '-584px' }}>
+          {content}
+        </div>
+      </div>
     );
   };
 
@@ -1880,7 +1926,7 @@ const handleDownloadPDF = async (patient: Patient) => {
           </div>
           
           {/* Right Side: A4 Preview */}
-          <div className="hidden lg:block w-[400px]">
+          <div className="hidden lg:block w-[400px] print:hidden">
             <div className="sticky top-24 space-y-6">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 px-4">
                 <FileText className="text-emerald-600" size={20} />
@@ -1972,22 +2018,7 @@ const handleDownloadPDF = async (patient: Patient) => {
                             <Printer size={16} />
                           </button>
                           <button 
-                            onClick={() => {
-                              setShowPreviewModal(p);
-                              setTimeout(() => {
-                                import('html2canvas').then(html2canvas => {
-                                  const element = document.getElementById('parchi-preview-modal');
-                                  if (element) {
-                                    html2canvas.default(element).then(canvas => {
-                                      const link = document.createElement('a');
-                                      link.download = `${p.name}_${p.hospital_yearly_serial}.png`;
-                                      link.href = canvas.toDataURL();
-                                      link.click();
-                                    });
-                                  }
-                                });
-                              }, 500);
-                            }} 
+                            onClick={() => handleDownloadPNG(p)} 
                             className="p-2 bg-purple-50 rounded-lg text-purple-600 hover:bg-purple-100"
                             title="Download PNG"
                           >
@@ -2551,7 +2582,7 @@ const handleDownloadPDF = async (patient: Patient) => {
               </div>
               
               {/* Right Side: A4 Preview */}
-              <div className="hidden lg:block w-[400px]">
+              <div className="hidden lg:block w-[400px] print:hidden">
                 <div className="sticky top-24 space-y-6">
                   <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 px-4">
                     <FileText className="text-emerald-600" size={20} />
@@ -2730,7 +2761,7 @@ const handleDownloadPDF = async (patient: Patient) => {
                     </div>
                   </div>
                 </div>
-                <div className="hidden lg:block w-[400px]">
+                <div className="hidden lg:block w-[400px] print:hidden">
                   <div className="sticky top-24 space-y-6">
                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 px-4">
                       <FileText className="text-emerald-600" size={20} />
@@ -2862,6 +2893,20 @@ const handleDownloadPDF = async (patient: Patient) => {
                 <h2 className="text-xl font-bold text-slate-900">Parchi Preview</h2>
                 <div className="flex gap-2">
                   <button 
+                    onClick={() => handleDownloadPDF(showPreviewModal)}
+                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                    title="Download PDF"
+                  >
+                    <Download size={20} />
+                  </button>
+                  <button 
+                    onClick={() => handleDownloadPNG(showPreviewModal)}
+                    className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-all"
+                    title="Download PNG"
+                  >
+                    <FileImage size={20} />
+                  </button>
+                  <button 
                     onClick={() => window.print()}
                     className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"
                     title="Print Parchi"
@@ -2874,7 +2919,7 @@ const handleDownloadPDF = async (patient: Patient) => {
                 </div>
               </div>
               <div className="flex justify-center print:block">
-                {renderA4Preview(showPreviewModal)}
+                {renderA4Preview(showPreviewModal, false)}
               </div>
             </motion.div>
           </div>
@@ -3005,10 +3050,10 @@ const handleDownloadPDF = async (patient: Patient) => {
         )}
       </AnimatePresence>
 
-      {/* Hidden PDF Content */}
+      {/* Hidden Export Content */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={pdfContentRef}>
-          {pdfData && renderA4Preview(pdfData, true)}
+          {(pdfData || pngData) && renderA4Preview(pdfData || pngData || {}, true)}
         </div>
       </div>
 
