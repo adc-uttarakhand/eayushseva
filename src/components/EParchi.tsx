@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2, FileImage } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -469,6 +469,17 @@ const handleDownloadPDF = async (patient: Patient) => {
             const el = elements[i] as HTMLElement;
             try {
               if (!el.style) continue;
+              
+              // Helper to check and replace oklch
+              for (let j = 0; j < el.style.length; j++) {
+                const prop = el.style[j];
+                const value = el.style.getPropertyValue(prop);
+                if (value && value.includes('oklch')) {
+                   el.style.setProperty(prop, 'transparent'); 
+                }
+              }
+
+              // Keep existing specific overrides
               const computed = window.getComputedStyle(el);
               if (computed.color && computed.color.includes('oklch')) el.style.color = '#0f172a';
               if (computed.backgroundColor && computed.backgroundColor.includes('oklch')) el.style.backgroundColor = '#ffffff';
@@ -1398,7 +1409,7 @@ const handleDownloadPDF = async (patient: Patient) => {
     const doctorName = getAssignedDoctorName(patientData.assigned_doctor_id);
     return (
     <div 
-      id={isForPDF ? "parchi-preview-content" : undefined}
+      id={isForPDF ? "parchi-preview-content" : "parchi-preview-modal"}
       className={`pdf-print-container bg-white border border-gray-300 shadow-2xl rounded-lg overflow-hidden ${isForPDF ? '' : 'aspect-[1/1.414] w-[400px]'} flex flex-col relative text-[10px] p-[5%] print:shadow-none print:w-full print:h-screen print:border-none print:p-0`}
       style={isForPDF ? { width: '794px', height: '1123px', overflow: 'hidden', fontSize: '10px', padding: '5%' } : undefined}
     >
@@ -1959,6 +1970,28 @@ const handleDownloadPDF = async (patient: Patient) => {
                             title="Print Parchi"
                           >
                             <Printer size={16} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setShowPreviewModal(p);
+                              setTimeout(() => {
+                                import('html2canvas').then(html2canvas => {
+                                  const element = document.getElementById('parchi-preview-modal');
+                                  if (element) {
+                                    html2canvas.default(element).then(canvas => {
+                                      const link = document.createElement('a');
+                                      link.download = `${p.name}_${p.hospital_yearly_serial}.png`;
+                                      link.href = canvas.toDataURL();
+                                      link.click();
+                                    });
+                                  }
+                                });
+                              }, 500);
+                            }} 
+                            className="p-2 bg-purple-50 rounded-lg text-purple-600 hover:bg-purple-100"
+                            title="Download PNG"
+                          >
+                            <FileImage size={16} />
                           </button>
                           <button 
                             onClick={() => handleDownloadPDF(p)} 

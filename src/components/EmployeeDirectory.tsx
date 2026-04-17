@@ -277,7 +277,20 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                       <td className="py-4 px-6 text-slate-600">{hospital?.district || 'N/A'}</td>
                       <td className="py-4 px-6 text-slate-600">{s.mobile_number}</td>
                       <td className="py-4 px-6 text-slate-500 text-xs">
-                        {s.is_verified && s.last_verified_on ? `Verified on: ${new Date(s.last_verified_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'Not verified'}
+                        <div className="flex flex-col gap-1">
+                          {s.is_verified && s.last_verified_on ? (
+                            <span className="text-emerald-600 font-bold">
+                              Verified: {new Date(s.last_verified_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, {new Date(s.last_verified_on).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Not verified</span>
+                          )}
+                          {s.last_edited_on && (
+                            <span className="text-yellow-700 font-bold">
+                              Edited: {new Date(s.last_edited_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, {new Date(s.last_edited_on).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

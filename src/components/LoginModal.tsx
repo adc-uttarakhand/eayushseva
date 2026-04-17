@@ -1,8 +1,8 @@
-import { X, Lock, User, ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { X, Lock, User, ShieldCheck, Eye, EyeOff, Loader2, UserSearch } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import RegistrationPage from './RegistrationPage';
+import SearchEmployeeModal from './SearchEmployeeModal';
 
 export interface UserSession {
   role: 'SUPER_ADMIN' | 'HOSPITAL' | 'DOCTOR' | 'DISTRICT_ADMIN' | 'STATE_ADMIN' | 'STAFF' | 'DISTRICT_MEDICINE_INCHARGE' | 'PHARMACY_MANAGER';
@@ -30,7 +30,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -262,8 +262,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div key="login-modal-wrapper" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div
+            key="login-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -272,6 +273,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
           />
           
           <motion.div
+            key="login-modal-content"
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -396,10 +398,11 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                 </div>
                 <div className="mt-4 text-center">
                   <button
-                    onClick={() => setIsRegistrationOpen(true)}
-                    className="text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
+                    onClick={() => setIsSearchModalOpen(true)}
+                    className="flex items-center gap-2 mx-auto text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
                   >
-                    Register
+                    <UserSearch size={16} />
+                    Search Employee
                   </button>
                 </div>
               </div>
@@ -413,7 +416,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
           </motion.div>
         </div>
       )}
-      {isRegistrationOpen && <RegistrationPage onClose={() => setIsRegistrationOpen(false)} />}
+      <AnimatePresence>
+        {isSearchModalOpen && <SearchEmployeeModal key="search-employee-modal" onClose={() => setIsSearchModalOpen(false)} />}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }

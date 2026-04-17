@@ -3,6 +3,7 @@ import { User, Activity, Plus, Save, UserCircle2, X, CheckCircle, Camera, Loader
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import HospitalChangeModal from './HospitalChangeModal';
+import { toast } from 'react-hot-toast';
 
 const UTTARAKHAND_DISTRICTS = [
   "Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", 
@@ -105,7 +106,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
     longLeaves: [{ id: generateId(), fromDate: '', toDate: '', leaveType: '', totalDays: 0 }],
     postings: [{ id: generateId(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
     attachments: [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }],
-    mainPostingName: '', mainPostingId: '', attachedHospitals: [] as any[]
+    mainPostingName: '', mainPostingId: '', attachedHospitals: [] as any[],
+    is_verified: false, last_verified_on: '', verified_by_admin: '', last_edited_on: ''
   });
 
   // Utility Functions
@@ -342,7 +344,11 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
           const end = parseDateStr(formatDateForUI(a.to));
           const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
           return { ...a, id: generateId(), hospital_id: a.hospital_id || '', hospital: latestHospital ? latestHospital.facility_name : a.hospital, status: latestHospital ? (latestHospital.status || 'Sugam') : (a.status || 'Sugam'), above7000: latestHospital ? (latestHospital.above_7000_feet || 'No') : (a.above7000 || 'No'), from: formatDateForUI(a.from), to: formatDateForUI(a.to), days: days > 0 ? days : 0 };
-        }) : [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }]
+        }) : [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }],
+        is_verified: staffData.is_verified || false,
+        last_verified_on: staffData.last_verified_on || '',
+        verified_by_admin: staffData.verified_by_admin || '',
+        last_edited_on: staffData.last_edited_on || ''
       };
       setProfile(newProfile);
       setInitialProfile(newProfile);
@@ -439,7 +445,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         long_leaves_count: serviceDays.totalLeaves, attachment_sugam_days: serviceDays.attachmentSugam, attachment_durgam_days: serviceDays.attachmentDurgam,
         attachment_durgam_above_7000_days: serviceDays.attachmentDurgamAbove7000, total_sugam_days: serviceDays.totalSugam,
         total_durgam_below_7000_days: serviceDays.totalDurgam, total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
-        last_edited_on: new Date().toISOString()
+        last_edited_on: new Date().toISOString(),
+        is_verified: profile.is_verified && (profile.last_verified_on && new Date(new Date().toISOString()) <= new Date(profile.last_verified_on))
       }, { onConflict: 'id' });
       if (staffError) throw new Error(`Staff Table Error: ${staffError.message}`);
 
@@ -743,7 +750,59 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
       {activeSubTab === 'service' && (
         <>
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2"><Building2 className="text-emerald-600" size={20} /> Service Record Details</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Building2 className="text-emerald-600" size={20} /> 
+                Service Record Details
+              </h2>
+              {/* In the button render */}
+              <div className="flex items-center gap-4">
+                  {(profile.last_verified_on || profile.last_edited_on) && (
+                    <div className="flex flex-col items-end gap-1">
+                      {profile.last_verified_on && (
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase">
+                          Verified on: {new Date(profile.last_verified_on).toLocaleString()}
+                        </span>
+                      )}
+                      {profile.last_edited_on && (
+                        <span className="text-[10px] font-bold text-yellow-700 uppercase">
+                          Last edited on: {new Date(profile.last_edited_on).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {userRole === 'ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { error } = await supabase
+                          .from('staff')
+                          .update({ 
+                            is_verified: true,
+                            last_verified_on: new Date().toISOString(),
+                            verified_by_admin: staffId
+                          })
+                          .eq('id', staffId);
+                        if (!error) {
+                          toast.success('Verified Successfully');
+                          setProfile(prev => ({ 
+                             ...prev, 
+                             is_verified: true, 
+                             last_verified_on: new Date().toISOString(),
+                             verified_by_admin: staffId 
+                          }));
+                        } else {
+                          alert('Failed to verify record: ' + error.message);
+                        }
+                      }}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center gap-2"
+                    >
+                      <CheckCircle size={16} />
+                      Verify Service Record
+                    </button>
+                  )}
+                </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of First Appointment</label>
