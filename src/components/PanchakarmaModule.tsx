@@ -130,6 +130,7 @@ export default function PanchakarmaModule({ session }: { session: any }) {
   const [registerFilter, setRegisterFilter] = useState<'today' | 'month' | 'quarter' | 'year' | 'custom'>('today');
   const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [filteredLogs, setFilteredLogs] = useState<Log[]>([]);
+  const [therapyCounts, setTherapyCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (activeTab === 'register') {
@@ -151,6 +152,15 @@ export default function PanchakarmaModule({ session }: { session: any }) {
         });
       }
       setFilteredLogs(filtered);
+
+      // Calculate therapy counts per patient
+      const counts: Record<string, number> = {};
+      dailyLogs.forEach(log => {
+        if (!counts[log.patient_id]) counts[log.patient_id] = 0;
+        counts[log.patient_id] += (log.therapy_name.split(',').length);
+      });
+      setTherapyCounts(counts);
+
     }
   }, [activeTab, dailyLogs, registerFilter, customDateRange]);
 
@@ -692,8 +702,8 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                   <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
                     <Activity size={20} />
                   </div>
-                  <p className="text-2xl font-black text-slate-900">{filteredLogs.length}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Procedures</p>
+                  <p className="text-2xl font-black text-slate-900">{filteredLogs.reduce((acc, log) => acc + (log.therapy_name.split(',').length), 0)}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total Therapies Given</p>
                 </div>
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
                   <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-4">
@@ -759,6 +769,7 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                           <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
                             {log.therapy_name}
                           </p>
+                          <p className="text-[10px] font-bold text-emerald-600 mt-1">Total Therapies Conducted: {therapyCounts[log.patient_id] || 0}</p>
                           <p className="text-[10px] text-slate-400 mt-1">{format(parseISO(log.created_at), 'dd MMM yyyy, hh:mm a')}</p>
                         </div>
                       </div>

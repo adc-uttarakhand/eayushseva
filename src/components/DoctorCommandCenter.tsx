@@ -2,7 +2,7 @@ import Profiler from './Profiler';
 import React, { useState, useEffect, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun, Stethoscope } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
@@ -20,6 +20,7 @@ import RegistrationRequests from './RegistrationRequests';
 import PanchakarmaModule from './PanchakarmaModule';
 import YogaModule from './YogaModule';
 import RapidTests from './RapidTests';
+import SpecialTherapyModule from './SpecialTherapyModule';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -47,6 +48,8 @@ const AVAILABLE_MODULES = [
   { id: 'suggestion_module', label: 'Suggestion Module' },
   { id: 'communication_module', label: 'Communication Module' },
   { id: 'panchakarma', label: 'Panchakarma Management' },
+  { id: 'rapid_tests', label: 'Rapid Tests Management' },
+  { id: 'special_therapy', label: 'Special Therapy Management' },
 ];
 
 const UTTARAKHAND_DISTRICTS = [
@@ -149,8 +152,8 @@ let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -1889,6 +1892,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <Activity size={18} /> {activeTab === 'rapid_tests' && 'Rapid Tests'}
               </button>
             )}
+            <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <Stethoscope size={18} /> {activeTab === 'special_therapy' && 'Special Therapy'}
+            </button>
           </div>
         </div>
       </div>
@@ -2432,6 +2438,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'rapid_tests' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
             <RapidTests hospitalId={session.selectedHospitalId || session.hospitalId || session.id} staffId={session.id} />
+          </div>
+        )}
+        {activeTab === 'special_therapy' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <SpecialTherapyModule session={session} />
           </div>
         )}
       </motion.div>
