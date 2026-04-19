@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Activity, Plus, Save, UserCircle2, X, CheckCircle, Camera, Loader2, Upload, Eye, EyeOff, Shield, Building2, MapPin, Calendar, GraduationCap } from 'lucide-react';
+import { User, Activity, Plus, Save, UserCircle2, X, CheckCircle, Camera, Loader2, Upload, Eye, EyeOff, Shield, Building2, MapPin, Calendar, GraduationCap, Lock, Unlock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import HospitalChangeModal from './HospitalChangeModal';
@@ -107,7 +107,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
     postings: [{ id: generateId(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
     attachments: [{ id: generateId(), hospital_id: '', hospital: '', from: '', to: '', status: 'Sugam', above7000: 'No', days: 0 }],
     mainPostingName: '', mainPostingId: '', attachedHospitals: [] as any[],
-    is_verified: false, last_verified_on: '', verified_by_admin: '', last_edited_on: ''
+    is_verified: false, last_verified_on: '', verified_by_admin: '', last_edited_on: '', is_locked: false
   });
 
   // Utility Functions
@@ -348,7 +348,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         is_verified: staffData.is_verified || false,
         last_verified_on: staffData.last_verified_on || '',
         verified_by_admin: staffData.verified_by_admin || '',
-        last_edited_on: staffData.last_edited_on || ''
+        last_edited_on: staffData.last_edited_on || '',
+        is_locked: staffData.is_locked || false
       };
       setProfile(newProfile);
       setInitialProfile(newProfile);
@@ -595,12 +596,12 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
 
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Full Name</label>
-              <input value={profile.fullName} onChange={e => setProfile({...profile, fullName: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.fullName} onChange={e => setProfile({...profile, fullName: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Role / Designation</label>
-              <select value={profile.designation} onChange={e => setProfile({...profile, designation: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.designation} onChange={e => setProfile({...profile, designation: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option value="">Select Role</option>
                 {roles.map((role, index) => <option key={role + index} value={role}>{role}</option>)}
               </select>
@@ -619,22 +620,22 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
-              <input value={profile.empId} onChange={e => setProfile({...profile, empId: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.empId} onChange={e => setProfile({...profile, empId: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">BCP Registration Number</label>
-              <input value={profile.bcpRegistrationNo} onChange={e => setProfile({...profile, bcpRegistrationNo: e.target.value})} placeholder="Optional" className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.bcpRegistrationNo} onChange={e => setProfile({...profile, bcpRegistrationNo: e.target.value})} placeholder="Optional" className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Father's Name</label>
-              <input value={profile.fatherName} onChange={e => setProfile({...profile, fatherName: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.fatherName} onChange={e => setProfile({...profile, fatherName: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Email ID</label>
-              <input type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1">
@@ -644,40 +645,40 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Mobile</label>
-              <input value={profile.mobile} onChange={e => setProfile({...profile, mobile: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.mobile} onChange={e => setProfile({...profile, mobile: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
 
             <div className="space-y-1 bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
               <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 ml-4">Employment Type</label>
-              <select value={profile.employmentType} onChange={e => setProfile({...profile, employmentType: e.target.value as any})} className="w-full bg-white border border-emerald-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.employmentType} onChange={e => setProfile({...profile, employmentType: e.target.value as any})} className={`w-full bg-white border border-emerald-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option value="Permanent">Permanent</option><option value="Contractual">Contractual</option><option value="Outsourced">Outsourced</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Class</label>
-              <select value={profile.employmentClass} onChange={e => setProfile({...profile, employmentClass: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.employmentClass} onChange={e => setProfile({...profile, employmentClass: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option>Class I</option><option>Class II</option><option>Class III</option><option>Class IV</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Gender</label>
-              <select value={profile.gender} onChange={e => setProfile({...profile, gender: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.gender} onChange={e => setProfile({...profile, gender: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option>Male</option><option>Female</option><option>Other</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Blood Group</label>
-              <select value={profile.bloodGroup} onChange={e => setProfile({...profile, bloodGroup: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.bloodGroup} onChange={e => setProfile({...profile, bloodGroup: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Present District</label>
-              <select value={profile.presentDistrict} onChange={e => setProfile({...profile, presentDistrict: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.presentDistrict} onChange={e => setProfile({...profile, presentDistrict: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <option value="">Select District</option>
                 {UTTARAKHAND_DISTRICTS.map((d, index) => <option key={d + index} value={d}>{d}</option>)}
               </select>
@@ -771,6 +772,25 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                       )}
                     </div>
                   )}
+                  {userRole === 'ADMIN' && profile.is_verified && profile.last_verified_on && (!profile.last_edited_on || new Date(profile.last_verified_on) > new Date(profile.last_edited_on)) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const newLockedStatus = !profile.is_locked;
+                        const { error } = await supabase
+                          .from('staff')
+                          .update({ is_locked: newLockedStatus })
+                          .eq('id', staffId);
+                        if (!error) {
+                          toast.success(newLockedStatus ? 'Profile locked' : 'Profile unlocked');
+                          setProfile(prev => ({ ...prev, is_locked: newLockedStatus }));
+                        } else alert('Failed: ' + error.message);
+                      }}
+                      className={`${profile.is_locked ? 'bg-red-600' : 'bg-slate-600'} text-white p-2 rounded-xl transition-all`}
+                    >
+                      {profile.is_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                    </button>
+                  )}
                   {userRole === 'ADMIN' && (
                     <button
                       type="button"
@@ -779,15 +799,17 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                           .from('staff')
                           .update({ 
                             is_verified: true,
+                            is_locked: true,
                             last_verified_on: new Date().toISOString(),
                             verified_by_admin: staffId
                           })
                           .eq('id', staffId);
                         if (!error) {
-                          toast.success('Verified Successfully');
+                          toast.success('Verified and Locked Successfully');
                           setProfile(prev => ({ 
                              ...prev, 
                              is_verified: true, 
+                             is_locked: true,
                              last_verified_on: new Date().toISOString(),
                              verified_by_admin: staffId 
                           }));
@@ -806,15 +828,17 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Date of First Appointment</label>
-                <input type="text" placeholder="DD-MMM-YYYY" value={profile.dateOfFirstAppointment} onChange={e => setProfile({...profile, dateOfFirstAppointment: maskDate(e.target.value)})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.dateOfFirstAppointment} onChange={e => setProfile({...profile, dateOfFirstAppointment: maskDate(e.target.value)})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of 1st Joining in Dept</label>
-                <input type="text" placeholder="DD-MMM-YYYY" value={profile.dateOfFirstJoiningDepartment} onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.dateOfFirstJoiningDepartment} onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">First Posting Place</label>
-                <HospitalSearchInput value={profile.firstPostingPlace} onChange={(val: any) => setProfile({...profile, firstPostingPlace: val})} hospitals={hospitals} className="w-full bg-slate-50 border-gray-100 rounded-2xl py-3 px-4 h-20" isTextarea={true} />
+                <div className={profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}>
+                  <HospitalSearchInput value={profile.firstPostingPlace} onChange={(val: any) => setProfile({...profile, firstPostingPlace: val})} hospitals={hospitals} className="w-full bg-slate-50 border-gray-100 rounded-2xl py-3 px-4 h-20" isTextarea={true} />
+                </div>
                 {profile.firstPostingPlace && (
                   <div className="flex gap-4 ml-4 mt-1">
                     {(() => {
@@ -832,14 +856,14 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Home District</label>
-                <select value={profile.homeDistrict} onChange={e => setProfile({...profile, homeDistrict: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                <select disabled={profile.is_locked && userRole !== 'ADMIN'} value={profile.homeDistrict} onChange={e => setProfile({...profile, homeDistrict: e.target.value})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <option value="">Select Home District</option>
                   {UTTARAKHAND_DISTRICTS.map((d, index) => <option key={d + index} value={d}>{d}</option>)}
                 </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Date of Birth</label>
-                <input type="text" placeholder="DD-MMM-YYYY" value={profile.dob} onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.dob} onChange={e => setProfile({...profile, dob: maskDate(e.target.value)})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
             </div>
           </div>
@@ -851,14 +875,16 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                 <div className="space-y-4">
                   {/* Current Posting */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-2 border-emerald-200 p-4 rounded-2xl bg-emerald-50/30">
-                    <div className="space-y-1 md:col-span-6">
+                      <div className="space-y-1 md:col-span-6">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Place</label>
-                      <HospitalSearchInput isTextarea value={profile.postings[0]?.hospitalName || ''} onChange={(val: any) => {
-                        const h = hospitals.find(h => h.facility_name === val);
-                        const newPostings = [...profile.postings];
-                        newPostings[0] = { ...newPostings[0], hospitalName: val, hospital_id: h ? h.hospital_id : '', status: h ? (h.status || 'Sugam') : 'Sugam', above7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : 'No' };
-                        setProfile({ ...profile, postings: newPostings });
-                      }} hospitals={hospitals} placeholder="Type hospital name..." />
+                      <div className={profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}>
+                        <HospitalSearchInput isTextarea value={profile.postings[0]?.hospitalName || ''} onChange={(val: any) => {
+                          const h = hospitals.find(h => h.facility_name === val);
+                          const newPostings = [...profile.postings];
+                          newPostings[0] = { ...newPostings[0], hospitalName: val, hospital_id: h ? h.hospital_id : '', status: h ? (h.status || 'Sugam') : 'Sugam', above7000: h ? (h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes' ? 'Yes' : 'No') : 'No' };
+                          setProfile({ ...profile, postings: newPostings });
+                        }} hospitals={hospitals} placeholder="Type hospital name..." />
+                      </div>
                       <div className="flex gap-3 ml-2 mt-1">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${profile.postings[0]?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{profile.postings[0]?.status || 'Sugam'}</span>
                         <span className="text-[9px] font-bold text-slate-400">Above 7000 ft: <span className="text-slate-600">{profile.postings[0]?.above7000 || 'No'}</span></span>
@@ -866,11 +892,11 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                     </div>
                     <div className="space-y-1 md:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
-                      <input type="text" placeholder="DD-MMM-YYYY" value={profile.postings[0]?.fromDate || ''} onChange={e => {
+                      <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.postings[0]?.fromDate || ''} onChange={e => {
                         const newPostings = [...profile.postings];
                         newPostings[0] = { ...newPostings[0], fromDate: maskDate(e.target.value) };
                         setProfile({ ...profile, postings: newPostings });
-                      }} className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                      }} className={`w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                     </div>
                     <div className="space-y-1 md:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">To Date</label>
@@ -902,10 +928,12 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                           <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start border p-4 rounded-2xl ${gap > 0 ? 'border-red-300 bg-red-50/20' : 'border-gray-100 bg-slate-50'}`}>
                             <div className="space-y-1 md:col-span-5">
                               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Subsequent Posting</label>
-                              <HospitalSearchInput isTextarea value={hospitals.find(h => h.hospital_id === posting.hospital_id)?.facility_name || ''} onChange={(val: any) => {
-                                const h = hospitals.find(h => h.facility_name === val);
-                                updatePosting(posting.id, 'hospital_id', h ? h.hospital_id : '');
-                              }} hospitals={hospitals} placeholder="Type hospital name..." />
+                              <div className={profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}>
+                                <HospitalSearchInput isTextarea value={hospitals.find(h => h.hospital_id === posting.hospital_id)?.facility_name || ''} onChange={(val: any) => {
+                                  const h = hospitals.find(h => h.facility_name === val);
+                                  updatePosting(posting.id, 'hospital_id', h ? h.hospital_id : '');
+                                }} hospitals={hospitals} placeholder="Type hospital name..." />
+                              </div>
                               <div className="flex gap-3 ml-2 mt-1">
                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitals.find(h => h.hospital_id === posting.hospital_id)?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{hospitals.find(h => h.hospital_id === posting.hospital_id)?.status || 'Sugam'}</span>
                                 <span className="text-[9px] font-bold text-slate-400">Above 7000 ft: <span className="text-slate-600">{(hospitals.find(h => h.hospital_id === posting.hospital_id)?.region_indicator === 'Above 7000' || hospitals.find(h => h.hospital_id === posting.hospital_id)?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span></span>
@@ -913,7 +941,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                             </div>
                             <div className="space-y-1 md:col-span-2">
                               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
-                              <input type="text" placeholder="DD-MMM-YYYY" value={posting.fromDate} onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                              <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={posting.fromDate} onChange={e => updatePosting(posting.id, 'fromDate', maskDate(e.target.value))} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                             </div>
                             <div className="space-y-1 md:col-span-2">
                               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
@@ -924,7 +952,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                               <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600"><div className="text-lg">{posting.days || 0} days</div></div>
                             </div>
                             <div className="md:col-span-1 flex justify-center pt-6">
-                              <button type="button" onClick={() => removePosting(posting.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><X size={20} /></button>
+                              <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={() => removePosting(posting.id)} className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><X size={20} /></button>
                             </div>
                           </div>
                         </div>
@@ -940,7 +968,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                     return isComplete ? (
                       <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm px-4 py-2"><CheckCircle size={16} /> Service History Complete</div>
                     ) : (
-                      <button type="button" onClick={addPosting} className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"><Plus size={16} /> Add Another Posting</button>
+                      <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={addPosting} className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><Plus size={16} /> Add Another Posting</button>
                     );
                   })()}
                 </div>
@@ -953,28 +981,29 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                     <div key={leave.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end border border-gray-100 p-4 rounded-2xl bg-slate-50">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From Date</label>
-                        <input type="text" placeholder="DD-MMM-YYYY" value={leave.fromDate} onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                        <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={leave.fromDate} onChange={e => updateLongLeave(leave.id, 'fromDate', maskDate(e.target.value))} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To Date</label>
-                        <input type="text" placeholder="DD-MMM-YYYY" value={leave.toDate} onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                        <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={leave.toDate} onChange={e => updateLongLeave(leave.id, 'toDate', maskDate(e.target.value))} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Leave Type</label>
-                        <input value={leave.leaveType} onChange={e => updateLongLeave(leave.id, 'leaveType', e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="e.g. Study Leave" />
+                        <input disabled={profile.is_locked && userRole !== 'ADMIN'} value={leave.leaveType} onChange={e => updateLongLeave(leave.id, 'leaveType', e.target.value)} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="e.g. Study Leave" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Total Days</label>
                         <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600"><div className="text-lg">{leave.totalDays || 0} days</div></div>
                       </div>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => removeLongLeave(leave.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px]"><X size={20} /></button>
+                        <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={() => removeLongLeave(leave.id)} className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all h-[42px] ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><X size={20} /></button>
                       </div>
                     </div>
                   ))}
-                  <button type="button" onClick={addLongLeave} className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:bg-emerald-50 p-3 rounded-2xl transition-all w-full justify-center border-2 border-dashed border-emerald-100"><Plus size={18} /> Add Leave</button>
+                  <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={addLongLeave} className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:bg-emerald-50 p-3 rounded-2xl transition-all w-full justify-center border-2 border-dashed border-emerald-100 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><Plus size={18} /> Add Leave</button>
+
                   <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration ({'>'}30 days)</span>
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Leaves Duration (&gt;30 days)</span>
                     <div className="text-2xl font-black text-slate-700">{serviceDays.totalLeaves} days</div>
                   </div>
                 </div>
@@ -995,22 +1024,22 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                       </div>
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">From</label>
-                        <input type="text" placeholder="DD-MMM-YYYY" value={att.from} onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                        <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={att.from} onChange={e => updateAttachment(att.id, 'from', maskDate(e.target.value))} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                       </div>
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">To</label>
-                        <input type="text" placeholder="DD-MMM-YYYY" value={att.to} onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                        <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={att.to} onChange={e => updateAttachment(att.id, 'to', maskDate(e.target.value))} className={`w-full bg-white border border-gray-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                       </div>
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Days</label>
                         <div className="w-full bg-slate-100 border border-gray-200 rounded-xl py-2 px-3 text-center font-bold text-slate-600"><div className="text-lg">{att.days || 0} days</div></div>
                       </div>
                       <div className="md:col-span-1 flex justify-center pt-6">
-                        <button type="button" onClick={() => removeAttachment(att.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><X size={20} /></button>
+                        <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={() => removeAttachment(att.id)} className={`p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><X size={20} /></button>
                       </div>
                     </div>
                   ))}
-                  <button type="button" onClick={addAttachment} className="flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2"><Plus size={16} /> Add More Attachments</button>
+                  <button disabled={profile.is_locked && userRole !== 'ADMIN'} type="button" onClick={addAttachment} className={`flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-all px-4 py-2 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`}><Plus size={16} /> Add More Attachments</button>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
                     <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Total Sugam Attachment Days</p>

@@ -92,6 +92,8 @@ export default function PanchakarmaModule({ session }: { session: any }) {
   const [paymentCollected, setPaymentCollected] = useState(false);
   const [isTherapySearchOpen, setIsTherapySearchOpen] = useState(false);
   const [therapyQuery, setTherapyQuery] = useState('');
+  const [isManualEntry, setIsManualEntry] = useState(false);
+  const [manualEntry, setManualEntry] = useState({ serial: '', name: '', age: '', gender: '' });
 
   const resetNewAppointmentData = () => {
     setNewAppointmentData({
@@ -221,15 +223,22 @@ export default function PanchakarmaModule({ session }: { session: any }) {
   };
 
   const fetchDailyLogs = async () => {
+    console.log('Fetching logs for hospital:', hospitalId);
     if (!hospitalId) return;
     setLoading(true);
-    const today = format(new Date(), 'yyyy-MM-dd');
+    // const today = format(new Date(), 'yyyy-MM-dd'); // Temporarily removed
     const { data, error } = await supabase
       .from('panchakarma_logs')
       .select('*, patients(name), staff(full_name, role)')
       .eq('hospital_id', hospitalId)
-      .gte('created_at', `${today}T00:00:00Z`)
+      // .gte('created_at', `${today}T00:00:00Z`) // Temporarily removed
       .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching panchakarma_logs:', error);
+    } else {
+      console.log('Fetched logs data:', data);
+    }
     
     if (data) {
       const logsWithDetails = data.map(log => ({
@@ -285,8 +294,12 @@ export default function PanchakarmaModule({ session }: { session: any }) {
   const totalAmount = selectedTherapies.reduce((acc, t) => acc + (t.charges || 0), 0);
 
   const saveSession = async () => {
-    if (!selectedPatient) {
+    if (!isManualEntry && !selectedPatient) {
       toast.error('Please select a patient');
+      return;
+    }
+    if (isManualEntry && (!manualEntry.name || !manualEntry.serial)) {
+      toast.error('Please fill in essential legacy patient details');
       return;
     }
     if (selectedTherapies.length === 0) {
@@ -300,7 +313,11 @@ export default function PanchakarmaModule({ session }: { session: any }) {
 
     setLoading(true);
     const logData = {
-      patient_id: selectedPatient.id,
+      patient_id: isManualEntry ? null : selectedPatient!.id,
+      legacy_serial: isManualEntry ? manualEntry.serial : null,
+      legacy_name: isManualEntry ? manualEntry.name : null,
+      legacy_age: isManualEntry ? manualEntry.age : null,
+      legacy_gender: isManualEntry ? manualEntry.gender : null,
       staff_id: session.user?.id || session.id,
       hospital_id: hospitalId,
       therapy_name: selectedTherapies.map(t => t.therapy_name).join(', '),
@@ -383,8 +400,17 @@ export default function PanchakarmaModule({ session }: { session: any }) {
               className="space-y-6"
             >
               {/* Smart Search */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-2">Find Patient (Last 15 Days)</label>
+              <div className="flex items-center justify-between px-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Find Patient / Legacy Entry</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 font-bold">Manual</span>
+                  <button onClick={() => setIsManualEntry(!isManualEntry)} className={`w-10 h-5 rounded-full transition-all ${isManualEntry ? 'bg-emerald-600' : 'bg-slate-200'} relative`}>
+                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isManualEntry ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+              
+              {!isManualEntry ? (
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
@@ -416,7 +442,14 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                     </div>
                   )}
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="text" placeholder="Serial" value={manualEntry.serial} onChange={e => setManualEntry({...manualEntry, serial: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                  <input type="text" placeholder="Name" value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                  <input type="number" placeholder="Age" value={manualEntry.age} onChange={e => setManualEntry({...manualEntry, age: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                  <input type="text" placeholder="Gender" value={manualEntry.gender} onChange={e => setManualEntry({...manualEntry, gender: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                </div>
+              )}
 
               {/* Patient Card */}
               {selectedPatient && (
@@ -774,8 +807,11 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                         <div className="text-xs font-medium text-slate-600">
                           {format(parseISO(log.created_at), 'dd MMM, hh:mm a')}
                         </div>
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {log.patient_name}
+                        <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-2">
+                          {log.patient_name !== 'Unknown' ? log.patient_name : log.legacy_name}
+                          {log.patient_name === 'Unknown' && (
+                            <span className="text-[8px] font-bold uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Legacy</span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-500 font-medium truncate italic">
                           {log.therapy_name}

@@ -19,8 +19,13 @@ interface SelectedTest {
 }
 
 export default function RapidTests({ hospitalId, staffId }: { hospitalId: string, staffId: string }) {
-  const [activeSubTab, setActiveSubTab] = useState<'conduct' | 'report' | 'register'>('conduct');
+  const [activeSubTab, setActiveSubTab] = useState<'conduct' | 'report' | 'register' | 'inventory'>('conduct');
   const [loading, setLoading] = useState(false);
+  
+  // Inventory State
+  const [kitsInventoryKits, setKitsInventoryKits] = useState<any[]>([]);
+  const [isAddKitModalOpen, setIsAddKitModalOpen] = useState(false);
+  const [newKit, setNewKit] = useState({ kit_name: '', order_number: '', batch_number: '', mfg_date: '', expiry_date: '', quantity: 0, received_date: new Date().toISOString().split('T')[0] });
   
   // Conduct State
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,7 +45,13 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
     fetchMasterTests();
     if (activeSubTab === 'report') fetchPendingReports();
     if (activeSubTab === 'register') fetchLogs();
+    if (activeSubTab === 'inventory') fetchInventory();
   }, [activeSubTab, filterDate]);
+
+  const fetchInventory = async () => {
+    const { data } = await supabase.from('rapid_kits_inventory').select('*').eq('hospital_id', hospitalId);
+    if (data) setKitsInventoryKits(data);
+  };
 
   const fetchMasterTests = async () => {
     const { data } = await supabase.from('rapid_tests').select('*');
@@ -58,13 +69,21 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
   };
 
   const fetchLogs = async () => {
-    const { data } = await supabase
+    console.log('Fetching logs for hospital:', hospitalId, 'date:', filterDate);
+    const { data, error } = await supabase
       .from('rapid_test_logs')
       .select('*, patients(name, hospital_yearly_serial)')
       .eq('hospital_id', hospitalId)
-      .gte('created_at', `${filterDate}T00:00:00Z`)
-      .lte('created_at', `${filterDate}T23:59:59Z`);
-    if (data) setLogs(data);
+      // .gte('created_at', `${filterDate}T00:00:00Z`) // Temporarily disabled
+      // .lte('created_at', `${filterDate}T23:59:59Z`); // Temporarily disabled
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching rapid_test_logs:', error);
+    } else {
+      console.log('Fetched logs data for hospital:', data);
+      setLogs(data || []);
+    }
   };
 
   const findPatients = async () => {
@@ -110,6 +129,26 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
     if (!isPaid && totalCharges > 0) return toast.error('Payment required for paid tests');
     
     for (const st of selectedTests) {
+      // Find an inventory kit for this test
+      const { data: kit } = await supabase
+        .from('rapid_kits_inventory')
+        .select('id, units_remaining')
+        .eq('test_name', st.test.test_name)
+        .eq('hospital_id', hospitalId)
+        .gt('units_remaining', 0)
+        .order('expiry_date', { ascending: true })
+        .single();
+      
+      if (kit) {
+        await supabase
+          .from('rapid_kits_inventory')
+          .update({ 
+            units_consumed: supabase.rpc('increment', { x: 1 }), // Assuming a trigger handles the actual calculation based on units_consumed/remaining update
+            units_remaining: kit.units_remaining - 1 
+          })
+          .eq('id', kit.id);
+      }
+
       const { error } = await supabase.from('rapid_test_logs').insert({
         patient_id: selectedPatient.id,
         staff_id: staffId,
@@ -142,15 +181,14 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 pb-32">
       <div className="flex items-center gap-4 mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Rapid Test Desk</h1>
         <div className="flex bg-slate-100 p-1 rounded-full">
-          {(['conduct', 'report', 'register'] as const).map(tab => (
+          {(['conduct', 'report', 'register', 'inventory'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveSubTab(tab)}
               className={`px-6 py-2 rounded-full text-sm font-bold capitalize transition-all ${activeSubTab === tab ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
             >
-              {tab === 'conduct' ? 'New Test' : tab}
+              {tab === 'conduct' ? 'New Test' : tab === 'inventory' ? 'Kits Inventory' : tab}
             </button>
           ))}
         </div>
@@ -297,13 +335,36 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
 
       {activeSubTab === 'register' && (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+          <div className="p-6 border-b border-slate-50 flex justify-between items-center gap-4">
             <h3 className="font-bold">Test Register</h3>
-            <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="bg-slate-50 border-none rounded-lg px-4 py-2 text-sm" />
+            <div className="flex gap-2">
+              <select onChange={e => setFilterDate(e.target.value)} className="bg-slate-50 border-none rounded-lg px-4 py-2 text-sm">
+                <option value={new Date().toISOString().split('T')[0]}>Today</option>
+                <option value={new Date(new Date().setMonth(new Date().getMonth()-1)).toISOString().split('T')[0]}>Month</option>
+                <option value={new Date(new Date().setFullYear(new Date().getFullYear()-1)).toISOString().split('T')[0]}>Year</option>
+              </select>
+              <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="bg-slate-50 border-none rounded-lg px-4 py-2 text-sm" />
+              <button 
+                onClick={() => {
+                  import('xlsx').then(XLSX => {
+                    const worksheet = XLSX.utils.json_to_sheet(logs.map(l => ({
+                      Date: l.created_at, Patient: l.patients?.name, Test: l.test_name, Result: l.test_result, Status: l.payment_status
+                    })));
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registers');
+                    XLSX.writeFile(workbook, `Rapid_Test_Register.csv`);
+                  });
+                }}
+                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold"
+              >
+                Download CSV
+              </button>
+            </div>
           </div>
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Patient</th>
                 <th className="px-6 py-4">Tests</th>
                 <th className="px-6 py-4">Result</th>
@@ -313,6 +374,7 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
             <tbody className="divide-y divide-slate-50 text-sm">
               {logs.map(l => (
                 <tr key={l.id}>
+                  <td className="px-6 py-4">{new Date(l.created_at).toLocaleDateString()}</td>
                   <td className="px-6 py-4 font-bold">{l.patients?.name}</td>
                   <td className="px-6 py-4">{l.test_name}</td>
                   <td className="px-6 py-4 text-emerald-600 font-medium">{l.test_result || 'Pending'}</td>
@@ -325,6 +387,121 @@ export default function RapidTests({ hospitalId, staffId }: { hospitalId: string
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeSubTab === 'inventory' && (
+        <div className="space-y-8">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Kits Inventory</h2>
+            <button onClick={() => setIsAddKitModalOpen(true)} className="bg-emerald-600 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2">
+              <Plus size={18} /> Add New Kits
+            </button>
+          </div>
+          
+          {isAddKitModalOpen && (
+            <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white p-8 rounded-3xl w-full max-w-lg space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Add New Kit Stock</h2>
+                  <button onClick={() => setIsAddKitModalOpen(false)} className="text-slate-400"><X size={24}/></button>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Kit Name</label>
+                    <select className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.kit_name} onChange={e => setNewKit({...newKit, kit_name: e.target.value})}>
+                      <option value="">Search/Select...</option>
+                      {Array.from(new Set(masterTests.map(t => t.test_name))).map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Order Number</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.order_number} onChange={e => setNewKit({...newKit, order_number: e.target.value})}/>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Batch Number</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.batch_number} onChange={e => setNewKit({...newKit, batch_number: e.target.value})}/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500">Mfg Date</label>
+                      <input type="date" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.mfg_date} onChange={e => setNewKit({...newKit, mfg_date: e.target.value})}/>
+                    </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">Expiry Date</label>
+                        <input type="date" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.expiry_date} onChange={e => setNewKit({...newKit, expiry_date: e.target.value})}/>
+                      </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Kits Received</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.quantity} onChange={e => setNewKit({...newKit, quantity: parseInt(e.target.value) || 0})}/>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Received On</label>
+                    <input type="date" className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm" value={newKit.received_date} onChange={e => setNewKit({...newKit, received_date: e.target.value})}/>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const dataToSave = {
+                    test_name: newKit.kit_name,
+                    order_number: newKit.order_number,
+                    batch_number: newKit.batch_number,
+                    mfg_date: newKit.mfg_date || null,
+                    expiry_date: newKit.expiry_date || null,
+                    total_count_received: newKit.quantity,
+                    receiving_date: newKit.received_date,
+                    hospital_id: hospitalId
+                  };
+                  const { error } = await supabase.from('rapid_kits_inventory').insert(dataToSave);
+                  if (error) {
+                    console.error('Insert error:', error);
+                    return toast.error(`Failed to update stock: ${error.message}`);
+                  }
+                  toast.success('Stock Updated');
+                  fetchInventory();
+                  setIsAddKitModalOpen(false);
+                  setNewKit({ kit_name: '', order_number: '', batch_number: '', mfg_date: '', expiry_date: '', quantity: 0, received_date: new Date().toISOString().split('T')[0] });
+                }} className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl">Save Stock</button>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-6">
+              <h3 className="font-bold mb-4">Latest Stock Position</h3>
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <th className="px-6 py-4">Kit Name</th>
+                    <th className="px-6 py-4">Batch No</th>
+                    <th className="px-6 py-4">Order No</th>
+                    <th className="px-6 py-4">Received Qty</th>
+                    <th className="px-6 py-4">Kits Used</th>
+                    <th className="px-6 py-4">Kits Left</th>
+                    <th className="px-6 py-4">Expiry Date</th>
+                    <th className="px-6 py-4">Days Left</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm">
+                  {kitsInventoryKits.map((k) => {
+                    const daysLeft = Math.ceil((new Date(k.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <tr key={k.id} className={daysLeft <= 30 ? 'bg-red-50' : ''}>
+                        <td className="px-6 py-4 font-bold">{k.test_name}</td>
+                        <td className="px-6 py-4">{k.batch_number}</td>
+                        <td className="px-6 py-4">{k.order_number}</td>
+                        <td className="px-6 py-4">{k.total_count_received}</td>
+                        <td className="px-6 py-4">{k.units_consumed}</td>
+                        <td className="px-6 py-4 font-bold">{k.units_remaining}</td>
+                        <td className={`px-6 py-4 ${daysLeft <= 30 ? 'text-red-600 font-bold' : ''}`}>{k.expiry_date}</td>
+                        <td className="px-6 py-4">{daysLeft} days</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

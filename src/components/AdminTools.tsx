@@ -14,9 +14,11 @@ import {
   ShieldCheck,
   BarChart3,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  UserX
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import SearchDeleteEmployeeModal from './SearchDeleteEmployeeModal';
 import { UserSession } from './LoginModal';
 import { supabase } from '../lib/supabase';
 
@@ -31,6 +33,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
   const [loading, setLoading] = useState(true);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingToggleState, setPendingToggleState] = useState<boolean | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTransferStatus();
@@ -80,6 +83,8 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
   if (!session) return null;
 
   console.log('AdminTools session:', session);
+  console.log('DEBUG AdminTools - All Tools:', tools);
+  console.log('DEBUG AdminTools - Filtered Tools:', tools.filter(t => t.show));
 
   const tools = [
     {
@@ -132,6 +137,15 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       action: () => onAddMedicine()
     },
     {
+      id: 'delete_employee',
+      label: 'Delete Employee',
+      description: 'Search and permanently remove an employee record from the system.',
+      icon: UserX,
+      color: 'red',
+      show: true,
+      action: () => setIsDeleteModalOpen(true)
+    },
+    {
       id: 'transfer_control',
       label: 'Transfer Module Control',
       description: 'Master switch to enable or disable the transfer module for all districts.',
@@ -151,6 +165,11 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
         onConfirm={handleConfirmToggle}
         title="Transfer Module Control"
         message={`Are you sure you want to ${pendingToggleState ? 'enable' : 'disable'} the transfer module for all districts?`}
+      />
+      <SearchDeleteEmployeeModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDelete={() => {}}
       />
       <div className="max-w-7xl mx-auto">
         <div className="mb-12">

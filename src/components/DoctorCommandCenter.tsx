@@ -1623,6 +1623,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     && (hospitalDetails?.panchakarma_centre || currentHospitalInfo?.panchakarma_centre);
   const showYoga = isIncharge || (isAssignedStaff && (activeModules.includes('yoga_instructor') || activeModules.includes('yoga_control')));
   const showRapidTests = isIncharge || (isAssignedStaff && activeModules.includes('rapid_tests'));
+  const showSpecialTherapy = isIncharge || (isAssignedStaff && activeModules.includes('special_therapy'));
   const showDistrictSupply = userRole === 'DISTRICT_ADMIN';
 
   const canRegister = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_registration');
@@ -1641,7 +1642,10 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     if (activeTab === 'inventory' && !showMedicineManagement) {
       setActiveTab(showDashboard ? 'dashboard' : 'profile');
     }
-  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement]);
+    if (activeTab === 'special_therapy' && !showSpecialTherapy) {
+      setActiveTab(showDashboard ? 'dashboard' : 'profile');
+    }
+  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement, showSpecialTherapy]);
 
   const calculateDuration = (startDateStr: string) => {
     if (!startDateStr) return '---';
@@ -1725,67 +1729,79 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
           </div>
         </div>
         {/* Main Tabs - Mobile Bottom Nav */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-lg overflow-x-auto flex p-1 gap-1">
-          {showDashboard && (
-            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <LayoutDashboard size={16} /> {activeTab === 'dashboard' && 'Dashboard'}
-            </button>
-          )}
-          {showProfile && (
-            <button onClick={() => setActiveTab('profile')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <User size={16} /> {activeTab === 'profile' && 'Profile'}
-            </button>
-          )}
-          {isMedicalOfficer && (
-            <button onClick={() => setActiveTab('deep_profile')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'deep_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <UserCircle2 size={16} /> {activeTab === 'deep_profile' && 'Deep Profile'}
-            </button>
-          )}
-          {isMedicalOfficer && (
-            <button onClick={() => setActiveTab('doctor_feedback')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'doctor_feedback' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Star size={16} /> {activeTab === 'doctor_feedback' && 'Feedback'}
-            </button>
-          )}
-          {showHospitalProfile && (
-            <button onClick={() => setActiveTab('hospital_profile')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'hospital_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Building2 size={16} /> {activeTab === 'hospital_profile' && 'Hospital'}
-            </button>
-          )}
-          {showStaff && (
-            <button onClick={() => setActiveTab('staff')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'staff' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Users size={16} /> {activeTab === 'staff' && 'Staff'}
-            </button>
-          )}
-          {showEParchi && (
-            <button onClick={() => setActiveTab('eparchi')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'eparchi' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <FileText size={16} /> {activeTab === 'eparchi' && 'E-Parchi'}
-            </button>
-          )}
-          {showPatients && (
-            <button onClick={() => setActiveTab('patients')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'patients' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Users size={16} /> {activeTab === 'patients' && 'Patients'}
-            </button>
-          )}
-          {showMedicineDemand && (
-            <button onClick={() => setActiveTab('medicine_demand')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'medicine_demand' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <ClipboardList size={16} /> {activeTab === 'medicine_demand' && 'Demands'}
-            </button>
-          )}
-          {showMedicineManagement && (
-            <button onClick={() => setActiveTab('inventory')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'inventory' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Package size={16} /> {activeTab === 'inventory' && 'Inventory'}
-            </button>
-          )}
-          {showPanchakarma && (
-            <button onClick={() => setActiveTab('panchakarma')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'panchakarma' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Hand size={16} /> {activeTab === 'panchakarma' && 'Panchakarma'}
-            </button>
-          )}
-          {showYoga && (
-            <button onClick={() => setActiveTab('yoga')} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold text-[11px] transition-all whitespace-nowrap ${activeTab === 'yoga' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-              <Sun size={16} /> {activeTab === 'yoga' && 'Yoga'}
-            </button>
-          )}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-lg flex p-1 gap-1 overflow-x-auto w-full">
+          <div className="flex gap-1">
+            {showDashboard && (
+              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <LayoutDashboard size={16} /> Dash
+              </button>
+            )}
+            {showProfile && (
+              <button onClick={() => setActiveTab('profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <User size={16} /> Profile
+              </button>
+            )}
+            {isMedicalOfficer && (
+              <button onClick={() => setActiveTab('deep_profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'deep_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <UserCircle2 size={16} /> Deep
+              </button>
+            )}
+            {isMedicalOfficer && (
+              <button onClick={() => setActiveTab('doctor_feedback')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'doctor_feedback' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Star size={16} /> Feedback
+              </button>
+            )}
+            {showHospitalProfile && (
+              <button onClick={() => setActiveTab('hospital_profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'hospital_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Building2 size={16} /> Hosp
+              </button>
+            )}
+            {showStaff && (
+              <button onClick={() => setActiveTab('staff')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'staff' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Users size={16} /> Staff
+              </button>
+            )}
+            {showEParchi && (
+              <button onClick={() => setActiveTab('eparchi')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'eparchi' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <FileText size={16} /> OPD
+              </button>
+            )}
+            {showPatients && (
+              <button onClick={() => setActiveTab('patients')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'patients' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Users size={16} /> Pats
+              </button>
+            )}
+            {showMedicineDemand && (
+              <button onClick={() => setActiveTab('medicine_demand')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'medicine_demand' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <ClipboardList size={16} /> Demand
+              </button>
+            )}
+            {showMedicineManagement && (
+              <button onClick={() => setActiveTab('inventory')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'inventory' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Package size={16} /> Inv
+              </button>
+            )}
+            {showPanchakarma && (
+              <button onClick={() => setActiveTab('panchakarma')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'panchakarma' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Hand size={16} /> Pancha
+              </button>
+            )}
+            {showYoga && (
+              <button onClick={() => setActiveTab('yoga')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'yoga' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Sun size={16} /> Yoga
+              </button>
+            )}
+            {showSpecialTherapy && (
+              <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <Stethoscope size={16} /> Therap
+              </button>
+            )}
+            {isIncharge && (
+              <button onClick={() => setActiveTab('certificate')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'certificate' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+                <FileText size={16} /> Cert
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Sub-Tabs Container */}
@@ -1894,9 +1910,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <Activity size={18} /> {activeTab === 'rapid_tests' && 'Rapid Tests'}
               </button>
             )}
-            <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
-              <Stethoscope size={18} /> {activeTab === 'special_therapy' && 'Special Therapy'}
-            </button>
+            {showSpecialTherapy && (
+              <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <Stethoscope size={18} /> {activeTab === 'special_therapy' && 'Special Therapy'}
+              </button>
+            )}
             {isIncharge && (
               <button onClick={() => setActiveTab('certificate')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'certificate' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
                 <FileText size={18} /> {activeTab === 'certificate' && 'Certificate Module'}
@@ -2454,7 +2472,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         )}
         {activeTab === 'certificate' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
-            <CertificateModule session={session} />
+            <CertificateModule session={session} hospitalName={hospitalName} />
           </div>
         )}
       </motion.div>

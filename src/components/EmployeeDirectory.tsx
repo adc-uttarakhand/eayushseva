@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase, Plus, Download } from 'lucide-react';
+import { Search, Filter, User, Building2, MapPin, Edit2, Save, X, Loader2, ShieldCheck, Phone, Mail, Briefcase, Plus, Download, Lock, Unlock, CheckCircle, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSession } from './LoginModal';
 import AddEmployeeModal from './AddEmployeeModal';
@@ -20,6 +21,10 @@ interface Staff {
   service_dossier?: string;
   email?: string;
   employment_type?: string;
+  is_verified?: boolean;
+  is_locked?: boolean;
+  last_verified_on?: string;
+  last_edited_on?: string;
 }
 
 interface Hospital {
@@ -43,6 +48,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
   const [selectedDistrict, setSelectedDistrict] = useState('All');
   const [selectedRole, setSelectedRole] = useState('All');
   const [selectedEmploymentType, setSelectedEmploymentType] = useState('All');
+  const [statusSort, setStatusSort] = useState<'none' | 'verified_first' | 'unverified_first'>('none');
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -94,6 +100,44 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     setLoading(false);
   };
 
+  const toggleStatusSort = () => {
+    if (statusSort === 'none') setStatusSort('verified_first');
+    else if (statusSort === 'verified_first') setStatusSort('unverified_first');
+    else setStatusSort('none');
+  };
+
+  const handleToggleLock = async (staffMember: Staff) => {
+    const newLockedStatus = !staffMember.is_locked;
+    
+    toast((t) => (
+      <div className="flex flex-col gap-2 p-2">
+        <span>Are you sure you want to {newLockedStatus ? 'lock' : 'unlock'} this profile?</span>
+        <div className="flex gap-2 justify-end">
+          <button 
+            className="bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold"
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const { error } = await supabase
+                .from('staff')
+                .update({ is_locked: newLockedStatus })
+                .eq('id', staffMember.id);
+              
+              if (!error) {
+                toast.success(newLockedStatus ? 'Profile locked' : 'Profile unlocked');
+                setStaff(prev => prev.map(s => s.id === staffMember.id ? { ...s, is_locked: newLockedStatus } : s));
+              } else {
+                toast.error('Failed to update lock status: ' + error.message);
+              }
+            }}
+          >
+            Confirm
+          </button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 px-3 py-1 rounded text-sm font-bold">Cancel</button>
+        </div>
+      </div>
+    ), { duration: 5000 });
+  };
+
   const handleUpdateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaff) return;
@@ -133,6 +177,10 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     const matchesEmploymentType = selectedEmploymentType === 'All' || s.employment_type === selectedEmploymentType;
     
     return hasAccess && matchesSearch && matchesDistrict && matchesRole && matchesEmploymentType;
+  }).sort((a,b) => {
+    if (statusSort === 'none') return 0;
+    if (statusSort === 'verified_first') return (a.is_verified === b.is_verified) ? 0 : a.is_verified ? -1 : 1;
+    return (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1;
   });
 
   const exportToExcel = () => {
@@ -153,6 +201,42 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
   };
 
   const canAddEmployee = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role || '');
+  const canBulkLock = ['SUPER_ADMIN', 'STATE_ADMIN'].includes(session?.role || '');
+
+  const handleBulkToggleLock = async (shouldLock: boolean) => {
+    const verifiedStaffIds = filteredStaff.filter(s => s.is_verified && s.is_locked !== shouldLock).map(s => s.id);
+    if (verifiedStaffIds.length === 0) return toast.error('No verified employees to change status');
+    
+    toast((t) => (
+      <div className="flex flex-col gap-2 p-2">
+        <span>Are you sure you want to {shouldLock ? 'lock' : 'unlock'} all {verifiedStaffIds.length} verified profiles?</span>
+        <div className="flex gap-2 justify-end">
+          <button 
+            className="bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold"
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const updates = verifiedStaffIds.map(id => 
+                supabase.from('staff').update({ is_locked: shouldLock }).eq('id', id)
+              );
+              const results = await Promise.all(updates);
+              const error = results.find(r => r.error)?.error;
+              
+              if (!error) {
+                toast.success('Profiles updated');
+                setStaff(prev => prev.map(s => verifiedStaffIds.includes(s.id) ? { ...s, is_locked: shouldLock } : s));
+              } else {
+                console.error('Bulk update error details:', error);
+                toast.error(`Failed to update: ${error.message || 'Unknown error'}`);
+              }
+            }}
+          >
+            Confirm
+          </button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 px-3 py-1 rounded text-sm font-bold">Cancel</button>
+        </div>
+      </div>
+    ), { duration: 5000 });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 pt-8 pb-40 px-4 md:px-8">
@@ -230,21 +314,44 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
         ) : (
           <>
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm mb-4">
-              <div className="p-4 border-b border-gray-100">
-                <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
-                  Total Employees: {filteredStaff.length}
-                </button>
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
+                    Total Employees: {filteredStaff.length}
+                  </button>
+                  <button className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full font-bold text-sm">
+                    Verified: {filteredStaff.filter(s => s.is_verified).length}
+                  </button>
+                  <button className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold text-sm">
+                    Locked: {filteredStaff.filter(s => s.is_locked).length}
+                  </button>
+                </div>
+                {canBulkLock && (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleBulkToggleLock(true)} className="bg-red-50 text-red-600 px-4 py-2 rounded-full font-bold text-sm flex items-center gap-1 hover:bg-red-100">
+                      <Lock size={14} /> Lock All Verified
+                    </button>
+                    <button onClick={() => handleBulkToggleLock(false)} className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full font-bold text-sm flex items-center gap-1 hover:bg-emerald-100">
+                      <Unlock size={14} /> Unlock All Verified
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <table className="hidden md:table w-full text-left border-collapse bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-slate-50/50">
                   <th className="py-4 px-6 font-bold text-slate-900">Name</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Role</th>
                   <th className="py-4 px-6 font-bold text-slate-900">Hospital</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">District</th>
                   <th className="py-4 px-6 font-bold text-slate-900">Mobile</th>
-                  <th className="py-4 px-6 font-bold text-slate-900">Verification Status</th>
+                  <th className="py-4 px-6 font-bold text-slate-900 cursor-pointer" onClick={toggleStatusSort}>
+                    <div className="flex items-center gap-1">
+                      Status
+                      {statusSort === 'verified_first' && <ChevronUp size={14} />}
+                      {statusSort === 'unverified_first' && <ChevronDown size={14} />}
+                      {statusSort === 'none' && <div className="w-[14px]"></div>}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -270,25 +377,35 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                                 </span>
                               )}
                             </div>
+                            <div className="text-[11px] text-slate-500 font-normal">
+                              {hospital?.district || 'N/A'} • {s.role}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-slate-600 font-medium">{s.role}</td>
                       <td className="py-4 px-6 text-slate-600">{hospital?.facility_name || 'N/A'}</td>
-                      <td className="py-4 px-6 text-slate-600">{hospital?.district || 'N/A'}</td>
                       <td className="py-4 px-6 text-slate-600">{s.mobile_number}</td>
-                      <td className="py-4 px-6 text-slate-500 text-xs">
+                      <td className="py-4 px-6">
                         <div className="flex flex-col gap-1">
-                          {s.is_verified && s.last_verified_on ? (
-                            <span className="text-emerald-600 font-bold">
-                              Verified: {new Date(s.last_verified_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, {new Date(s.last_verified_on).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                          {s.is_locked ? (
+                            <div className="flex items-center gap-1 text-red-600 font-bold text-xs cursor-pointer hover:underline" onClick={() => handleToggleLock(s)}>
+                              <Lock size={14} /> Locked
+                            </div>
+                          ) : s.is_verified ? (
+                            <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs">
+                              <CheckCircle size={14} /> Verified
+                            </div>
                           ) : (
-                            <span className="text-slate-500">Not verified</span>
+                            <div className="text-slate-400 font-bold text-xs">Not verified</div>
+                          )}
+                          {s.last_verified_on && (
+                            <span className="text-[10px] text-slate-500">
+                              Verified: {new Date(s.last_verified_on).toLocaleDateString('en-IN')}
+                            </span>
                           )}
                           {s.last_edited_on && (
-                            <span className="text-yellow-700 font-bold">
-                              Edited: {new Date(s.last_edited_on).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, {new Date(s.last_edited_on).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            <span className="text-[10px] text-yellow-700">
+                              Edited: {new Date(s.last_edited_on).toLocaleDateString('en-IN')}
                             </span>
                           )}
                         </div>
