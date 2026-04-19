@@ -37,6 +37,7 @@ import DiseaseManagement from './components/DiseaseManagement';
 import RoleManagement from './components/RoleManagement';
 import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
+import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'react-hot-toast';
@@ -112,6 +113,7 @@ export default function App() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isHospitalDetailsOpen, setIsHospitalDetailsOpen] = useState(false);
   const [isAddMedicineOpen, setIsAddMedicineOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(() => {
@@ -834,7 +836,23 @@ export default function App() {
           >
             Login Directory
           </button>
+          
+          {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN') && (
+            <button 
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-red-600 shadow-sm hover:bg-red-50 transition-all flex flex-col items-start gap-2"
+            >
+              <span>Delete Employee</span>
+              <span className="text-sm font-normal text-red-400">Permanently remove records</span>
+            </button>
+          )}
+
           <AddMedicineModal isOpen={isAddMedicineOpen} onClose={() => setIsAddMedicineOpen(false)} onSuccess={() => alert('Medicine added successfully')} />
+          <SearchDeleteEmployeeModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onDelete={() => {}}
+          />
         </div>
       </div>
     );
