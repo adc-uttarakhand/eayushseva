@@ -75,6 +75,7 @@ interface Log {
   payment_collected: boolean;
   created_at: string;
   staff_name: string;
+  staff_role: string;
 }
 
 export default function PanchakarmaModule({ session }: { session: any }) {
@@ -225,19 +226,21 @@ export default function PanchakarmaModule({ session }: { session: any }) {
     const today = format(new Date(), 'yyyy-MM-dd');
     const { data, error } = await supabase
       .from('panchakarma_logs')
-      .select('*, patients(name)')
+      .select('*, patients(name), staff(full_name, role)')
       .eq('hospital_id', hospitalId)
       .gte('created_at', `${today}T00:00:00Z`)
       .order('created_at', { ascending: false });
     
     if (data) {
-      const logsWithPatientName = data.map(log => ({
+      const logsWithDetails = data.map(log => ({
         ...log,
-        patient_name: log.patients?.name || 'Unknown'
+        patient_name: log.patients?.name || 'Unknown',
+        staff_name: log.staff?.full_name || 'N/A',
+        staff_role: log.staff?.role || 'Staff'
       }));
-      setDailyLogs(logsWithPatientName);
-      const total = logsWithPatientName.length;
-      const revenue = logsWithPatientName.reduce((acc, log) => acc + (log.charges || 0), 0);
+      setDailyLogs(logsWithDetails);
+      const total = logsWithDetails.length;
+      const revenue = logsWithDetails.reduce((acc, log) => acc + (log.charges || 0), 0);
       setStats({ totalTherapies: total, totalRevenue: revenue });
     }
     setLoading(false);
@@ -757,39 +760,50 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  {filteredLogs.map((log) => (
-                    <div key={log.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
-                          <User size={24} />
+                  <div className="grid grid-cols-6 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest px-6 mb-2">
+                    <div>Date</div>
+                    <div>Patient</div>
+                    <div>Therapies</div>
+                    <div>Count</div>
+                    <div>Staff</div>
+                    <div className="text-right">Revenue</div>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredLogs.map((log) => (
+                      <div key={log.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm grid grid-cols-6 gap-4 items-center group hover:border-emerald-200 transition-all">
+                        <div className="text-xs font-medium text-slate-600">
+                          {format(parseISO(log.created_at), 'dd MMM, hh:mm a')}
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900">{log.patient_name}</h4>
-                          <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-                            {log.therapy_name}
-                          </p>
-                          <p className="text-[10px] font-bold text-emerald-600 mt-1">Total Therapies Conducted: {therapyCounts[log.patient_id] || 0}</p>
-                          <p className="text-[10px] text-slate-400 mt-1">{format(parseISO(log.created_at), 'dd MMM yyyy, hh:mm a')}</p>
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {log.patient_name}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium truncate italic">
+                          {log.therapy_name}
+                        </div>
+                        <div className="text-xs font-bold text-emerald-600">
+                          {log.therapy_name.split(',').length}
+                        </div>
+                        <div className="text-[10px] text-slate-600">
+                          <p className="font-bold">{log.staff_name || 'N/A'}</p>
+                          <p className="opacity-70">{log.staff_role || 'Staff'}</p>
+                        </div>
+                        <div className="text-right text-xs font-black text-slate-900">
+                          ₹{log.charges}
+                          <div className={`mt-1 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full inline-block ${
+                            log.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {log.payment_status}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-black text-slate-900">₹{log.charges}</p>
-                        <span className={`text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-full mt-1 inline-block ${
-                          log.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {log.payment_status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                   {filteredLogs.length === 0 && (
                     <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-slate-200">
                       <ClipboardList size={48} className="mx-auto text-slate-200 mb-4" />
                       <p className="text-slate-400 font-medium">No activity found for selected period</p>
                     </div>
                   )}
-                </div>
               </div>
             </motion.div>
           )}

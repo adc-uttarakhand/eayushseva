@@ -21,6 +21,7 @@ import PanchakarmaModule from './PanchakarmaModule';
 import YogaModule from './YogaModule';
 import RapidTests from './RapidTests';
 import SpecialTherapyModule from './SpecialTherapyModule';
+import CertificateModule from './CertificateModule';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -50,6 +51,7 @@ const AVAILABLE_MODULES = [
   { id: 'panchakarma', label: 'Panchakarma Management' },
   { id: 'rapid_tests', label: 'Rapid Tests Management' },
   { id: 'special_therapy', label: 'Special Therapy Management' },
+  { id: 'certificate', label: 'Certificate Module' },
 ];
 
 const UTTARAKHAND_DISTRICTS = [
@@ -152,8 +154,8 @@ let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate'>(() => (session?.isIncharge ? 'certificate' : 'dashboard'));
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -1895,6 +1897,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Stethoscope size={18} /> {activeTab === 'special_therapy' && 'Special Therapy'}
             </button>
+            {isIncharge && (
+              <button onClick={() => setActiveTab('certificate')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'certificate' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <FileText size={18} /> {activeTab === 'certificate' && 'Certificate Module'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2443,6 +2450,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'special_therapy' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
             <SpecialTherapyModule session={session} />
+          </div>
+        )}
+        {activeTab === 'certificate' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <CertificateModule session={session} />
           </div>
         )}
       </motion.div>
