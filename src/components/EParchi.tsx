@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2, FileImage } from 'lucide-react';
+import { Search, Plus, History, User, Calendar, Hash, FileText, Save, Loader2, Languages, CheckCircle, Printer, Download, MessageCircle, ArrowLeft, Trash2, AlertTriangle, ShoppingCart, IndianRupee, X, Eye, ArrowLeftRight, CheckCircle2, FileImage, MapPin } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
 import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
@@ -55,6 +56,8 @@ interface Patient {
   gender: string;
   mobile: string;
   aadhar: string;
+  patient_location?: string;
+  detailed_address?: string;
   complaints: string;
   diagnosis: string;
   history: string;
@@ -72,7 +75,9 @@ interface Patient {
   investigations: string;
   prescription: string;
   created_at: string;
+  registration_date?: string | null;
   revisit_count?: number;
+  revisit_date?: string | null;
   is_new?: boolean;
   status?: string;
   consultation_mode?: string;
@@ -85,6 +90,18 @@ interface Patient {
   prescribed_tests?: string;
   fee_amount?: number;
 }
+
+const getValidityDate = (regDate: string | null | undefined) => {
+  if (!regDate) return '-';
+  try {
+    const date = new Date(regDate);
+    if (isNaN(date.getTime())) return '-';
+    date.setDate(date.getDate() + 14);
+    return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
+  } catch (e) {
+    return '-';
+  }
+};
 
 interface Staff {
   id: string;
@@ -386,7 +403,11 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
   const [searchQuery, setSearchQuery] = useState('');
   const [diseaseMaster, setDiseaseMaster] = useState<any[]>([]);
   const [registrationList, setRegistrationList] = useState<Patient[]>([]);
-  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filterType, setFilterType] = useState<'today' | 'monthly' | 'range'>('today');
+  const [filterMonth, setFilterMonth] = useState<string>((new Date().getMonth() + 1).toString().padStart(2, '0'));
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showPreviewModal, setShowPreviewModal] = useState<Patient | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const pdfContentRef = useRef<HTMLDivElement>(null);
@@ -402,7 +423,7 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     if (activeRegistrationSubTab === 'list') {
       fetchRegistrationList();
     }
-  }, [activeRegistrationSubTab, filterDate]);
+  }, [activeRegistrationSubTab, filterType, filterMonth, filterYear, startDate, endDate]);
 
   const fetchDiseases = async () => {
     try {
@@ -424,10 +445,24 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
       let query = supabase
         .from('patients')
         .select('*')
-        .eq('hospital_id', hospitalId)
-        .gte('created_at', `${filterDate}T00:00:00Z`)
-        .lte('created_at', `${filterDate}T23:59:59Z`)
-        .order('created_at', { ascending: false });
+        .eq('hospital_id', hospitalId);
+
+      if (filterType === 'today') {
+        const today = new Date().toISOString().split('T')[0];
+        query = query.gte('created_at', `${today}T00:00:00Z`)
+                     .lte('created_at', `${today}T23:59:59Z`);
+      } else if (filterType === 'monthly') {
+        const startOfMonth = `${filterYear}-${filterMonth}-01T00:00:00Z`;
+        const lastDay = new Date(Number(filterYear), Number(filterMonth), 0).getDate();
+        const endOfMonth = `${filterYear}-${filterMonth}-${lastDay}T23:59:59Z`;
+        query = query.gte('created_at', startOfMonth)
+                     .lte('created_at', endOfMonth);
+      } else if (filterType === 'range') {
+        query = query.gte('created_at', `${startDate}T00:00:00Z`)
+                     .lte('created_at', `${endDate}T23:59:59Z`);
+      }
+      
+      query = query.order('created_at', { ascending: false });
       
       const { data, error } = await query;
       if (error) throw error;
@@ -611,6 +646,7 @@ const handleDownloadPNG = async (patient: Patient) => {
   const [dispensedMedicines, setDispensedMedicines] = useState<string[]>([]);
   const [masterMedicines, setMasterMedicines] = useState<string[]>([]);
   const [currentPrescription, setCurrentPrescription] = useState<any[]>([]);
+  const [originalPatient, setOriginalPatient] = useState<Patient | null>(null);
 
   const fetchPatientConsumptionHistory = async (patientId: string) => {
     try {
@@ -653,6 +689,8 @@ const handleDownloadPNG = async (patient: Patient) => {
     gender: 'Male',
     mobile: '',
     aadhar: '',
+    patient_location: '',
+    detailed_address: '',
     complaints: '',
     diagnosis: '',
     history: '',
@@ -817,7 +855,14 @@ const handleDownloadPNG = async (patient: Patient) => {
       const month = now.getMonth();
       const fyStartYear = month >= 3 ? year : year - 1;
       const fyStartDate = new Date(fyStartYear, 3, 1).toISOString();
-      const fy = month >= 3 ? `${year}-${(year + 1).toString().slice(-2)}` : `${year - 1}-${year.toString().slice(-2)}`;
+      const { data: hospitalData } = await supabase
+        .from('hospitals')
+        .select('sr_no')
+        .eq('hospital_id', hospitalId)
+        .single();
+      const hSrNo = hospitalData?.sr_no || '00';
+
+      const fy = month >= 3 ? `${year.toString().slice(-2)}-${(year + 1).toString().slice(-2)}` : `${(year - 1).toString().slice(-2)}-${year.toString().slice(-2)}`;
       
       const { count: globalCount } = await supabase
         .from('patients')
@@ -845,7 +890,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       const nextDaily = (dailyCount || 0) + 1;
 
       setGlobalSerial(`${nextGlobal}/${fy}`);
-      setHospitalYearlySerial(`H-${nextHospital.toString().padStart(2, '0')}/${fy}`);
+      setHospitalYearlySerial(`${nextHospital.toString().padStart(4, '0')}/${hSrNo}/${fy}`);
       setDailyOpdNumber(nextDaily.toString().padStart(2, '0'));
       setRevisitCount(0);
     } catch (err) {
@@ -929,48 +974,86 @@ const handleDownloadPNG = async (patient: Patient) => {
   };
 
   const selectPatient = async (patient: Patient) => {
-    const lastVisit = new Date(patient.created_at);
-    const diffDays = Math.ceil(Math.abs(new Date().getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const history = await fetchPatientHistory(patient.aadhar, patient.mobile);
-    const visitCount = history.length;
+    setLoading(true);
+    try {
+      // 1. Identify Original/New registration record (is_new: true)
+      const { data: originalData } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('hospital_yearly_serial', patient.hospital_yearly_serial)
+        .eq('hospital_id', patient.hospital_id)
+        .eq('is_new', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (diffDays <= 15) {
-      setFormData({ ...patient, global_serial: patient.global_serial || '', assigned_doctor_id: '' });
-      setGlobalSerial(patient.global_serial);
-      setHospitalYearlySerial(patient.hospital_yearly_serial);
-      
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
-      const { count: dailyCount } = await supabase
+      const baseRecord = originalData || patient;
+      setOriginalPatient(baseRecord);
+
+      // 2. Count existing False rows for revisit count
+      const { count: falseRowsCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('hospital_id', hospitalId)
-        .gte('created_at', startOfDay)
-        .lte('created_at', endOfDay);
+        .eq('hospital_yearly_serial', baseRecord.hospital_yearly_serial)
+        .eq('hospital_id', baseRecord.hospital_id)
+        .eq('is_new', false);
+
+      const nextRevisitCount = (falseRowsCount || 0) + 1;
+      const registrationDate = new Date(baseRecord.registration_date || baseRecord.created_at);
+      const diffDays = Math.ceil(Math.abs(new Date().getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const history = await fetchPatientHistory(patient.aadhar, patient.mobile);
+      const historyLength = history.length;
+
+      if (diffDays <= 15) {
+        const targetRegistrationDate = baseRecord.registration_date || baseRecord.created_at || '';
+        setFormData({ 
+          ...patient, 
+          global_serial: baseRecord.global_serial || patient.global_serial || '', 
+          assigned_doctor_id: '',
+          revisit_count: nextRevisitCount,
+          registration_date: targetRegistrationDate
+        });
+        setGlobalSerial(baseRecord.global_serial || patient.global_serial);
+        setHospitalYearlySerial(baseRecord.hospital_yearly_serial || patient.hospital_yearly_serial);
         
-      setDailyOpdNumber(((dailyCount || 0) + 1).toString().padStart(2, '0'));
-      setRevisitCount(visitCount);
-      setIsNew(false);
-    } else {
-      toast('Patient last visit was more than 15 days ago. They will be registered as a New Patient, but personal details have been auto-filled.', {
-        icon: 'ℹ️',
-        duration: 5000
-      });
-      setFormData({
-        ...patient,
-        complaints: '',
-        diagnosis: '',
-        prescription: '',
-        global_serial: '',
-        assigned_doctor_id: '',
-      });
-      setRevisitCount(visitCount);
-      generateSerials();
-      setIsNew(true);
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+        const { count: dailyCount } = await supabase
+          .from('patients')
+          .select('*', { count: 'exact', head: true })
+          .eq('hospital_id', hospitalId)
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay);
+          
+        setDailyOpdNumber(((dailyCount || 0) + 1).toString().padStart(2, '0'));
+        setRevisitCount(nextRevisitCount);
+        setIsNew(false);
+      } else {
+        toast('Patient last visit was more than 15 days ago. They will be registered as a New Patient, but personal details have been auto-filled.', {
+          icon: 'ℹ️',
+          duration: 5000
+        });
+        setFormData({
+          ...patient,
+          complaints: '',
+          diagnosis: '',
+          prescription: '',
+          global_serial: '',
+          assigned_doctor_id: '',
+          registration_date: new Date().toISOString()
+        });
+        setRevisitCount(historyLength);
+        generateSerials();
+        setIsNew(true);
+      }
+    } catch (err) {
+      console.error('Select patient error:', err);
+    } finally {
+      setLoading(false);
+      setPatients([]);
     }
-    setPatients([]);
   };
 
   const handleRegistrationSubmit = async (e: React.FormEvent) => {
@@ -981,21 +1064,41 @@ const handleDownloadPNG = async (patient: Patient) => {
     }
     setSaving(true);
     try {
-      const payload = {
+      const serverNow = new Date().toISOString();
+      const payload: any = {
         ...formData,
-        global_serial: globalSerial,
-        hospital_yearly_serial: hospitalYearlySerial,
+        global_serial: isNew ? globalSerial : (originalPatient?.global_serial || formData.global_serial),
+        hospital_yearly_serial: isNew ? hospitalYearlySerial : (originalPatient?.hospital_yearly_serial || formData.hospital_yearly_serial),
         daily_opd_number: dailyOpdNumber,
-        hospital_id: hospitalId,
+        hospital_id: isNew ? hospitalId : (originalPatient?.hospital_id || hospitalId),
         revisit_count: revisitCount,
         is_new: isNew,
-        created_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        created_at: serverNow,
+        registration_date: isNew ? serverNow : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
+        revisit_date: isNew ? null : serverNow,
         status: formData.assigned_doctor_id === 'teleconsultation' ? 'Completed' : 'Waiting',
         consultation_mode: formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation' : 'Online',
-        queue_time: formData.assigned_doctor_id === 'teleconsultation' ? null : new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        queue_time: formData.assigned_doctor_id === 'teleconsultation' ? null : serverNow,
         assigned_doctor_id: formData.assigned_doctor_id === 'teleconsultation' ? null : formData.assigned_doctor_id,
         fee_amount: feeAmount,
       };
+
+      if (!isNew) {
+        delete payload.id;
+        if (originalPatient) {
+          payload.name = originalPatient.name;
+          payload.age = originalPatient.age;
+          payload.gender = originalPatient.gender;
+          payload.mobile = originalPatient.mobile;
+          payload.aadhar = originalPatient.aadhar;
+          payload.patient_location = originalPatient.patient_location;
+          payload.detailed_address = originalPatient.detailed_address;
+          payload.hospital_id = originalPatient.hospital_id;
+          payload.global_serial = originalPatient.global_serial;
+          payload.hospital_yearly_serial = originalPatient.hospital_yearly_serial;
+          payload.registration_date = originalPatient.registration_date || originalPatient.created_at;
+        }
+      }
 
       const { error } = await supabase.from('patients').insert([payload]);
       if (error) throw error;
@@ -1003,10 +1106,12 @@ const handleDownloadPNG = async (patient: Patient) => {
       toast.success(formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation recorded successfully!' : 'Patient registered and sent for consultation successfully!');
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
+        patient_location: '', detailed_address: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
         mutra: '', mala: '', jivha: '', netra: '', nidra: '', agni: '',
         ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: ''
       });
+      setOriginalPatient(null);
       setPatientHistory([]);
       generateSerials();
       setIsNew(true);
@@ -1029,22 +1134,42 @@ const handleDownloadPNG = async (patient: Patient) => {
 
     setSaving(true);
     try {
+      const serverNow = new Date().toISOString();
       const isTeleconsultation = formData.assigned_doctor_id === 'teleconsultation';
-      const payload = {
+      const payload: any = {
         ...formData,
-        global_serial: globalSerial,
-        hospital_yearly_serial: hospitalYearlySerial,
+        global_serial: isNew ? globalSerial : (originalPatient?.global_serial || formData.global_serial),
+        hospital_yearly_serial: isNew ? hospitalYearlySerial : (originalPatient?.hospital_yearly_serial || formData.hospital_yearly_serial),
         daily_opd_number: dailyOpdNumber,
-        hospital_id: hospitalId,
+        hospital_id: isNew ? hospitalId : (originalPatient?.hospital_id || hospitalId),
         revisit_count: revisitCount,
         is_new: isNew,
-        created_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        created_at: serverNow,
+        registration_date: isNew ? serverNow : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
+        revisit_date: isNew ? null : serverNow,
         status: 'Completed',
         consultation_mode: isTeleconsultation ? 'Teleconsultation' : 'Offline',
         queue_time: null,
         assigned_doctor_id: isTeleconsultation ? null : formData.assigned_doctor_id,
         fee_amount: feeAmount,
       };
+
+      if (!isNew) {
+        delete payload.id;
+        if (originalPatient) {
+          payload.name = originalPatient.name;
+          payload.age = originalPatient.age;
+          payload.gender = originalPatient.gender;
+          payload.mobile = originalPatient.mobile;
+          payload.aadhar = originalPatient.aadhar;
+          payload.patient_location = originalPatient.patient_location;
+          payload.detailed_address = originalPatient.detailed_address;
+          payload.hospital_id = originalPatient.hospital_id;
+          payload.global_serial = originalPatient.global_serial;
+          payload.hospital_yearly_serial = originalPatient.hospital_yearly_serial;
+          payload.registration_date = originalPatient.registration_date || originalPatient.created_at;
+        }
+      }
 
       const { error } = await supabase.from('patients').insert([payload]);
       if (error) throw error;
@@ -1054,10 +1179,12 @@ const handleDownloadPNG = async (patient: Patient) => {
       toast.success('Offline Parchi recorded and PDF generated!');
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
+        patient_location: '', detailed_address: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
         mutra: '', mala: '', jivha: '', netra: '', nidra: '', agni: '',
         ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: ''
       });
+      setOriginalPatient(null);
       generateSerials();
       setIsNew(true);
     } catch (err) {
@@ -1461,23 +1588,39 @@ const handleDownloadPNG = async (patient: Patient) => {
         <div className="h-[2.0625%] flex justify-between items-center px-3 text-[10.5px] bg-white">
           <div className="flex gap-3">
             <p><span className="font-bold">Date:</span> {new Date(patientData.created_at || new Date()).toLocaleDateString()}</p>
+            <p><span className="font-bold">Valid Until:</span> {getValidityDate(patientData.registration_date || patientData.created_at)}</p>
             <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial || hospitalYearlySerial}</p>
             <p><span className="font-bold">Daily OPD:</span> {patientData.daily_opd_number || dailyOpdNumber}</p>
-          </div>
-          <div className="flex gap-3">
             <p><span className="font-bold">Type:</span> {patientData.is_new ? 'New' : 'Revisit'}</p>
             <p><span className="font-bold">Revisit:</span> {(patientData.revisit_count || revisitCount).toString().padStart(2, '0')}</p>
           </div>
         </div>
 
         {/* 6% Patient Personal Details */}
-        <div className="h-[6%] px-3 py-1.5 flex flex-col justify-center bg-white">
+        <div className="h-[6%] px-3 py-1.5 flex flex-col justify-center bg-white relative">
           <p className="text-[10.5px] font-bold uppercase mb-1 text-emerald-700">Patient Details</p>
+          <div className="absolute top-1.5 right-3 ">
+            <QRCodeSVG value={JSON.stringify({
+              id: patientData.id,
+              date: new Date(patientData.created_at || new Date()).toLocaleDateString(),
+              globalSerial: patientData.global_serial,
+              hospitalSerial: patientData.hospital_yearly_serial,
+              type: patientData.is_new ? 'New' : 'Revisit',
+              revisitCount: patientData.revisit_count || revisitCount,
+              name: patientData.name,
+              age: patientData.age,
+              gender: patientData.gender,
+              mobile: patientData.mobile,
+              aadhar: patientData.aadhar,
+              hospitalId: patientData.hospital_id
+            })} size={52.5} />
+          </div>
           <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[12px]">
             <p><span className="font-bold text-slate-500">Name:</span> {patientData.name || '---'}</p>
-            <p><span className="font-bold text-slate-500">Age/Sex:</span> {patientData.age || '--'} / {patientData.gender?.charAt(0)}</p>
+            <p><span className="font-bold text-slate-500">Age/Gender:</span> {patientData.age || '--'} / {patientData.gender?.charAt(0)}</p>
+            <div />
+            <p><span className="font-bold text-slate-500">Aadhar:</span> {patientData.aadhar || '---'}</p>
             <p><span className="font-bold text-slate-500">Mobile:</span> {patientData.mobile || '---'}</p>
-            <p className="col-span-3"><span className="font-bold text-slate-500">Aadhar:</span> {patientData.aadhar || '---'}</p>
           </div>
         </div>
 
@@ -1749,16 +1892,39 @@ const handleDownloadPNG = async (patient: Patient) => {
                   </button>
                 </div>
 
-                {patients.length > 0 && (
+                {patients.filter(p => {
+                    const regDate = p.registration_date || p.created_at;
+                    if (!regDate) return false;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const vtDate = new Date(regDate);
+                    vtDate.setDate(vtDate.getDate() + 14);
+                    vtDate.setHours(0, 0, 0, 0);
+                    return vtDate >= today;
+                  }).length > 0 && (
                   <div className="mt-6 space-y-2">
-                    {patients.map(p => {
+                    {patients.filter(p => {
+                      const regDate = p.registration_date || p.created_at;
+                      if (!regDate) return false;
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const vtDate = new Date(regDate);
+                      vtDate.setDate(vtDate.getDate() + 14);
+                      vtDate.setHours(0, 0, 0, 0);
+                      return vtDate >= today;
+                    }).map(p => {
                       if (!patientLastVisit[p.id!]) checkPatientHistory(p);
                       return (
                         <div key={p.id} className="w-full p-4 border border-gray-100 rounded-xl mb-2">
                           <div className="flex justify-between items-center">
                             <div>
                               <p className="font-bold text-slate-900">{p.name}</p>
-                              <p className="text-xs text-slate-500">{p.global_serial} • {p.mobile}</p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                <p className="text-[10px] text-slate-500 font-medium bg-slate-50 px-2 py-0.5 rounded-full">{p.hospital_yearly_serial}</p>
+                                <p className="text-[10px] text-slate-500 font-medium bg-slate-50 px-2 py-0.5 rounded-full">{p.mobile}</p>
+                                <p className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Reg: {new Date(p.registration_date || p.created_at).toLocaleDateString()}</p>
+                                <p className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full">Valid Until: {getValidityDate(p.registration_date || p.created_at)}</p>
+                              </div>
                               {patientLastVisit[p.id!] && (
                                 <p className="text-xs font-bold text-red-500 mt-1">
                                   Medicine given {patientLastVisit[p.id!].days} days back
@@ -1784,101 +1950,144 @@ const handleDownloadPNG = async (patient: Patient) => {
             )}
 
             <form onSubmit={handleRegistrationSubmit} className="space-y-8">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-neutral-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <Calendar size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{cur.date}</span>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <Calendar size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{cur.date}</span>
                   </div>
-                  <p className="font-bold text-slate-900">{new Date().toLocaleDateString()}</p>
+                  <p className="font-semibold text-slate-800 text-xs">{new Date().toLocaleDateString()}</p>
                 </div>
-                <div className="bg-neutral-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <Hash size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{cur.globalSerial}</span>
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <Calendar size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Valid Until</span>
                   </div>
-                  <p className="font-bold text-emerald-600">{globalSerial}</p>
-                </div>
-                <div className="bg-neutral-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <Hash size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{cur.hospitalSerial}</span>
+                  <div className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    {getValidityDate(formData.registration_date || new Date().toISOString())}
                   </div>
-                  <p className="font-bold text-emerald-600">{hospitalYearlySerial}</p>
                 </div>
-                <div className="bg-neutral-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <Hash size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{cur.dailyOpd}</span>
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <IndianRupee size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Fee (₹)</span>
                   </div>
-                  <p className="font-bold text-emerald-600">{dailyOpdNumber}</p>
+                  <p className="font-semibold text-purple-600 text-xs">{feeAmount}</p>
                 </div>
-                <div className="bg-neutral-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <History size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{cur.revisit}</span>
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1_5">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <Hash size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{cur.globalSerial}</span>
                   </div>
-                  <p className="font-bold text-blue-600">{revisitCount.toString().padStart(2, '0')}</p>
+                  <p className="font-semibold text-emerald-600 text-xs truncate w-full pl-4">{globalSerial}</p>
                 </div>
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1_5">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <Hash size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{cur.hospitalSerial}</span>
+                  </div>
+                  <p className="font-semibold text-emerald-600 text-xs truncate w-full pl-4">{hospitalYearlySerial}</p>
+                </div>
+                <div className="col-span-1" />
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1 mr-[-90px]">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <Hash size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{cur.dailyOpd}</span>
+                  </div>
+                  <p className="font-semibold text-emerald-600 text-xs">{dailyOpdNumber}</p>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1 ml-[87px] mt-0 mr-[-198px]">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <History size={12} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{cur.revisit}</span>
+                  </div>
+                  <p className="font-semibold text-blue-600 text-xs">{revisitCount.toString().padStart(2, '0')}</p>
+                </div>
+                <div className="col-span-1" />
               </div>
 
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm pl-[15px] pr-[21px] pt-[6px] pb-[5px] mt-[-14px] mb-[13px] mr-0">
                 <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <User className="text-emerald-600" size={20} />
                   Basic Information
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.name}</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.name}</label>
                     <input 
                       value={formData.name}
                       onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.age}</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.age}</label>
                     <input 
                       value={formData.age}
                       onChange={e => setFormData({...formData, age: e.target.value})}
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.gender}</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.gender}</label>
                     <select 
-                      value={formData.gender}
+                      value={formData.gender ?? ''}
                       onChange={e => setFormData({...formData, gender: e.target.value})}
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                     >
                       <option>Male</option>
                       <option>Female</option>
                       <option>Other</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.mobile}</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.mobile}</label>
                     <input 
                       value={formData.mobile}
                       onChange={e => setFormData({...formData, mobile: e.target.value})}
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{cur.aadhar}</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.aadhar}</label>
                     <input 
                       value={formData.aadhar}
                       onChange={e => setFormData({...formData, aadhar: e.target.value})}
-                      className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                     />
                   </div>
-                  {/* Removed Centralized Serial No. input */}
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">Patient Location</label>
+                    <select 
+                      value={formData.patient_location ?? ''}
+                      onChange={e => setFormData({...formData, patient_location: e.target.value})}
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
+                      required
+                    >
+                      <option value="">Select Location</option>
+                      <option value="Local">Local</option>
+                      <option value="Nearby Village/City">Nearby Village/City</option>
+                      <option value="Other District">Other District</option>
+                      <option value="Outside Uttarakhand">Outside Uttarakhand</option>
+                      <option value="NRI">NRI</option>
+                      <option value="Foreign Nationalist">Foreign Nationalist</option>
+                    </select>
+                  </div>
+                  <div className="space-y-0.5 md:col-span-3">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3 flex items-center gap-1"><MapPin size={10}/> Detailed Address</label>
+                    <textarea 
+                      value={formData.detailed_address}
+                      onChange={e => setFormData({...formData, detailed_address: e.target.value})}
+                      className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
+                      rows={1}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm mt-[-4px] pt-[6px] pl-[15px] pb-[12px] pr-[34px]">
                 <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <User className="text-emerald-600" size={20} />
                   Assign Doctor
@@ -1944,20 +2153,81 @@ const handleDownloadPNG = async (patient: Patient) => {
         <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-900">Registration List</h2>
-            <div className="flex gap-2">
-              <input 
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-4"
-              />
-              <input 
-                type="text"
-                placeholder="Search by Name/Mobile..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-4"
-              />
+            <div className="flex flex-wrap gap-4 items-center">
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setFilterType('today')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => setFilterType('monthly')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setFilterType('range')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'range' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Range
+                </button>
+              </div>
+
+              {filterType === 'monthly' && (
+                <div className="flex gap-2">
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                        {new Date(2000, i).toLocaleString('default', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  >
+                    {[2024, 2025, 2026].map(year => (
+                      <option key={year} value={year.toString()}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {filterType === 'range' && (
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  />
+                  <span className="text-slate-400 font-bold">to</span>
+                  <input 
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  />
+                </div>
+              )}
+
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text"
+                  placeholder="Search by Name/Mobile..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-neutral-50 border border-gray-100 rounded-xl py-2 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                />
+              </div>
             </div>
           </div>
           
@@ -1965,68 +2235,52 @@ const handleDownloadPNG = async (patient: Patient) => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Timestamp</th>
-                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Hospital Serial</th>
-                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Type</th>
-                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Patient Details</th>
-                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Identity</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Name</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Serial</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Mobile</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Aadhar</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Reg Date</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Valid Until</th>
                   <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center">
+                    <td colSpan={7} className="py-12 text-center">
                       <Loader2 className="animate-spin mx-auto text-emerald-600 mb-2" size={32} />
                       <p className="text-slate-500 font-medium">Loading registrations...</p>
                     </td>
                   </tr>
                 ) : registrationList.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center">
+                    <td colSpan={7} className="py-12 text-center">
                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FileText className="text-slate-300" size={32} />
                       </div>
-                      <p className="text-slate-500 font-medium">No registrations found for this date.</p>
+                      <p className="text-slate-500 font-medium">No registrations found for selected period.</p>
                     </td>
                   </tr>
                 ) : (
                   registrationList
-                    .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.mobile.includes(searchQuery))
+                    .filter(p => !searchQuery || 
+                                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                 p.mobile.includes(searchQuery) ||
+                                 (p.aadhar && p.aadhar.includes(searchQuery)) ||
+                                 p.hospital_yearly_serial.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
                     .map(p => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
-                        <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleString()}</td>
-                        <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.hospital_yearly_serial}</td>
-                        <td className="py-4 px-4 text-sm text-slate-600">{p.is_new ? 'New' : 'Old'} ({p.revisit_count})</td>
-                        <td className="py-4 px-4 text-sm text-slate-900">{p.name} ({p.age}/{p.gender})</td>
-                        <td className="py-4 px-4 text-sm text-slate-600">{p.mobile} / {p.aadhar ? p.aadhar.replace(/.(?=.{4})/g, '*') : '---'}</td>
+                        <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.name} ({p.age}/{p.gender})</td>
+                        <td className="py-4 px-4 text-sm text-emerald-700 font-bold">{p.hospital_yearly_serial}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.mobile}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.aadhar || '---'}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
+                        <td className="py-4 px-4 text-sm text-emerald-700">{getValidityDate(p.registration_date || p.created_at)}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{(p.registration_date || p.created_at) ? new Date(p.registration_date || p.created_at).toLocaleDateString() : '---'}</td>
                         <td className="py-4 px-4 text-right flex justify-end gap-2">
                           <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100" title="Preview">
                             <Eye size={16} />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setShowPreviewModal(p);
-                              setTimeout(() => window.print(), 500);
-                            }} 
-                            className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"
-                            title="Print Parchi"
-                          >
-                            <Printer size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDownloadPNG(p)} 
-                            className="p-2 bg-purple-50 rounded-lg text-purple-600 hover:bg-purple-100"
-                            title="Download PNG"
-                          >
-                            <FileImage size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDownloadPDF(p)} 
-                            className="p-2 bg-blue-50 rounded-lg text-blue-600 hover:bg-blue-100"
-                            title="Download PDF"
-                          >
-                            <Download size={16} />
                           </button>
                         </td>
                       </tr>

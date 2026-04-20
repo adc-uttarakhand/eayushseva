@@ -82,10 +82,6 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
 
   if (!session) return null;
 
-  console.log('AdminTools session:', session);
-  console.log('DEBUG AdminTools - All Tools:', tools);
-  console.log('DEBUG AdminTools - Filtered Tools:', tools.filter(t => t.show));
-
   const tools = [
     {
       id: 'employees',

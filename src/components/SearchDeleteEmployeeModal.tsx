@@ -26,16 +26,30 @@ export default function SearchDeleteEmployeeModal({ isOpen, onClose, onDelete }:
   };
 
   const handleDelete = async (staffId: string) => {
-    if (!confirm('Are you sure you want to delete this employee? This action is irreversible.')) return;
-    
-    const { error } = await supabase.from('staff').delete().eq('id', staffId);
-    if (error) {
-      toast.error('Failed to delete staff: ' + error.message);
-    } else {
-      toast.success('Staff deleted successfully');
-      setResults(results.filter(r => r.id !== staffId));
-      onDelete();
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-2 p-2">
+        <span>Are you sure you want to permanently delete this employee?</span>
+        <div className="flex gap-2 justify-end">
+          <button 
+            className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold"
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const { error } = await supabase.from('staff').delete().eq('id', staffId);
+              if (error) {
+                toast.error('Failed to delete: ' + error.message);
+              } else {
+                toast.success('Staff deleted successfully');
+                setResults(results.filter(r => r.id !== staffId));
+                onDelete();
+              }
+            }}
+          >
+            Confirm
+          </button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 px-3 py-1 rounded text-sm font-bold">Cancel</button>
+        </div>
+      </div>
+    ), { duration: 5000 });
   };
 
   if (!isOpen) return null;
