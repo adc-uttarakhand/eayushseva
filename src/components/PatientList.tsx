@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download } from 'lucide-react';
+import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface PatientRecord {
   id: string;
@@ -199,6 +200,52 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
     URL.revokeObjectURL(url);
   };
 
+  const handleDeletePatient = async (patient: PatientRecord) => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="bg-red-50 text-red-600 p-2 rounded-lg">
+            <Trash2 size={20} />
+          </div>
+          <div>
+            <p className="font-bold text-slate-900">Confirm Deletion</p>
+            <p className="text-xs text-slate-500">Delete {patient.name} and all linked revisits?</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                const { error } = await supabase
+                  .from('patients')
+                  .delete()
+                  .eq('hospital_id', hospitalId)
+                  .eq('hospital_yearly_serial', patient.hospital_yearly_serial);
+
+                if (error) throw error;
+                toast.success('Record deleted successfully');
+                fetchPatients();
+              } catch (err) {
+                console.error('Error deleting patient:', err);
+                toast.error('Failed to delete patient record');
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-all shadow-sm shadow-red-100"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), { duration: 5000, position: 'top-center' });
+  };
+
   const filteredPatients = patients.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.mobile.includes(searchQuery) ||
@@ -332,6 +379,7 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Contact</th>
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Fee Collected</th>
                   <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
+                  <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -365,6 +413,15 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
                       }`}>
                         {patient.is_new ? 'NEW VISIT' : 'REVISIT'}
                       </span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <button 
+                        onClick={() => handleDeletePatient(patient)}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Entry"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}

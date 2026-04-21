@@ -474,6 +474,55 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     }
   };
 
+  const handleDeleteRegistration = async (patient: Patient) => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="bg-red-50 text-red-600 p-2 rounded-lg">
+            <Trash2 size={20} />
+          </div>
+          <div>
+            <p className="font-bold text-slate-900">Confirm Deletion</p>
+            <p className="text-xs text-slate-500">Delete registration for {patient.name} and all linked revisits?</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                setLoading(true);
+                const { error } = await supabase
+                  .from('patients')
+                  .delete()
+                  .eq('hospital_id', hospitalId)
+                  .eq('hospital_yearly_serial', patient.hospital_yearly_serial);
+
+                if (error) throw error;
+                toast.success('Registration deleted successfully');
+                fetchRegistrationList();
+              } catch (err) {
+                console.error('Error deleting registration:', err);
+                toast.error('Failed to delete registration');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-all shadow-sm shadow-red-100"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), { duration: 5000, position: 'top-center' });
+  };
+
 const removeOklch = (clonedDoc: Document) => {
   const elements = clonedDoc.getElementsByTagName('*');
   for (let i = 0; i < elements.length; i++) {
@@ -583,6 +632,7 @@ const handleDownloadPNG = async (patient: Patient) => {
 };
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [legacyMode, setLegacyMode] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
   const [patientLastVisit, setPatientLastVisit] = useState<Record<string, { days: number, history: any[] }>>({});
@@ -709,6 +759,7 @@ const handleDownloadPNG = async (patient: Patient) => {
     prescription: '',
     global_serial: '',
     assigned_doctor_id: '',
+    registration_date: new Date().toISOString().split('T')[0],
   });
 
   const [globalSerial, setGlobalSerial] = useState('');
@@ -1000,7 +1051,8 @@ const handleDownloadPNG = async (patient: Patient) => {
 
       const nextRevisitCount = (falseRowsCount || 0) + 1;
       const registrationDate = new Date(baseRecord.registration_date || baseRecord.created_at);
-      const diffDays = Math.ceil(Math.abs(new Date().getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
+      const comparisonDate = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
+      const diffDays = Math.ceil(Math.abs(comparisonDate.getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
       
       const history = await fetchPatientHistory(patient.aadhar, patient.mobile);
       const historyLength = history.length;
@@ -1017,7 +1069,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         setGlobalSerial(baseRecord.global_serial || patient.global_serial);
         setHospitalYearlySerial(baseRecord.hospital_yearly_serial || patient.hospital_yearly_serial);
         
-        const now = new Date();
+        const now = comparisonDate;
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
         const { count: dailyCount } = await supabase
@@ -1042,7 +1094,7 @@ const handleDownloadPNG = async (patient: Patient) => {
           prescription: '',
           global_serial: '',
           assigned_doctor_id: '',
-          registration_date: new Date().toISOString()
+          registration_date: legacyMode && formData.registration_date ? formData.registration_date : new Date().toISOString().split('T')[0]
         });
         setRevisitCount(historyLength);
         generateSerials();
@@ -1065,6 +1117,7 @@ const handleDownloadPNG = async (patient: Patient) => {
     setSaving(true);
     try {
       const serverNow = new Date().toISOString();
+      const actualNow = legacyMode && formData.registration_date ? new Date(formData.registration_date).toISOString() : serverNow;
       const payload: any = {
         ...formData,
         global_serial: isNew ? globalSerial : (originalPatient?.global_serial || formData.global_serial),
@@ -1073,12 +1126,14 @@ const handleDownloadPNG = async (patient: Patient) => {
         hospital_id: isNew ? hospitalId : (originalPatient?.hospital_id || hospitalId),
         revisit_count: revisitCount,
         is_new: isNew,
-        created_at: serverNow,
-        registration_date: isNew ? serverNow : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
-        revisit_date: isNew ? null : serverNow,
+        created_at: actualNow,
+        registration_date: isNew 
+          ? actualNow 
+          : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
+        revisit_date: isNew ? null : actualNow,
         status: formData.assigned_doctor_id === 'teleconsultation' ? 'Completed' : 'Waiting',
         consultation_mode: formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation' : 'Online',
-        queue_time: formData.assigned_doctor_id === 'teleconsultation' ? null : serverNow,
+        queue_time: formData.assigned_doctor_id === 'teleconsultation' ? null : actualNow,
         assigned_doctor_id: formData.assigned_doctor_id === 'teleconsultation' ? null : formData.assigned_doctor_id,
         fee_amount: feeAmount,
       };
@@ -1109,8 +1164,10 @@ const handleDownloadPNG = async (patient: Patient) => {
         patient_location: '', detailed_address: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
         mutra: '', mala: '', jivha: '', netra: '', nidra: '', agni: '',
-        ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: ''
+        ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: '',
+        registration_date: new Date().toISOString().split('T')[0]
       });
+      setLegacyMode(false);
       setOriginalPatient(null);
       setPatientHistory([]);
       generateSerials();
@@ -1135,6 +1192,7 @@ const handleDownloadPNG = async (patient: Patient) => {
     setSaving(true);
     try {
       const serverNow = new Date().toISOString();
+      const actualNow = legacyMode && formData.registration_date ? new Date(formData.registration_date).toISOString() : serverNow;
       const isTeleconsultation = formData.assigned_doctor_id === 'teleconsultation';
       const payload: any = {
         ...formData,
@@ -1144,9 +1202,11 @@ const handleDownloadPNG = async (patient: Patient) => {
         hospital_id: isNew ? hospitalId : (originalPatient?.hospital_id || hospitalId),
         revisit_count: revisitCount,
         is_new: isNew,
-        created_at: serverNow,
-        registration_date: isNew ? serverNow : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
-        revisit_date: isNew ? null : serverNow,
+        created_at: actualNow,
+        registration_date: isNew 
+          ? actualNow 
+          : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
+        revisit_date: isNew ? null : actualNow,
         status: 'Completed',
         consultation_mode: isTeleconsultation ? 'Teleconsultation' : 'Offline',
         queue_time: null,
@@ -1182,8 +1242,10 @@ const handleDownloadPNG = async (patient: Patient) => {
         patient_location: '', detailed_address: '',
         complaints: '', diagnosis: '', history: '', nadi: '', prakruti: '',
         mutra: '', mala: '', jivha: '', netra: '', nidra: '', agni: '',
-        ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: ''
+        ahar_shakti: '', satva: '', vyayam_shakti: '', investigations: '', prescription: '', global_serial: '', assigned_doctor_id: '',
+        registration_date: new Date().toISOString().split('T')[0]
       });
+      setLegacyMode(false);
       setOriginalPatient(null);
       generateSerials();
       setIsNew(true);
@@ -1871,6 +1933,26 @@ const handleDownloadPNG = async (patient: Patient) => {
               </button>
             </div>
 
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => setLegacyMode(!legacyMode)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  legacyMode 
+                    ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-500/20 shadow-sm' 
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                <History size={14} className={legacyMode ? 'animate-pulse' : ''} />
+                Legacy Data Entry
+              </button>
+              {legacyMode && (
+                <span className="text-[10px] text-amber-600 font-medium italic animate-pulse">
+                  * Back-date mode enabled
+                </span>
+              )}
+            </div>
+
             {!isNew && (
               <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4">
@@ -1895,7 +1977,7 @@ const handleDownloadPNG = async (patient: Patient) => {
                 {patients.filter(p => {
                     const regDate = p.registration_date || p.created_at;
                     if (!regDate) return false;
-                    const today = new Date();
+                    const today = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
                     today.setHours(0, 0, 0, 0);
                     const vtDate = new Date(regDate);
                     vtDate.setDate(vtDate.getDate() + 14);
@@ -1906,7 +1988,7 @@ const handleDownloadPNG = async (patient: Patient) => {
                     {patients.filter(p => {
                       const regDate = p.registration_date || p.created_at;
                       if (!regDate) return false;
-                      const today = new Date();
+                      const today = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
                       today.setHours(0, 0, 0, 0);
                       const vtDate = new Date(regDate);
                       vtDate.setDate(vtDate.getDate() + 14);
@@ -1950,15 +2032,24 @@ const handleDownloadPNG = async (patient: Patient) => {
             )}
 
             <form onSubmit={handleRegistrationSubmit} className="space-y-8">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between">
+              <div className="grid grid-cols-6 gap-3">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Calendar size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.date}</span>
                   </div>
-                  <p className="font-semibold text-slate-800 text-xs">{new Date().toLocaleDateString()}</p>
+                  {legacyMode ? (
+                    <input 
+                      type="date"
+                      value={formData.registration_date?.split('T')[0] || ''}
+                      onChange={e => setFormData({...formData, registration_date: e.target.value})}
+                      className="font-semibold text-amber-700 text-xs bg-amber-50 border-none px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-amber-500/20"
+                    />
+                  ) : (
+                    <p className="font-semibold text-slate-800 text-xs">{new Date().toLocaleDateString()}</p>
+                  )}
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Calendar size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">Valid Until</span>
@@ -1967,43 +2058,42 @@ const handleDownloadPNG = async (patient: Patient) => {
                     {getValidityDate(formData.registration_date || new Date().toISOString())}
                   </div>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <IndianRupee size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">Fee (₹)</span>
                   </div>
                   <p className="font-semibold text-purple-600 text-xs">{feeAmount}</p>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1_5">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-3">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Hash size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.globalSerial}</span>
                   </div>
                   <p className="font-semibold text-emerald-600 text-xs truncate w-full pl-4">{globalSerial}</p>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1_5">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-3">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Hash size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.hospitalSerial}</span>
                   </div>
                   <p className="font-semibold text-emerald-600 text-xs truncate w-full pl-4">{hospitalYearlySerial}</p>
                 </div>
-                <div className="col-span-1" />
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1 mr-[-90px]">
+
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-3">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Hash size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.dailyOpd}</span>
                   </div>
                   <p className="font-semibold text-emerald-600 text-xs">{dailyOpdNumber}</p>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-1 ml-[87px] mt-0 mr-[-198px]">
+                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-3">
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <History size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.revisit}</span>
                   </div>
                   <p className="font-semibold text-blue-600 text-xs">{revisitCount.toString().padStart(2, '0')}</p>
                 </div>
-                <div className="col-span-1" />
               </div>
 
               <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm pl-[15px] pr-[21px] pt-[6px] pb-[5px] mt-[-14px] mb-[13px] mr-0">
@@ -2277,10 +2367,16 @@ const handleDownloadPNG = async (patient: Patient) => {
                         <td className="py-4 px-4 text-sm text-slate-600">{p.aadhar || '---'}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
                         <td className="py-4 px-4 text-sm text-emerald-700">{getValidityDate(p.registration_date || p.created_at)}</td>
-                        <td className="py-4 px-4 text-sm text-slate-600">{(p.registration_date || p.created_at) ? new Date(p.registration_date || p.created_at).toLocaleDateString() : '---'}</td>
                         <td className="py-4 px-4 text-right flex justify-end gap-2">
                           <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100" title="Preview">
                             <Eye size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteRegistration(p)} 
+                            className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100" 
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
                           </button>
                         </td>
                       </tr>
