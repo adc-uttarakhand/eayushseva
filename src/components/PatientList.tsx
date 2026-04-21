@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download, Edit2, Check, X } from 'lucide-react';
+import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download, Edit2, Check, X, IndianRupee } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 
@@ -54,7 +54,8 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
     newPatients: 0,
     femalePatients: 0,
     aadharSeeded: 0,
-    mobileSeeded: 0
+    mobileSeeded: 0,
+    totalFees: 0
   });
 
   useEffect(() => {
@@ -144,7 +145,8 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
         newPatients: records.filter(p => !p.global_serial.includes('revisit')).length, // Simplified logic for demo
         femalePatients: records.filter(p => p.gender === 'Female').length,
         aadharSeeded: records.filter(p => p.aadhar && p.aadhar.length === 12).length,
-        mobileSeeded: records.filter(p => p.mobile && p.mobile.length === 10).length
+        mobileSeeded: records.filter(p => p.mobile && p.mobile.length === 10).length,
+        totalFees: records.reduce((sum, p) => sum + (p.fee_amount || 0), 0)
       });
 
     } catch (err) {
@@ -308,13 +310,14 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         {[
           { label: 'Total OPD', value: stats.totalOPD, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'New Patients', value: stats.newPatients, icon: UserPlus, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Female Patients', value: stats.femalePatients, icon: UserCheck, color: 'text-pink-600', bg: 'bg-pink-50' },
           { label: 'Aadhar Seeded', value: stats.aadharSeeded, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Mobile Seeded', value: stats.mobileSeeded, icon: Phone, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Fee Collected', value: `₹${stats.totalFees}`, icon: IndianRupee, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map((stat, i) => (
           <motion.div 
             key={stat.label}

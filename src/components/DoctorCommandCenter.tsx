@@ -153,6 +153,16 @@ const HospitalSearchInput = ({
 let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
+const EXPERTISE_KEYWORDS = [
+  "Marma Chikitsa", "Ayurvedic Neurotherapy", "Leech Therapy", "Ayurvedic Antenatal Care", "Panchakarma Therapies", 
+  "Uttar Vasti", "Siravedh", "Viddhakarma", "NCD Reversal", "Panchakarma Procedures", "Agnikarma", "Kshar Karma", 
+  "Kshar Sutra", "Netra Kriya Kalpa", "Pediatric Disorders", "Rheumatism", "Hyperuricemia", "Liver Disorders", 
+  "Gynecological Disorders", "ENT Disorders", "Eye Disorders", "GI Disorders", "Skin Diseases", "Psoriasis", 
+  "Auto immune Disorders", "Chronic Pain Management", "Osteoarthritis", "Neurological Disorders", "Spine Disorders", 
+  "Reproductive System Disorders", "Infertility", "Psychiatry", "Endocrine Disorders", "Preventive Medicine", 
+  "Cancer Rehab", "Cancer Management", "Yoga"
+];
+
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
   const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate'>('dashboard');
   const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate') => {
@@ -181,6 +191,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [isHospitalProfileDirty, setIsHospitalProfileDirty] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
+  const [isKeywordsModalOpen, setIsKeywordsModalOpen] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -2112,12 +2123,20 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Expertise Keywords (e.g. Diabetes, NCD Reversal)</label>
-                  <input 
-                    value={profile.keywords} 
-                    onChange={e => setProfile({...profile, keywords: e.target.value})} 
-                    placeholder="Enter keywords separated by commas"
-                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                  />
+                  <div 
+                    onClick={() => setIsKeywordsModalOpen(true)}
+                    className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 min-h-[50px] cursor-pointer hover:bg-slate-100 transition-colors flex flex-wrap gap-2"
+                  >
+                    {profile.keywords ? (
+                      profile.keywords.split(',').map(kw => (
+                        <span key={kw} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg text-xs font-bold border border-emerald-100">
+                          {kw.trim()}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 text-sm">Select expertise keywords...</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2911,6 +2930,86 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 }
               }} 
             />
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isKeywordsModalOpen && (
+          <div key="keywords-modal" className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Expertise Keywords</h2>
+                  <p className="text-slate-500 text-sm mt-1">Select your areas of specialization</p>
+                </div>
+                <button 
+                  onClick={() => setIsKeywordsModalOpen(false)}
+                  className="p-3 hover:bg-white rounded-2xl transition-colors shadow-sm"
+                >
+                  <X size={24} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {EXPERTISE_KEYWORDS.map(keyword => {
+                    const isSelected = (profile.keywords || "").split(',').map(k => k.trim()).filter(k => k !== '').includes(keyword);
+                    return (
+                      <label 
+                        key={keyword}
+                        className={`flex items-center gap-3 p-4 rounded-2xl border transition-all cursor-pointer group ${
+                          isSelected 
+                            ? 'bg-emerald-50 border-emerald-200 shadow-sm shadow-emerald-100/50' 
+                            : 'bg-white border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/30'
+                        }`}
+                      >
+                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                          isSelected 
+                            ? 'bg-emerald-600 border-emerald-600' 
+                            : 'bg-white border-gray-200 group-hover:border-emerald-300'
+                        }`}>
+                          {isSelected && <Check size={14} className="text-white" />}
+                        </div>
+                        <input 
+                          type="checkbox"
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={() => {
+                            let currentKeywords = profile.keywords ? profile.keywords.split(',').map(k => k.trim()).filter(k => k !== '') : [];
+                            if (isSelected) {
+                              currentKeywords = currentKeywords.filter(k => k !== keyword);
+                            } else {
+                              currentKeywords.push(keyword);
+                            }
+                            setProfile({ ...profile, keywords: currentKeywords.join(', ') });
+                          }}
+                        />
+                        <span className={`text-sm font-bold transition-colors ${
+                          isSelected ? 'text-emerald-700' : 'text-slate-600 group-hover:text-emerald-600'
+                        }`}>
+                          {keyword}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-gray-100 bg-slate-50/50 flex justify-end gap-3">
+                <button 
+                  onClick={() => setIsKeywordsModalOpen(false)}
+                  className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
