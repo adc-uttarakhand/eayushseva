@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download, Trash2 } from 'lucide-react';
+import { Search, Filter, Calendar, Users, UserPlus, UserCheck, Phone, CreditCard, Loader2, ChevronDown, Download, Edit2, Check, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 
@@ -38,6 +38,9 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<PatientRecord>>({});
+  const [updating, setUpdating] = useState(false);
 
   const maskDate = (value: string) => {
     const v = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -200,50 +203,36 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
     URL.revokeObjectURL(url);
   };
 
-  const handleDeletePatient = async (patient: PatientRecord) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <div className="bg-red-50 text-red-600 p-2 rounded-lg">
-            <Trash2 size={20} />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900">Confirm Deletion</p>
-            <p className="text-xs text-slate-500">Delete {patient.name} and all linked revisits?</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                const { error } = await supabase
-                  .from('patients')
-                  .delete()
-                  .eq('hospital_id', hospitalId)
-                  .eq('hospital_yearly_serial', patient.hospital_yearly_serial);
+  const handleEdit = (patient: PatientRecord) => {
+    setEditingId(patient.id);
+    setEditForm({
+      name: patient.name,
+      age: patient.age,
+      gender: patient.gender,
+      mobile: patient.mobile,
+      aadhar: patient.aadhar
+    });
+  };
 
-                if (error) throw error;
-                toast.success('Record deleted successfully');
-                fetchPatients();
-              } catch (err) {
-                console.error('Error deleting patient:', err);
-                toast.error('Failed to delete patient record');
-              }
-            }}
-            className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-all shadow-sm shadow-red-100"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    ), { duration: 5000, position: 'top-center' });
+  const handleUpdatePatient = async () => {
+    if (!editingId) return;
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .update(editForm)
+        .eq('id', editingId);
+
+      if (error) throw error;
+      toast.success('Patient record updated successfully');
+      setEditingId(null);
+      fetchPatients();
+    } catch (err) {
+      console.error('Error updating patient:', err);
+      toast.error('Failed to update patient record');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const filteredPatients = patients.filter(p => 
@@ -383,48 +372,120 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredPatients.map((patient) => (
-                  <tr key={patient.id} className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="px-8 py-6">
-                      <p className="font-bold text-slate-900">{new Date(patient.created_at).toLocaleDateString()}</p>
-                      <p className="text-xs text-slate-400">{new Date(patient.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                    </td>
-                    <td className="px-8 py-6">
-                      <p className="font-bold text-slate-900">{patient.name}</p>
-                      <p className="text-xs text-slate-500">{patient.age}Y • {patient.gender}</p>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md w-fit">G: {patient.global_serial}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md w-fit">Y: {patient.hospital_yearly_serial}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md w-fit">D: {patient.daily_opd_number}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <p className="text-sm font-medium text-slate-700">{patient.mobile || 'N/A'}</p>
-                      <p className="text-[10px] text-slate-400">Aadhar: {patient.aadhar ? `****${patient.aadhar.slice(-4)}` : 'Not Seeded'}</p>
-                    </td>
-                    <td className="px-8 py-6">
-                      <p className="font-bold text-slate-900">₹{patient.fee_amount || 0}</p>
-                    </td>
-                    <td className="px-8 py-6">
-                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${
-                        patient.is_new ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {patient.is_new ? 'NEW VISIT' : 'REVISIT'}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <button 
-                        onClick={() => handleDeletePatient(patient)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Entry"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredPatients.map((patient) => {
+                  const isEditing = editingId === patient.id;
+                  return (
+                    <tr key={patient.id} className="hover:bg-neutral-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <p className="font-bold text-slate-900">{new Date(patient.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-400">{new Date(patient.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2">
+                            <input
+                              className="bg-neutral-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500/20"
+                              value={editForm.name}
+                              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                              placeholder="Name"
+                            />
+                            <div className="flex gap-2">
+                              <input
+                                className="bg-neutral-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500/20 w-16"
+                                value={editForm.age}
+                                onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                                placeholder="Age"
+                              />
+                              <select
+                                className="bg-neutral-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500/20"
+                                value={editForm.gender}
+                                onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                              >
+                                <option>Male</option>
+                                <option>Female</option>
+                                <option>Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-bold text-slate-900">{patient.name}</p>
+                            <p className="text-xs text-slate-500">{patient.age}Y • {patient.gender}</p>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md w-fit">G: {patient.global_serial}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md w-fit">Y: {patient.hospital_yearly_serial}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md w-fit">D: {patient.daily_opd_number}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2">
+                            <input
+                              className="bg-neutral-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500/20"
+                              value={editForm.mobile}
+                              onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+                              placeholder="Mobile"
+                            />
+                            <input
+                              className="bg-neutral-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-500/20"
+                              value={editForm.aadhar}
+                              onChange={(e) => setEditForm({ ...editForm, aadhar: e.target.value })}
+                              placeholder="Aadhar"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-slate-700">{patient.mobile || 'N/A'}</p>
+                            <p className="text-[10px] text-slate-400">Aadhar: {patient.aadhar ? `****${patient.aadhar.slice(-4)}` : 'Not Seeded'}</p>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-8 py-6">
+                        <p className="font-bold text-slate-900">₹{patient.fee_amount || 0}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${
+                          patient.is_new ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {patient.is_new ? 'NEW VISIT' : 'REVISIT'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        {isEditing ? (
+                          <div className="flex justify-end gap-1">
+                            <button
+                              onClick={handleUpdatePatient}
+                              disabled={updating}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Save Changes"
+                            >
+                              {updating ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="Cancel"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleEdit(patient)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                            title="Edit Record"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

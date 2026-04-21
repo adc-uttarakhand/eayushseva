@@ -474,55 +474,6 @@ export default function EParchi({ hospitalId, hospitalName, district, hospitalTy
     }
   };
 
-  const handleDeleteRegistration = async (patient: Patient) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <div className="bg-red-50 text-red-600 p-2 rounded-lg">
-            <Trash2 size={20} />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900">Confirm Deletion</p>
-            <p className="text-xs text-slate-500">Delete registration for {patient.name} and all linked revisits?</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                setLoading(true);
-                const { error } = await supabase
-                  .from('patients')
-                  .delete()
-                  .eq('hospital_id', hospitalId)
-                  .eq('hospital_yearly_serial', patient.hospital_yearly_serial);
-
-                if (error) throw error;
-                toast.success('Registration deleted successfully');
-                fetchRegistrationList();
-              } catch (err) {
-                console.error('Error deleting registration:', err);
-                toast.error('Failed to delete registration');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-all shadow-sm shadow-red-100"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    ), { duration: 5000, position: 'top-center' });
-  };
-
 const removeOklch = (clonedDoc: Document) => {
   const elements = clonedDoc.getElementsByTagName('*');
   for (let i = 0; i < elements.length; i++) {
@@ -2331,7 +2282,6 @@ const handleDownloadPNG = async (patient: Patient) => {
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Aadhar</th>
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Reg Date</th>
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Valid Until</th>
-                  <th className="text-right py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -2370,13 +2320,6 @@ const handleDownloadPNG = async (patient: Patient) => {
                         <td className="py-4 px-4 text-right flex justify-end gap-2">
                           <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100" title="Preview">
                             <Eye size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteRegistration(p)} 
-                            className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100" 
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
                           </button>
                         </td>
                       </tr>
