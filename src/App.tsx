@@ -38,7 +38,7 @@ import RoleManagement from './components/RoleManagement';
 import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity } from 'lucide-react';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'react-hot-toast';
 
@@ -77,6 +77,16 @@ interface Hospital {
   is_verified?: boolean;
   panchakarma_centre?: boolean;
 }
+
+const EXPERTISE_KEYWORDS_LIST = [
+  "Marma Chikitsa", "Ayurvedic Neurotherapy", "Leech Therapy", "Ayurvedic Antenatal Care", "Panchakarma Therapies", 
+  "Uttar Vasti", "Siravedh", "Viddhakarma", "NCD Reversal", "Panchakarma Procedures", "Agnikarma", "Kshar Karma", 
+  "Kshar Sutra", "Netra Kriya Kalpa", "Pediatric Disorders", "Rheumatism", "Hyperuricemia", "Liver Disorders", 
+  "Gynecological Disorders", "ENT Disorders", "Eye Disorders", "GI Disorders", "Skin Diseases", "Psoriasis", 
+  "Auto immune Disorders", "Chronic Pain Management", "Osteoarthritis", "Neurological Disorders", "Spine Disorders", 
+  "Reproductive System Disorders", "Infertility", "Psychiatry", "Endocrine Disorders", "Preventive Medicine", 
+  "Cancer Rehab", "Cancer Management", "Yoga"
+];
 
 export default function App() {
   const [activeTab, _setActiveTab] = useState<TabId>('dashboard');
@@ -259,27 +269,37 @@ export default function App() {
       return;
     }
 
-    // Fetch doctors and their profiles
-    const { data: doctors, error: docError } = await supabase
-      .from('staff')
-      .select('*, doctor_profiles(*)')
-      .eq('role', 'Doctor');
+    // Fetch from doctor_profiles and join staff
+    const { data: profiles, error: docError } = await supabase
+      .from('doctor_profiles')
+      .select(`
+        *,
+        staff (*)
+      `);
 
-    if (doctors) {
-      const results = doctors.filter(doc => {
-        const keywords = doc.doctor_profiles?.keywords?.toLowerCase() || '';
-        const specialization = doc.doctor_profiles?.specialization?.toLowerCase() || '';
-        const name = doc.full_name?.toLowerCase() || '';
-        const q = query.toLowerCase();
+    if (profiles) {
+      const q = query.toLowerCase().trim();
+      const results = profiles.filter(profile => {
+        const keywords = (profile.keywords || '').toLowerCase();
+        const specialization = (profile.specialization || '').toLowerCase();
+        const docName = (profile.staff?.full_name || '').toLowerCase();
         
-        return keywords.includes(q) || specialization.includes(q) || name.includes(q);
-      }).map(doc => {
-        const hospital = hospitals.find(h => h.hospital_id === doc.hospital_id);
+        return keywords.includes(q) || specialization.includes(q) || docName.includes(q);
+      }).map(profile => {
+        const doc = profile.staff;
+        const hospital = doc ? hospitals.find(h => h.hospital_id === doc.hospital_id) : null;
+        
         let distance = null;
         if (userLocation && hospital?.latitude && hospital?.longitude) {
           distance = calculateDistance(userLocation.lat, userLocation.lng, hospital.latitude, hospital.longitude);
         }
-        return { ...doc, hospitalName: hospital?.facility_name, distance };
+        
+        return {  
+          ...doc, 
+          doctor_profiles: profile,
+          hospitalName: hospital?.facility_name || 'Not Available', 
+          distance 
+        };
       });
       setDoctorSearchResults(results);
     }
@@ -535,48 +555,96 @@ export default function App() {
                 </button>
               </div>
               <div className="p-8">
-                <div className="relative mb-8">
+                <div className="relative mb-6">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input 
                     type="text"
-                    placeholder="Search by disease (e.g. Diabetes, NCD) or name..."
+                    placeholder="Search by expertise (e.g. Yoga, Marma) or name..."
                     value={doctorSearchQuery}
                     onChange={(e) => handleDoctorSearch(e.target.value)}
                     className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-lg font-medium"
                   />
                 </div>
 
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                {!doctorSearchQuery && (
+                  <div className="mb-8">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 px-1 flex items-center gap-2">
+                      <Filter size={12} /> Browse by Expertise
+                    </p>
+                    <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-1 custom-scrollbar">
+                      {EXPERTISE_KEYWORDS_LIST.map(tag => (
+                        <button 
+                          key={tag}
+                          onClick={() => handleDoctorSearch(tag)}
+                          className="px-4 py-2 rounded-xl bg-white border border-gray-100 text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:border-emerald-100 hover:text-emerald-700 transition-all shadow-sm flex items-center gap-2"
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {doctorSearchResults.length > 0 ? (
                     doctorSearchResults.map(doc => (
-                      <div key={doc.id} className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all">
+                      <div key={doc.id} className="p-6 rounded-[2rem] border border-gray-100 bg-white hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-900/5 transition-all group">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-slate-900 text-lg">Dr. {doc.full_name}</h3>
-                            <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest">{doc.doctor_profiles?.specialization}</p>
-                            <p className="text-slate-500 text-sm mt-1 flex items-center gap-1">
-                              <Building2 size={14} /> {doc.hospitalName}
-                            </p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-slate-900 text-xl tracking-tight">{doc.full_name}</h3>
+                              <div className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                                {doc.doctor_profiles?.specialization}
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-col gap-1.5 mt-2">
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
+                                  <Building2 size={16} />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">Facility Name</p>
+                                  <p className="text-sm font-bold text-slate-700 group-hover:text-emerald-600 transition-colors leading-tight mt-0.5">
+                                    {doc.hospitalName || 'Facility Not Assigned'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
+
                           {doc.distance !== null && !isNaN(doc.distance) && (
-                            <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold">
-                              {doc.distance.toFixed(1)} km away
+                            <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl flex flex-col items-center">
+                              <span className="text-lg font-black tracking-tighter leading-none">{doc.distance.toFixed(1)}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Km away</span>
                             </div>
                           )}
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {doc.doctor_profiles?.keywords?.split(',').map((k: string, i: number) => (
-                            <span key={i} className="bg-white border border-gray-200 px-2 py-1 rounded-lg text-[10px] font-medium text-slate-600">
-                              {k.trim()}
-                            </span>
-                          ))}
-                        </div>
+
+                        {doc.doctor_profiles?.keywords && (
+                          <div className="mt-5 pt-5 border-t border-gray-50 flex flex-wrap gap-2">
+                            {doc.doctor_profiles.keywords.split(',').map((k: string, i: number) => (
+                              <span key={i} className="bg-slate-50 text-slate-600 border border-gray-100 px-3 py-1.5 rounded-xl text-[10px] font-bold group-hover:bg-emerald-50/50 group-hover:border-emerald-100 group-hover:text-emerald-700 transition-all">
+                                {k.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))
                   ) : doctorSearchQuery ? (
-                    <p className="text-center text-slate-400 py-10">No specialists found for "{doctorSearchQuery}"</p>
+                    <div className="py-12 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-gray-200">
+                      <Search className="mx-auto text-slate-300 mb-4" size={48} />
+                      <h3 className="text-xl font-bold text-slate-900">No specialists found</h3>
+                      <p className="text-slate-500 mt-2">We couldn't find any doctor matching "{doctorSearchQuery}"</p>
+                    </div>
                   ) : (
-                    <p className="text-center text-slate-400 py-10">Enter a disease or keyword to find experts</p>
+                    <div className="py-12 text-center">
+                      <Stethoscope className="mx-auto text-emerald-100 mb-4" size={64} />
+                      <h3 className="text-xl font-bold text-slate-900 leading-tight">Find Top AYUSH Experts</h3>
+                      <p className="text-slate-500 mt-2 max-w-sm mx-auto">Enter a disease, treatment, or keyword to browse qualified specialists across Uttarakhand.</p>
+                    </div>
                   )}
                 </div>
               </div>
