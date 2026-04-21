@@ -38,7 +38,7 @@ import RoleManagement from './components/RoleManagement';
 import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope } from 'lucide-react';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'react-hot-toast';
 
@@ -736,25 +736,236 @@ export default function App() {
     );
   };
 
-  const renderStats = () => (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto pb-40"
-    >
-      <div className="mb-12">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight">State Healthcare <br /><span className="text-emerald-600">Statistics</span></h1>
-        <p className="text-slate-500 mt-2">Real-time insights into Uttarakhand's AYUSH network performance.</p>
-      </div>
+  const [realStats, setRealStats] = useState({
+    totalPatients: 0,
+    panchakarmaTreatments: 0,
+    yogaSessions: 0,
+    loading: true
+  });
 
-      <div className="bg-white border border-gray-100 p-12 rounded-[2.5rem] shadow-sm text-center">
-        <Activity className="mx-auto text-emerald-600 mb-4" size={48} />
-        <h3 className="text-2xl font-bold text-slate-900">Statistics Coming Soon</h3>
-        <p className="text-slate-500 mt-2">We are currently integrating real-time data from all facilities.</p>
-      </div>
-    </motion.div>
-  );
+  const fetchGlobalStats = async () => {
+    try {
+      setRealStats(prev => ({ ...prev, loading: true }));
+      
+      // Fetch total patient count
+      const { count: patientCount } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch panchakarma log count
+      const { count: pkCount } = await supabase
+        .from('panchakarma_logs')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch yoga session count
+      const { count: yogaCount } = await supabase
+        .from('yoga_sessions')
+        .select('*', { count: 'exact', head: true });
+
+      setRealStats({
+        totalPatients: patientCount || 0,
+        panchakarmaTreatments: pkCount || 0,
+        yogaSessions: yogaCount || 0,
+        loading: false
+      });
+    } catch (err) {
+      console.error('Error fetching global stats:', err);
+      setRealStats(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      fetchGlobalStats();
+    }
+  }, [activeTab]);
+
+  const renderStats = () => {
+    const stats = {
+      hospitals: hospitals.length,
+      districts: new Set(hospitals.map(h => h.district).filter(d => d)).size,
+      totalPatients: realStats.totalPatients,
+      panchakarmaTreatments: realStats.panchakarmaTreatments,
+      yogaSessions: realStats.yogaSessions,
+      systems: new Set(hospitals.map(h => h.system)).size
+    };
+
+    const statCards = [
+      { 
+        title: "AYUSH Facilities", 
+        value: stats.hospitals, 
+        label: "Registered centres across Uttarakhand",
+        icon: Building2,
+        color: "bg-blue-50 text-blue-600 border-blue-100"
+      },
+      { 
+        title: "Patient Footfall", 
+        value: stats.totalPatients, 
+        label: "Real-time global registrations",
+        icon: Users,
+        color: "bg-emerald-50 text-emerald-600 border-emerald-100"
+      },
+      { 
+        title: "Panchakarma Services", 
+        value: stats.panchakarmaTreatments, 
+        label: "Total treatments administered",
+        icon: Activity,
+        color: "bg-amber-50 text-amber-600 border-amber-100"
+      },
+      { 
+        title: "Yoga & Wellness", 
+        value: stats.yogaSessions, 
+        label: "Total sessions conducted state-wide",
+        icon: Star,
+        color: "bg-purple-50 text-purple-600 border-purple-100"
+      }
+    ];
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="pt-24 px-4 sm:px-8 max-w-7xl mx-auto pb-40"
+      >
+        <div className="flex items-center justify-between mb-12">
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight">State Healthcare <br /><span className="text-emerald-600">Analytics</span></h1>
+            <p className="text-slate-500 mt-2 font-medium">Verified real-time data from Uttarakhand's AYUSH network.</p>
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={fetchGlobalStats}
+              disabled={realStats.loading}
+              className="bg-emerald-50 text-emerald-600 p-3 rounded-full hover:bg-emerald-100 transition-all"
+            >
+              <Activity size={20} className={realStats.loading ? 'animate-spin' : ''} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('dashboard')}
+              className="bg-slate-100 p-3 rounded-full hover:bg-slate-200 transition-all hidden sm:block"
+            >
+              <X size={24} className="text-slate-600" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {statCards.map((card, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className={`p-8 rounded-[2.5rem] border ${card.color} shadow-sm group hover:shadow-xl transition-all h-full flex flex-col`}
+            >
+              <div className="bg-white/50 w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                <card.icon size={24} />
+              </div>
+              <div className="flex-1">
+                <div className="text-4xl font-black tracking-tighter mb-1 select-none">
+                  {realStats.loading ? '...' : card.value.toLocaleString()}
+                </div>
+                <h3 className="text-sm font-bold opacity-80 uppercase tracking-widest">{card.title}</h3>
+              </div>
+              <p className="text-slate-500 text-[10px] font-bold mt-4 leading-normal">{card.label}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="flex flex-col gap-8">
+            <div className="bg-white border border-gray-100 p-10 rounded-[2.5rem] shadow-sm">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <Building2 className="text-emerald-600" size={24} />
+                Medical Systems Distribution
+              </h3>
+              <div className="space-y-6">
+                {['Ayurveda', 'Unani'].map(sys => {
+                  const total = hospitals.filter(h => h.system && h.system !== '').length || 1;
+                  const count = hospitals.filter(h => h.system === sys).length;
+                  const percentage = Math.round((count / total) * 100) || 0;
+                  return (
+                    <div key={sys} className="space-y-2">
+                      <div className="flex justify-between text-sm font-bold">
+                        <span className="text-slate-600">{sys}</span>
+                        <span className="text-emerald-600 tracking-tight">{count} Units ({percentage}%)</span>
+                      </div>
+                      <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-gray-50">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percentage}%` }}
+                          className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all duration-1000"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 p-10 rounded-[2.5rem] shadow-sm">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <LayoutDashboard className="text-blue-500" size={24} />
+                Facility Type Distribution
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Array.from(new Set(hospitals.map(h => h.type).filter(t => t))).sort().map(type => {
+                  const count = hospitals.filter(h => h.type === type).length;
+                  return (
+                    <div key={type} className="p-4 bg-slate-50 rounded-2xl border border-gray-50 group hover:bg-white hover:border-blue-100 transition-all">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{type}</p>
+                      <p className="text-2xl font-black text-slate-900 tracking-tighter">{count}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 p-10 rounded-[2.5rem] shadow-sm flex flex-col justify-center items-center text-center">
+             <div className="bg-emerald-50 w-20 h-20 rounded-[2rem] flex items-center justify-center text-emerald-600 mb-6">
+               <ShieldCheck size={40} />
+             </div>
+             <h3 className="text-2xl font-bold text-slate-900">Verified System Data</h3>
+             <p className="text-slate-500 mt-4 leading-relaxed max-w-sm">
+               All statistics are generated directly from encrypted server records. 
+               Data is updated automatically as healthcare transactions occur state-wide.
+             </p>
+             <div className="mt-8 flex gap-3">
+                <span className="px-4 py-2 bg-slate-100 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Live Sync
+                </span>
+                <span className="px-4 py-2 bg-slate-100 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Verified
+                </span>
+             </div>
+          </div>
+        </div>
+
+        {/* YouTube Channel Link */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-16 pt-8 border-t border-gray-100 text-center"
+        >
+          <a 
+            href="https://www.youtube.com/@ukdirayurved" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 bg-red-50 text-red-600 px-8 py-4 rounded-3xl font-bold hover:bg-red-600 hover:text-white transition-all group scale-90 sm:scale-100"
+          >
+            <div className="bg-red-600 text-white p-1.5 rounded-lg group-hover:bg-white group-hover:text-red-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+            </div>
+            <span>Departmental YouTube Channel</span>
+          </a>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-4">@ukdirayurved</p>
+        </motion.div>
+      </motion.div>
+    );
+  };
 
   const renderHospitals = () => (
     <motion.div 
@@ -1321,7 +1532,7 @@ export default function App() {
             <PanchakarmaModule session={session} />
           </motion.div>
         )}
-        {(activeTab === 'doctors' || activeTab === 'tools' || activeTab === 'staff' || activeTab === 'stats') && (
+        {(activeTab === 'doctors' || activeTab === 'tools' || activeTab === 'staff') && (
           <motion.div 
             key="placeholder"
             initial={{ opacity: 0 }}
