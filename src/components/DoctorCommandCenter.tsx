@@ -154,7 +154,7 @@ let _idCounter = 0;
 const generateId = () => `gen_${Date.now()}_${++_idCounter}_${Math.random().toString(36).slice(2)}`;
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate'>(() => (session?.isIncharge ? 'certificate' : 'dashboard'));
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate'>('dashboard');
   const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
@@ -1811,7 +1811,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
               {activeTab === 'profile' && (
                 <>
                   <button onClick={() => setProfileSubTab('basic')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all ${profileSubTab === 'basic' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Basic</button>
-                  <button onClick={() => setProfileSubTab('service')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all ${profileSubTab === 'service' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Service</button>
+                  {profile.employmentType === 'Permanent' && (
+                    <button onClick={() => setProfileSubTab('service')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all ${profileSubTab === 'service' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Service</button>
+                  )}
                   <button onClick={() => setProfileSubTab('trainings')} className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all ${profileSubTab === 'trainings' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>Trainings</button>
                 </>
               )}

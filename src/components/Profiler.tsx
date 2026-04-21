@@ -441,7 +441,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         return;
       }
     }
-    if (activeSubTab === 'basic' && (!profile.dob || !profile.dateOfFirstJoiningDepartment || !profile.homeDistrict)) {
+
+    if (activeSubTab === 'basic' && profile.employmentType === 'Permanent' && (!profile.dob || !profile.dateOfFirstJoiningDepartment || !profile.homeDistrict)) {
       alert('Please fill DOB, Joining Date, and Home District before saving.');
       return;
     }
