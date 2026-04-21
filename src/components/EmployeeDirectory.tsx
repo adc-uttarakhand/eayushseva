@@ -76,6 +76,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
       const { data, error } = await supabase
         .from('staff')
         .select('*')
+        .order('last_edited_on', { ascending: false, nullsFirst: false })
         .range(from, to);
 
       if (error) {
@@ -178,9 +179,18 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
     
     return hasAccess && matchesSearch && matchesDistrict && matchesRole && matchesEmploymentType;
   }).sort((a,b) => {
-    if (statusSort === 'none') return 0;
-    if (statusSort === 'verified_first') return (a.is_verified === b.is_verified) ? 0 : a.is_verified ? -1 : 1;
-    return (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1;
+    if (statusSort === 'verified_first') {
+      const statusDiff = (a.is_verified === b.is_verified) ? 0 : a.is_verified ? -1 : 1;
+      if (statusDiff !== 0) return statusDiff;
+    } else if (statusSort === 'unverified_first') {
+      const statusDiff = (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1;
+      if (statusDiff !== 0) return statusDiff;
+    }
+    
+    // Default sort by last_edited_on
+    const dateA = a.last_edited_on ? new Date(a.last_edited_on).getTime() : 0;
+    const dateB = b.last_edited_on ? new Date(b.last_edited_on).getTime() : 0;
+    return dateB - dateA;
   });
 
   const exportToExcel = () => {

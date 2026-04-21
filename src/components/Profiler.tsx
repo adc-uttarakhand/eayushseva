@@ -83,8 +83,27 @@ interface ProfilerProps {
   onDirtyChange?: (isDirty: boolean) => void;
 }
 
-export default function Profiler({ staffId, userRole, isIncharge, hospitalName, hospitals, activeSubTab, onDirtyChange }: ProfilerProps) {
+export default function Profiler({ staffId, userRole, isIncharge, hospitalName, hospitals: propHospitals, activeSubTab, onDirtyChange }: ProfilerProps) {
   const [loading, setLoading] = useState(true);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMasterHospitals = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('hospitals')
+          .select('*')
+          .order('facility_name');
+        if (error) throw error;
+        if (data) setHospitals(data);
+        else setHospitals(propHospitals || []);
+      } catch (err) {
+        console.error('Error fetching master hospitals:', err);
+        setHospitals(propHospitals || []);
+      }
+    };
+    fetchMasterHospitals();
+  }, [propHospitals]);
   const [initialProfile, setInitialProfile] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -336,7 +355,16 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
           const start = parseDateStr(formatDateForUI(p.fromDate));
           const end = parseDateStr(formatDateForUI(p.toDate));
           const days = (!isNaN(start.getTime()) && !isNaN(end.getTime())) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
-          return { ...p, id: generateId(), hospitalName: latestHospital ? latestHospital.facility_name : p.hospitalName, fromDate: formatDateForUI(p.fromDate), toDate: formatDateForUI(p.toDate), above7000: p.above7000 || 'No', days: days > 0 ? days : 0 };
+          return { 
+            ...p, 
+            id: generateId(), 
+            hospitalName: latestHospital ? latestHospital.facility_name : p.hospitalName, 
+            status: latestHospital ? (latestHospital.status || 'Sugam') : (p.status || 'Sugam'),
+            fromDate: formatDateForUI(p.fromDate), 
+            toDate: formatDateForUI(p.toDate), 
+            above7000: latestHospital ? (latestHospital.above_7000_feet || 'No') : (p.above7000 || 'No'), 
+            days: days > 0 ? days : 0 
+          };
         }) : [{ id: generateId(), hospitalName: '', hospital_id: '', fromDate: '', toDate: '', status: 'Sugam', above7000: 'No', days: 0 }],
         attachments: staffData.attachments && staffData.attachments.length > 0 ? staffData.attachments.map((a: any) => {
           const latestHospital = hospitals.find(h => h.hospital_id === a.hospital_id);
@@ -508,7 +536,15 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
     let newPostings = prev.postings.map(p => p.id === id ? { ...p, [field]: value } : p);
     if (field === 'hospital_id') {
       newPostings = newPostings.map(p => {
-        if (p.id === id) { const h = hospitals.find(h => h.hospital_id === p.hospital_id); return { ...p, status: h ? (h.status || 'Sugam') : p.status, above7000: h ? (h.above_7000_feet || 'No') : p.above7000 }; }
+        if (p.id === id) { 
+          const h = hospitals.find(h => h.hospital_id === p.hospital_id); 
+          return { 
+            ...p, 
+            hospitalName: h ? h.facility_name : p.hospitalName,
+            status: h ? (h.status || 'Sugam') : p.status, 
+            above7000: h ? (h.above_7000_feet || 'No') : p.above7000 
+          }; 
+        }
         return p;
       });
     }
@@ -545,7 +581,15 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
     let newAttachments = prev.attachments.map(a => a.id === id ? { ...a, [field]: value } : a);
     if (field === 'hospital') {
       newAttachments = newAttachments.map(a => {
-        if (a.id === id) { const h = hospitals.find(h => h.facility_name === a.hospital); return { ...a, hospital_id: h ? h.hospital_id : '', status: h ? (h.status || 'Sugam') : a.status, above7000: h ? ((h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No') : a.above7000 }; }
+        if (a.id === id) { 
+          const h = hospitals.find(h => h.facility_name === a.hospital); 
+          return { 
+            ...a, 
+            hospital_id: h ? h.hospital_id : (a.hospital_id || ''), 
+            status: h ? (h.status || 'Sugam') : a.status, 
+            above7000: h ? ((h.region_indicator === 'Above 7000' || h.above_7000_feet === 'Yes') ? 'Yes' : 'No') : a.above7000 
+          }; 
+        }
         return a;
       });
     }
@@ -929,14 +973,14 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                             <div className="space-y-1 md:col-span-5">
                               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Subsequent Posting</label>
                               <div className={profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}>
-                                <HospitalSearchInput isTextarea value={hospitals.find(h => h.hospital_id === posting.hospital_id)?.facility_name || ''} onChange={(val: any) => {
+                                <HospitalSearchInput isTextarea value={posting.hospitalName || ''} onChange={(val: any) => {
                                   const h = hospitals.find(h => h.facility_name === val);
                                   updatePosting(posting.id, 'hospital_id', h ? h.hospital_id : '');
                                 }} hospitals={hospitals} placeholder="Type hospital name..." />
                               </div>
                               <div className="flex gap-3 ml-2 mt-1">
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${hospitals.find(h => h.hospital_id === posting.hospital_id)?.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{hospitals.find(h => h.hospital_id === posting.hospital_id)?.status || 'Sugam'}</span>
-                                <span className="text-[9px] font-bold text-slate-400">Above 7000 ft: <span className="text-slate-600">{(hospitals.find(h => h.hospital_id === posting.hospital_id)?.region_indicator === 'Above 7000' || hospitals.find(h => h.hospital_id === posting.hospital_id)?.above_7000_feet === 'Yes') ? 'Yes' : 'No'}</span></span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${posting.status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{posting.status || 'Sugam'}</span>
+                                <span className="text-[9px] font-bold text-slate-400">Above 7000 ft: <span className="text-slate-600">{posting.above7000 || 'No'}</span></span>
                               </div>
                             </div>
                             <div className="space-y-1 md:col-span-2">
