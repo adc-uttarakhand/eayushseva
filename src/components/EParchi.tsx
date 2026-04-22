@@ -732,7 +732,6 @@ const handleDownloadPNG = async (patient: Patient) => {
 
   useEffect(() => {
     if (activeTab === 'registration') {
-      generateSerials();
       fetchDoctors();
     } else if (activeTab === 'queue') {
       fetchQueue();
@@ -861,13 +860,15 @@ const handleDownloadPNG = async (patient: Patient) => {
     }
   };
 
-  const generateSerials = async () => {
+  const generateSerials = async (dateStr?: string) => {
     try {
-      const now = new Date();
+      const now = dateStr ? new Date(dateStr) : new Date();
       const year = now.getFullYear();
       const month = now.getMonth();
       const fyStartYear = month >= 3 ? year : year - 1;
       const fyStartDate = new Date(fyStartYear, 3, 1).toISOString();
+      const fyEndDate = new Date(fyStartYear + 1, 3, 1).toISOString();
+      
       const { data: hospitalData } = await supabase
         .from('hospitals')
         .select('sr_no')
@@ -880,13 +881,15 @@ const handleDownloadPNG = async (patient: Patient) => {
       const { count: globalCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', fyStartDate);
+        .gte('created_at', fyStartDate)
+        .lt('created_at', fyEndDate);
 
       const { count: hospitalCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
-        .gte('created_at', fyStartDate);
+        .gte('created_at', fyStartDate)
+        .lt('created_at', fyEndDate);
 
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
@@ -910,6 +913,12 @@ const handleDownloadPNG = async (patient: Patient) => {
       console.error('Error generating serials:', err);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'registration' && formData.registration_date) {
+      generateSerials(formData.registration_date);
+    }
+  }, [formData.registration_date, activeTab]);
 
   const fetchPatientHistory = async (aadhar: string, mobile: string) => {
     if (!aadhar && !mobile) return;
@@ -1132,7 +1141,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       setLegacyMode(false);
       setOriginalPatient(null);
       setPatientHistory([]);
-      generateSerials();
+      generateSerials(formData.registration_date);
       setIsNew(true);
     } catch (err) {
       console.error('Save error:', err);
@@ -1936,7 +1945,13 @@ const handleDownloadPNG = async (patient: Patient) => {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setLegacyMode(!legacyMode)}
+                  onClick={() => {
+                    const newLegacyMode = !legacyMode;
+                    setLegacyMode(newLegacyMode);
+                    if (!newLegacyMode) {
+                      generateSerials();
+                    }
+                  }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all ${
                     legacyMode 
                       ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500/20 shadow-sm' 
