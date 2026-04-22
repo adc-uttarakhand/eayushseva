@@ -1412,6 +1412,14 @@ export default function App() {
           </motion.div>
         )}
         {activeTab === 'stats' && renderStats()}
+        {activeTab === 'patients' && (
+          <motion.div key="patients-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <PatientList 
+              hospitalId={(session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') ? '' : (session?.hospitalId || currentHospital?.hospital_id || session?.id || '')} 
+              session={session}
+            />
+          </motion.div>
+        )}
         {activeTab === 'hospitals' && (
           (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') 
             ? <HospitalDirectory session={session} activeSubTab={hospitalSubTab} /> 
