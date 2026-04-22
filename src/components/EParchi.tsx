@@ -89,6 +89,17 @@ interface Patient {
   prescribed_special_therapy?: string;
   prescribed_tests?: string;
   fee_amount?: number;
+  bp?: string | null;
+  temp_f?: number | null;
+  pulse_rate?: number | null;
+  respiratory_rate?: number | null;
+  spo2?: number | null;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  bmi?: number | null;
+  rbs?: number | null;
+  hb?: number | null;
+  pain_scale?: number | null;
 }
 
 const getValidityDate = (regDate: string | null | undefined) => {
@@ -1358,6 +1369,11 @@ const handleDownloadPNG = async (patient: Patient) => {
     if (!selectedPatient?.id) return;
     setSaving(true);
     try {
+      if (!formData.diagnosis || formData.diagnosis.trim() === '') {
+        toast.error('Diagnosis is mandatory');
+        setSaving(false);
+        return;
+      }
       // 1. Update patient status
       const prescriptionString = JSON.stringify(prescribedMedicines);
 
@@ -1384,7 +1400,18 @@ const handleDownloadPNG = async (patient: Patient) => {
         prescribed_special_therapy: selectedTherapies.filter(t => t.module_name === 'Special Therapy'),
         prescribed_tests: selectedTests,
         status: 'Consultation Completed',
-        consultation_completed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+        consultation_completed_at: new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        bp: formData.bp,
+        temp_f: formData.temp_f ? parseFloat(formData.temp_f as any) : null,
+        pulse_rate: formData.pulse_rate ? parseInt(formData.pulse_rate as any) : null,
+        respiratory_rate: formData.respiratory_rate ? parseInt(formData.respiratory_rate as any) : null,
+        spo2: formData.spo2 ? parseInt(formData.spo2 as any) : null,
+        weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg as any) : null,
+        height_cm: formData.height_cm ? parseFloat(formData.height_cm as any) : null,
+        bmi: formData.bmi ? parseFloat(formData.bmi as any) : null,
+        rbs: formData.rbs ? parseInt(formData.rbs as any) : null,
+        hb: formData.hb ? parseFloat(formData.hb as any) : null,
+        pain_scale: formData.pain_scale ? parseInt(formData.pain_scale as any) : null
       };
 
       const { error } = await supabase
@@ -1682,6 +1709,27 @@ const handleDownloadPNG = async (patient: Patient) => {
                 <div key={field.id} className="text-[9px] leading-tight flex justify-between gap-1">
                   <span className="font-bold text-slate-600 shrink-0">{field.label}:</span> 
                   <span className="break-words whitespace-pre-wrap text-right">{(patientData as any)[field.id] || '-'}</span>
+                </div>
+              ))}
+              <p className="text-[10.5px] font-bold uppercase text-emerald-700 mt-2 mb-1 border-b border-slate-200 pb-1">Modern Parameters</p>
+              {[
+                { id: 'bp', label: 'BP', unit: ' mmHg' },
+                { id: 'temp_f', label: 'Temp', unit: '\u00B0F' },
+                { id: 'pulse_rate', label: 'Pulse' },
+                { id: 'respiratory_rate', label: 'Resp' },
+                { id: 'spo2', label: 'SpO2', unit: '%' },
+                { id: 'weight_kg', label: 'Wt', unit: ' kg' },
+                { id: 'height_cm', label: 'Ht', unit: ' cm' },
+                { id: 'bmi', label: 'BMI' },
+                { id: 'rbs', label: 'RBS' },
+                { id: 'hb', label: 'Hb' },
+                { id: 'pain_scale', label: 'Pain' },
+              ].filter(field => (patientData as any)[field.id]).map(field => (
+                <div key={field.id} className="text-[9px] leading-tight flex justify-between gap-1">
+                  <span className="font-bold text-slate-600 shrink-0">{field.label}:</span> 
+                  <span className="break-words whitespace-pre-wrap text-right">
+                    {(patientData as any)[field.id]}{field.unit || ''}
+                  </span>
                 </div>
               ))}
             </div>
@@ -2462,7 +2510,47 @@ const handleDownloadPNG = async (patient: Patient) => {
                   </div>
 
                   <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6">Ayurvedic Parameters</h2>
+                    <h2 className="text-xl font-bold text-slate-900 mb-6">Modern Parameters</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      {[
+                        { id: 'bp', label: 'BP (mmHg)' },
+                        { id: 'temp_f', label: 'Temp (F)', type: 'number' },
+                        { id: 'pulse_rate', label: 'Pulse Rate', type: 'number' },
+                        { id: 'respiratory_rate', label: 'Resp Rate', type: 'number' },
+                        { id: 'spo2', label: 'SpO2 (%)', type: 'number' },
+                        { id: 'weight_kg', label: 'Weight (kg)', type: 'number' },
+                        { id: 'height_cm', label: 'Height (cm)', type: 'number' },
+                        { id: 'bmi', label: 'BMI', type: 'number', readOnly: true },
+                        { id: 'rbs', label: 'RBS', type: 'number' },
+                        { id: 'hb', label: 'Hb', type: 'number' },
+                        { id: 'pain_scale', label: 'Pain Scale (0-10)', type: 'number' },
+                      ].map(field => (
+                        <div key={field.id} className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">{field.label}</label>
+                          <input 
+                            type={field.type || 'text'}
+                            readOnly={field.readOnly}
+                            value={(formData as any)[field.id] || ''}
+                            onChange={e => {
+                                const val = e.target.value;
+                                setFormData(prev => {
+                                    const next = {...prev, [field.id]: val};
+                                    if ((field.id === 'weight_kg' || field.id === 'height_cm') && next.weight_kg && next.height_cm) {
+                                        const w = parseFloat(next.weight_kg);
+                                        const h = parseFloat(next.height_cm) / 100;
+                                        if (h > 0) next.bmi = parseFloat((w / (h * h)).toFixed(1));
+                                    }
+                                    return next;
+                                });
+                            }}
+                            className="w-full bg-neutral-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       {[
                         { id: 'nadi', label: 'Nadi' },
