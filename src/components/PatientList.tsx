@@ -85,19 +85,27 @@ interface PatientRecord {
   pain_scale?: number | null;
 }
 
+import { UserSession } from './LoginModal';
+
 interface PatientListProps {
   hospitalId: string;
   hospitalName?: string;
+  session?: UserSession;
 }
 
 type TimeRange = 'today' | 'month' | 'quarter' | 'year' | 'custom';
 
-export default function PatientList({ hospitalId, hospitalName: initialHospitalName }: PatientListProps) {
+export default function PatientList({ hospitalId, hospitalName: initialHospitalName, session }: PatientListProps) {
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [hospitalName, setHospitalName] = useState<string>(initialHospitalName || 'AYUSH HEALTH CENTRE');
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [activeTab, setActiveTab] = useState<'all' | 'opd' | 'teleconsultation'>('all');
+  
+  // New Admin filters
+  const [districtFilter, setDistrictFilter] = useState<string>('All');
+  const [hospitalsList, setHospitalsList] = useState<any[]>([]); // Need to fetch all hospitals if admin
+  const [hospitalFilter, setHospitalFilter] = useState<string>('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -273,7 +281,22 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
 
   useEffect(() => {
     fetchPatients();
-  }, [hospitalId, timeRange, startDate, endDate, activeTab]);
+  }, [hospitalId, timeRange, startDate, endDate, activeTab, districtFilter, hospitalFilter]);
+
+  // Fetch all hospitals for district/hospital filters if admin
+  useEffect(() => {
+    if (session && (session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || session.role === 'DISTRICT_ADMIN')) {
+      const fetchHospitals = async () => {
+        let query = supabase.from('hospitals').select('hospital_id, facility_name, district');
+        if (session.role === 'DISTRICT_ADMIN' && session.district) {
+          query = query.eq('district', session.district);
+        }
+        const { data } = await query;
+        if (data) setHospitalsList(data);
+      };
+      fetchHospitals();
+    }
+  }, [session]);
 
   const fetchPatients = async () => {
     setLoading(true);
@@ -281,8 +304,20 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
       let query = supabase
         .from('patients')
         .select('*')
-        .eq('hospital_id', hospitalId)
         .order('created_at', { ascending: false });
+
+      // Only restrict by hospital_id if a valid UUID is provided
+      if (hospitalId && hospitalId !== 'ALL' && hospitalId !== 'undefined' && hospitalId !== '') {
+        query = query.eq('hospital_id', hospitalId);
+      } else if (session && (session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || session.role === 'DISTRICT_ADMIN')) {
+        // Handle admin filters
+        if (hospitalFilter !== 'All') {
+          query = query.eq('hospital_id', hospitalFilter);
+        } else if (districtFilter !== 'All') {
+          const districtHospitals = hospitalsList.filter(h => h.district === districtFilter).map(h => h.hospital_id);
+          query = query.in('hospital_id', districtHospitals);
+        }
+      }
 
       if (activeTab === 'teleconsultation') {
         query = query.eq('consultation_mode', 'Teleconsultation');
@@ -762,6 +797,44 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
           </div>
         ))}
       </div>
+
+      {/* Admin Filters */}
+      {session && (session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || session.role === 'DISTRICT_ADMIN') && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-6 p-4 flex gap-4">
+          <div className="flex-1">
+            <label className="text-xs font-bold text-slate-500 mb-1 block">District</label>
+            <select
+              value={districtFilter}
+              onChange={(e) => {
+                setDistrictFilter(e.target.value);
+                setHospitalFilter('All');
+              }}
+              className="w-full bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+            >
+              <option value="All">All Districts</option>
+              {[...new Set(hospitalsList.map(h => h.district))].filter(Boolean).sort().map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-bold text-slate-500 mb-1 block">Hospital</label>
+            <select
+              value={hospitalFilter}
+              onChange={(e) => setHospitalFilter(e.target.value)}
+              className="w-full bg-neutral-50 border border-gray-100 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+            >
+              <option value="All">All Hospitals</option>
+              {hospitalsList
+                .filter(h => districtFilter === 'All' || h.district === districtFilter)
+                .sort((a, b) => a.facility_name.localeCompare(b.facility_name))
+                .map(h => (
+                  <option key={h.hospital_id} value={h.hospital_id}>{h.facility_name}</option>
+                ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-6 p-4">

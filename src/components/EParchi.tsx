@@ -2132,7 +2132,7 @@ const handleDownloadPNG = async (patient: Patient) => {
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.name}</label>
                     <input 
                       value={formData.name}
-                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      onChange={e => setFormData({...formData, name: e.target.value.replace(/\b\w/g, char => char.toUpperCase())})}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                       required
                     />
