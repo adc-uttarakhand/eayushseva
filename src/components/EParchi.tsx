@@ -914,11 +914,7 @@ const handleDownloadPNG = async (patient: Patient) => {
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'registration' && formData.registration_date) {
-      generateSerials(formData.registration_date);
-    }
-  }, [formData.registration_date, activeTab]);
+  // Serial generation is now handled explicitly on new patient creation.
 
   const fetchPatientHistory = async (aadhar: string, mobile: string) => {
     if (!aadhar && !mobile) return;
@@ -943,7 +939,7 @@ const handleDownloadPNG = async (patient: Patient) => {
     setLoading(true);
     try {
       const cleanQuery = searchQuery.replace(/[^0-9]/g, '');
-      let query = supabase.from('patients').select('*').eq('hospital_id', hospitalId);
+      let query = supabase.from('patients').select('*').eq('hospital_id', hospitalId).eq('is_new', true);
       
       if (cleanQuery) {
         query = query.or(`hospital_yearly_serial.ilike.%${cleanQuery}%,mobile.ilike.%${cleanQuery}%`);
@@ -1013,33 +1009,38 @@ const handleDownloadPNG = async (patient: Patient) => {
       setOriginalPatient(baseRecord);
 
       // 2. Count existing False rows for revisit count
-      const { count: falseRowsCount } = await supabase
+      let countQuery = supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_yearly_serial', baseRecord.hospital_yearly_serial)
         .eq('hospital_id', baseRecord.hospital_id)
         .eq('is_new', false);
+      
+      if (!patient.is_new) {
+        countQuery = countQuery.neq('id', patient.id);
+      }
+      
+      const { count: falseRowsCount } = await countQuery;
 
       const nextRevisitCount = (falseRowsCount || 0) + 1;
+      
       const registrationDate = new Date(baseRecord.registration_date || baseRecord.created_at);
       const comparisonDate = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
       const diffDays = Math.ceil(Math.abs(comparisonDate.getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
       
       const history = await fetchPatientHistory(patient.aadhar, patient.mobile) || [];
-      const historyLength = history.length;
-
+      const historyLength = history.length;      
       if (diffDays <= 15) {
-        const targetRegistrationDate = baseRecord.registration_date || baseRecord.created_at || '';
         setFormData({ 
-          ...patient, 
-          global_serial: baseRecord.global_serial || patient.global_serial || '', 
+          ...baseRecord, 
           assigned_doctor_id: '',
           revisit_count: nextRevisitCount,
-          registration_date: targetRegistrationDate
+          registration_date: baseRecord.registration_date || baseRecord.created_at || ''
         });
-        setGlobalSerial(baseRecord.global_serial || patient.global_serial);
-        setHospitalYearlySerial(baseRecord.hospital_yearly_serial || patient.hospital_yearly_serial);
-        
+        setRevisitCount(nextRevisitCount);
+        setGlobalSerial(baseRecord.global_serial || '');
+        setHospitalYearlySerial(baseRecord.hospital_yearly_serial || '');
+        setIsNew(false);
         const now = comparisonDate;
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
@@ -1051,25 +1052,17 @@ const handleDownloadPNG = async (patient: Patient) => {
           .lte('created_at', endOfDay);
           
         setDailyOpdNumber(((dailyCount || 0) + 1).toString().padStart(2, '0'));
-        setRevisitCount(nextRevisitCount);
-        setIsNew(false);
       } else {
-        toast('Patient last visit was more than 15 days ago. They will be registered as a New Patient, but personal details have been auto-filled.', {
-          icon: 'ℹ️',
-          duration: 5000
-        });
-        setFormData({
-          ...patient,
-          complaints: '',
-          diagnosis: '',
-          prescription: '',
-          global_serial: '',
+        setFormData({ 
+          ...baseRecord, 
           assigned_doctor_id: '',
-          registration_date: legacyMode && formData.registration_date ? formData.registration_date : new Date().toISOString().split('T')[0]
+          revisit_count: nextRevisitCount,
+          registration_date: baseRecord.registration_date || baseRecord.created_at || ''
         });
-        setRevisitCount(historyLength);
-        generateSerials();
-        setIsNew(true);
+        setRevisitCount(nextRevisitCount);
+        setGlobalSerial(baseRecord.global_serial || '');
+        setHospitalYearlySerial(baseRecord.hospital_yearly_serial || '');
+        setIsNew(false);
       }
     } catch (err) {
       console.error('Select patient error:', err);
@@ -1462,7 +1455,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       globalSerial: 'Global Serial',
       hospitalSerial: 'Hospital Yearly Serial',
       dailyOpd: 'Daily OPD No.',
-      date: 'Date',
+      date: 'Registration Date',
       prescription: 'Prescription',
       revisit: 'Revisit Count',
       preview: 'Parchi Preview'
@@ -1486,7 +1479,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       globalSerial: 'ग्लोबल सीरियल',
       hospitalSerial: 'अस्पताल वार्षिक सीरियल',
       dailyOpd: 'दैनिक ओपीडी नंबर',
-      date: 'दिनांक',
+      date: 'पंजीकरण दिनांक',
       prescription: 'नुस्खा',
       revisit: 'पुनरावृत्ति गणना',
       preview: 'पर्ची पूर्वावलोकन'
@@ -1638,10 +1631,10 @@ const handleDownloadPNG = async (patient: Patient) => {
           <div className="flex gap-3">
             <p><span className="font-bold">Date:</span> {new Date(patientData.created_at || new Date()).toLocaleDateString()}</p>
             <p><span className="font-bold">Valid Until:</span> {getValidityDate(patientData.registration_date || patientData.created_at)}</p>
-            <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial || hospitalYearlySerial}</p>
-            <p><span className="font-bold">Daily OPD:</span> {patientData.daily_opd_number || dailyOpdNumber}</p>
+            <p><span className="font-bold">Yearly:</span> {patientData.hospital_yearly_serial}</p>
+            <p><span className="font-bold">Daily OPD:</span> {patientData.daily_opd_number}</p>
             <p><span className="font-bold">Type:</span> {patientData.is_new ? 'New' : 'Revisit'}</p>
-            <p><span className="font-bold">Revisit:</span> {(patientData.revisit_count || revisitCount).toString().padStart(2, '0')}</p>
+            <p><span className="font-bold">Revisit:</span> {(patientData.revisit_count || 0).toString().padStart(2, '0')}</p>
           </div>
         </div>
 
@@ -1655,7 +1648,7 @@ const handleDownloadPNG = async (patient: Patient) => {
               globalSerial: patientData.global_serial,
               hospitalSerial: patientData.hospital_yearly_serial,
               type: patientData.is_new ? 'New' : 'Revisit',
-              revisitCount: patientData.revisit_count || revisitCount,
+              revisitCount: patientData.revisit_count || 0,
               name: patientData.name,
               age: patientData.age,
               gender: patientData.gender,
@@ -2001,9 +1994,10 @@ const handleDownloadPNG = async (patient: Patient) => {
                 </div>
 
                 {patients.filter(p => {
+                    if (legacyMode) return true;
                     const regDate = p.registration_date || p.created_at;
                     if (!regDate) return false;
-                    const today = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
+                    const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const vtDate = new Date(regDate);
                     vtDate.setDate(vtDate.getDate() + 14);
@@ -2012,9 +2006,10 @@ const handleDownloadPNG = async (patient: Patient) => {
                   }).length > 0 && (
                   <div className="mt-6 space-y-2">
                     {patients.filter(p => {
+                      if (legacyMode) return true;
                       const regDate = p.registration_date || p.created_at;
                       if (!regDate) return false;
-                      const today = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
+                      const today = new Date();
                       today.setHours(0, 0, 0, 0);
                       const vtDate = new Date(regDate);
                       vtDate.setDate(vtDate.getDate() + 14);
@@ -2059,7 +2054,21 @@ const handleDownloadPNG = async (patient: Patient) => {
 
             <form onSubmit={handleRegistrationSubmit} className="space-y-8">
               <div className="grid grid-cols-6 gap-3">
-                <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
+                {!isNew && (
+                  <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Calendar size={12} />
+                      <span className="text-[9px] font-bold uppercase tracking-wider">Revisit Date</span>
+                    </div>
+                    <input 
+                      type="date"
+                      value={formData.revisit_date?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                      onChange={e => setFormData({...formData, revisit_date: e.target.value})}
+                      className="font-semibold text-emerald-700 text-xs bg-emerald-50 border-none px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                )}
+                <div className={`bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between ${!isNew ? 'col-span-2' : 'col-span-2'}`}>
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Calendar size={12} />
                     <span className="text-[9px] font-bold uppercase tracking-wider">{cur.date}</span>
@@ -2067,12 +2076,13 @@ const handleDownloadPNG = async (patient: Patient) => {
                   {legacyMode ? (
                     <input 
                       type="date"
+                      readOnly={!isNew}
                       value={formData.registration_date?.split('T')[0] || ''}
-                      onChange={e => setFormData({...formData, registration_date: e.target.value})}
-                      className="font-semibold text-amber-700 text-xs bg-amber-50 border-none px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-amber-500/20"
+                      onChange={e => isNew && setFormData({...formData, registration_date: e.target.value})}
+                      className={`font-semibold text-xs border-none px-2 py-0.5 rounded focus:outline-none ${!isNew ? 'text-slate-500 bg-slate-100' : 'text-amber-700 bg-amber-50 focus:ring-1 focus:ring-amber-500/20'}`}
                     />
                   ) : (
-                    <p className="font-semibold text-slate-800 text-xs">{new Date().toLocaleDateString()}</p>
+                    <p className="font-semibold text-slate-800 text-xs">{new Date(formData.registration_date || '').toLocaleDateString()}</p>
                   )}
                 </div>
                 <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between col-span-2">
@@ -2356,20 +2366,22 @@ const handleDownloadPNG = async (patient: Patient) => {
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Mobile</th>
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Aadhar</th>
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Reg Date</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Revisit Date</th>
+                  <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Visit Type</th>
                   <th className="text-left py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Valid Until</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center">
+                    <td colSpan={9} className="py-12 text-center">
                       <Loader2 className="animate-spin mx-auto text-emerald-600 mb-2" size={32} />
                       <p className="text-slate-500 font-medium">Loading registrations...</p>
                     </td>
                   </tr>
                 ) : registrationList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center">
+                    <td colSpan={9} className="py-12 text-center">
                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FileText className="text-slate-300" size={32} />
                       </div>
@@ -2378,12 +2390,20 @@ const handleDownloadPNG = async (patient: Patient) => {
                   </tr>
                 ) : (
                   registrationList
-                    .filter(p => !searchQuery || 
+                    .filter(p => {
+                      const validityDate = new Date(new Date(p.registration_date || p.created_at).getTime() + 14 * 24 * 60 * 60 * 1000);
+                      
+                      // Show new registrations within validity, OR all revisits (is_new === false)
+                      const isNewValid = (p.is_new === true && validityDate >= new Date(new Date().setHours(0,0,0,0))) || (p.is_new === false);
+                      
+                      const matchesSearch = !searchQuery || 
                                  p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                                  p.mobile.includes(searchQuery) ||
                                  (p.aadhar && p.aadhar.includes(searchQuery)) ||
-                                 p.hospital_yearly_serial.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
+                                 p.hospital_yearly_serial.toLowerCase().includes(searchQuery.toLowerCase());
+                      
+                      return matchesSearch && isNewValid;
+                    })
                     .map(p => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
                         <td className="py-4 px-4 text-sm font-bold text-slate-900">{p.name} ({p.age}/{p.gender})</td>
@@ -2391,6 +2411,17 @@ const handleDownloadPNG = async (patient: Patient) => {
                         <td className="py-4 px-4 text-sm text-slate-600">{p.mobile}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{p.aadhar || '---'}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.revisit_date ? new Date(p.revisit_date).toLocaleDateString() : '---'}</td>
+                        <td className="py-4 px-4 text-sm">
+                          {p.is_new ? (
+                            <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">New</span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">Revisit</span>
+                              <span className="w-5 h-5 flex items-center justify-center bg-amber-600 text-white rounded-full text-[10px] font-bold">{p.revisit_count || 1}</span>
+                            </div>
+                          )}
+                        </td>
                         <td className="py-4 px-4 text-sm text-emerald-700">{getValidityDate(p.registration_date || p.created_at)}</td>
                         <td className="py-4 px-4 text-right flex justify-end gap-2">
                           <button onClick={() => setShowPreviewModal(p)} className="p-2 bg-emerald-50 rounded-lg text-emerald-600 hover:bg-emerald-100" title="Preview">
