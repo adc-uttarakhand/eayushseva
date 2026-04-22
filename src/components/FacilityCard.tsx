@@ -67,7 +67,7 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
           <div className="flex-1">
             <h3 className="font-bold text-lg text-slate-900 leading-tight">{name}</h3>
             <div className="flex items-center gap-1 text-slate-500 mt-1">
-              <MapPin size={14} />
+              <MapPin size={6} />
               <span className="text-sm">{district}, Uttarakhand</span>
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function FacilityCard({ name, rating, ratingCount = 0, district, 
             {rating > 0 && (
               <>
                 <div className="flex items-center gap-1 bg-neutral-50 px-2 py-1 rounded-lg">
-                  <Star size={14} className="fill-amber-400 text-amber-400" />
+                  <Star size={6} className="fill-amber-400 text-amber-400" />
                   <span className="text-sm font-bold">{(Number(rating) || 0).toFixed(1)}</span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-bold mt-1">({ratingCount} reviews)</span>

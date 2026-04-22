@@ -6,9 +6,10 @@ interface ServiceRecordTabProps {
   isAdminMode: boolean;
   onBack?: () => void;
   hospitals?: any[];
+  employmentType?: string;
 }
 
-export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, hospitals = [] }: ServiceRecordTabProps) {
+export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, hospitals = [], employmentType }: ServiceRecordTabProps) {
   // Yahan humne 3 tabs ke liye state add kar di hai
   const [activeSubTab, setActiveSubTab] = useState<'basic' | 'service' | 'trainings'>('basic');
 
@@ -31,18 +32,22 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, h
         >
           Basic Info
         </button>
-        <button 
-          onClick={() => setActiveSubTab('service')}
-          className={`pb-3 font-bold text-sm ${activeSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
-        >
-          Service Record
-        </button>
-        <button 
-          onClick={() => setActiveSubTab('trainings')}
-          className={`pb-3 font-bold text-sm ${activeSubTab === 'trainings' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
-        >
-          Trainings
-        </button>
+        {!(isAdminMode && employmentType !== 'Permanent') && (
+          <button 
+            onClick={() => setActiveSubTab('service')}
+            className={`pb-3 font-bold text-sm ${activeSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Service Record
+          </button>
+        )}
+        {!(isAdminMode && employmentType !== 'Permanent') && (
+          <button 
+            onClick={() => setActiveSubTab('trainings')}
+            className={`pb-3 font-bold text-sm ${activeSubTab === 'trainings' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Trainings
+          </button>
+        )}
       </div>
 
       <div className="bg-transparent w-full">
@@ -50,7 +55,8 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, h
           staffId={targetStaffId} 
           userRole={isAdminMode ? 'ADMIN' : 'STAFF'} 
           hospitals={hospitals} 
-          activeSubTab={activeSubTab} 
+          activeSubTab={activeSubTab}
+          employmentType={employmentType}
         />
       </div>
     </div>

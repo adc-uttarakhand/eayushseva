@@ -81,6 +81,7 @@ interface ProfilerProps {
   hospitals: any[];
   activeSubTab: 'basic' | 'service' | 'trainings';
   onDirtyChange?: (isDirty: boolean) => void;
+  employmentType?: string;
 }
 
 export default function Profiler({ staffId, userRole, isIncharge, hospitalName, hospitals: propHospitals, activeSubTab, onDirtyChange }: ProfilerProps) {

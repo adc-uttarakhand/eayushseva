@@ -65,6 +65,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
       setActiveTab(activeSubTab);
     }
   }, [activeSubTab]);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'panchakarma' | 'coe' | 'supraja' | 'verified'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     district: 'All',
@@ -215,7 +216,13 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
     const matchesStatus = filters.status === 'All' || h.status === filters.status;
     const matchesAbove7000ft = filters.above7000ft === 'All' || h.above_7000_feet === filters.above7000ft;
     
-    return matchesSearch && matchesDistrict && matchesType && matchesSystem && matchesRegion && matchesStatus && matchesAbove7000ft;
+    let matchesFilter = true;
+    if (activeFilter === 'panchakarma') matchesFilter = !!h.panchakarma_centre;
+    else if (activeFilter === 'coe') matchesFilter = !!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false';
+    else if (activeFilter === 'supraja') matchesFilter = !!h.supraja_centre;
+    else if (activeFilter === 'verified') matchesFilter = !!h.is_verified;
+    
+    return matchesSearch && matchesDistrict && matchesType && matchesSystem && matchesRegion && matchesStatus && matchesAbove7000ft && matchesFilter;
   });
 
   const handleDownloadExcel = () => {
@@ -347,9 +354,36 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
               </div>
             ) : (
               <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                <div className="p-4 border-b border-gray-100">
-                  <button className="bg-emerald-600 text-white px-4 py-2 rounded-full font-bold text-sm">
-                    Total Hospitals: {filteredHospitals.length}
+                <div className="p-4 border-b border-gray-100 flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => setActiveFilter('all')}
+                    className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                  >
+                    Total: {hospitals.length}
+                  </button>
+                  <button 
+                    onClick={() => setActiveFilter('panchakarma')}
+                    className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeFilter === 'panchakarma' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-800'}`}
+                  >
+                    Panchakarma: {hospitals.filter(h => h.panchakarma_centre).length}
+                  </button>
+                  <button 
+                    onClick={() => setActiveFilter('coe')}
+                    className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeFilter === 'coe' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-800'}`}
+                  >
+                    CoE: {hospitals.filter(h => !!h.centre_of_excellence && h.centre_of_excellence !== 'False' && h.centre_of_excellence !== 'false').length}
+                  </button>
+                  <button 
+                    onClick={() => setActiveFilter('supraja')}
+                    className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeFilter === 'supraja' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'}`}
+                  >
+                    Supraja: {hospitals.filter(h => h.supraja_centre).length}
+                  </button>
+                  <button 
+                    onClick={() => setActiveFilter('verified')}
+                    className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeFilter === 'verified' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'}`}
+                  >
+                    Verified: {hospitals.filter(h => h.is_verified).length}
                   </button>
                 </div>
                 {/* Desktop Table View */}
@@ -394,6 +428,11 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                                   CoE: {h.centre_of_excellence === 'True' ? 'Yes' : h.centre_of_excellence}
                                 </span>
                               )}
+                              {h.panchakarma_centre && (
+                                <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest rounded-full ml-6 mt-1">
+                                  Panchakarma Centre
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="py-4 px-6 text-slate-600">{h.district}</td>
@@ -421,7 +460,16 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
                       }}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <div className="font-bold text-slate-900">{h.facility_name}</div>
+                        <div className="font-bold text-slate-900">
+                          {h.facility_name}
+                          {h.panchakarma_centre && (
+                            <div className="mt-1">
+                              <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                                Panchakarma Centre
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${h.status === 'Active' || h.status === 'Sugam' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
                           {h.status || 'N/A'}
                         </span>

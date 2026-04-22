@@ -182,10 +182,46 @@ export default function PanchakarmaModule({ session }: { session: any }) {
     });
   };
 
-  const hospitalName = session?.hospitalName || 'AYUSH Hospital';
-  const staffName = session?.full_name || 'Staff Member';
-  const staffRole = session?.role || 'Staff';
+  const [displayHospitalName, setDisplayHospitalName] = useState(session?.hospital_name || session?.hospitalName || 'AYUSH Hospital');
+  const [displayStaffRole, setDisplayStaffRole] = useState(session?.role || 'Staff');
+  const [staffName] = useState(session?.full_name || session?.name || 'Staff Member');
+
   const hospitalId = session?.activeHospitalId || session?.hospitalId || session?.id;
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      console.log("PanchakarmaModule Debug: hospitalId used for query:", hospitalId);
+      // If hospital name is missing or we could fetch it explicitly
+      if (hospitalId) {
+        // Since 'id' and 'facility_id' don't exist, try matching using 'facility_name'
+        // as the identifier if that's what's available
+        const { data: hospData, error: hospErr } = await supabase
+          .from('hospitals')
+          .select('*')
+          .eq('facility_name', hospitalId)
+          .maybeSingle();
+
+        console.log("PanchakarmaModule Debug: Hospital Query Result (Using facility_name as ID):", { hospData, hospErr, hospitalId });
+        
+        if (hospData) {
+          setDisplayHospitalName(hospData.facility_name || hospData.facilty_name || hospData.hospital_name || 'AYUSH Hospital');
+        } else if (hospErr) {
+          console.error("PanchakarmaModule Debug: Hospital Query Error:", hospErr);
+        }
+      }
+      
+      // Fetch role
+      if (session?.user?.id || session?.id) {
+         const { data: staffData, error: staffErr } = await supabase
+           .from('staff')
+           .select('role')
+           .eq('id', session?.user?.id || session?.id)
+           .maybeSingle();
+         if (staffData) setDisplayStaffRole(staffData.role);
+      }
+    };
+    fetchMetadata();
+  }, [hospitalId, session?.user?.id, session?.id]);
 
   useEffect(() => {
     fetchMasterTherapies();
@@ -265,11 +301,12 @@ export default function PanchakarmaModule({ session }: { session: any }) {
     const fifteenDaysAgo = new Date();
     fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
     
-    // Search by name OR hospital_yearly_serial
+    // Search by name OR hospital_yearly_serial, only for new registrations
     const { data, error } = await supabase
       .from('patients')
       .select('*')
       .eq('hospital_id', hospitalId)
+      .eq('is_new', true)
       .gte('created_at', fifteenDaysAgo.toISOString())
       .or(`name.ilike.%${query}%,hospital_yearly_serial.ilike.%${query}%`)
       .limit(5);
@@ -353,20 +390,19 @@ export default function PanchakarmaModule({ session }: { session: any }) {
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
-            <Stethoscope size={24} />
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-900">{staffName}</span>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{displayStaffRole}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
+                <Bell size={20} />
+              </button>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 leading-none">{staffName}</h2>
-            <p className="text-[10px] font-medium text-slate-500 mt-1 uppercase tracking-wider">{staffRole} • {hospitalName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
-            <Bell size={20} />
-          </button>
         </div>
       </header>
 
@@ -435,6 +471,10 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                           <div>
                             <p className="text-sm font-bold text-slate-900">{p.name}</p>
                             <p className="text-[10px] text-slate-500">OPD: {p.hospital_yearly_serial} • {p.age}y/{p.gender}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">
+                              Reg: {new Date(p.created_at).toLocaleDateString()} • 
+                              Valid Until: {new Date(new Date(p.registration_date || p.created_at).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                            </p>
                           </div>
                           <ChevronRight size={16} className="text-slate-300" />
                         </button>
@@ -473,10 +513,18 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                         <X size={16} />
                       </button>
                     </div>
-                    <div className="mt-6 flex items-center gap-4">
+                    <div className="mt-6 flex items-center gap-4 flex-wrap">
                       <div className="bg-white/20 px-4 py-2 rounded-xl">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-100">OPD Number</p>
                         <p className="text-sm font-bold">{selectedPatient.hospital_yearly_serial}</p>
+                      </div>
+                      <div className="bg-white/20 px-4 py-2 rounded-xl">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-100">Reg Date</p>
+                        <p className="text-sm font-bold">{new Date(selectedPatient.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="bg-white/20 px-4 py-2 rounded-xl">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-100">Valid Until</p>
+                        <p className="text-sm font-bold">{new Date(new Date(selectedPatient.registration_date || selectedPatient.created_at).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
@@ -490,9 +538,9 @@ export default function PanchakarmaModule({ session }: { session: any }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Select Therapies</label>
                   <button 
                     onClick={() => setIsTherapySearchOpen(true)}
-                    className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1"
+                    className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-100 transition-all"
                   >
-                    <Plus size={12} /> Add Therapy
+                    <Plus size={16} /> Add Therapy
                   </button>
                 </div>
                 
