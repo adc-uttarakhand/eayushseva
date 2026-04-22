@@ -1025,7 +1025,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       const comparisonDate = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
       const diffDays = Math.ceil(Math.abs(comparisonDate.getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      const history = await fetchPatientHistory(patient.aadhar, patient.mobile);
+      const history = await fetchPatientHistory(patient.aadhar, patient.mobile) || [];
       const historyLength = history.length;
 
       if (diffDays <= 15) {
