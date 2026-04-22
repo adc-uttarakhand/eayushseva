@@ -1884,23 +1884,35 @@ const handleDownloadPNG = async (patient: Patient) => {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 px-1">
-              <button
-                type="button"
-                onClick={() => setLegacyMode(!legacyMode)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  legacyMode 
-                    ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-500/20 shadow-sm' 
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                }`}
-              >
-                <History size={14} className={legacyMode ? 'animate-pulse' : ''} />
-                Legacy Data Entry
-              </button>
-              {legacyMode && (
-                <span className="text-[10px] text-amber-600 font-medium italic animate-pulse">
-                  * Back-date mode enabled
-                </span>
+            <div className="flex flex-col gap-3 px-1 mb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLegacyMode(!legacyMode)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all ${
+                    legacyMode 
+                      ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500/20 shadow-sm' 
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  <History size={16} className={legacyMode ? 'animate-pulse' : ''} />
+                  Legacy Data Entry
+                </button>
+                {legacyMode && (
+                  <span className="text-xs text-emerald-600 font-bold italic animate-pulse flex items-center gap-1">
+                    <CheckCircle size={12} /> Back-date mode enabled
+                  </span>
+                )}
+              </div>
+              {!legacyMode && (
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex gap-3 items-start max-w-2xl">
+                  <div className="bg-amber-500 text-white p-1.5 rounded-lg mt-0.5">
+                    <History size={16} />
+                  </div>
+                  <p className="text-[11px] font-bold text-amber-800 leading-relaxed uppercase tracking-tight">
+                    1 अप्रैल 2026 से मरीज पोर्टल में भरने हेतु Legacy Data Entry बटन को ऑन करें, इससे आप डेट कॉलम में पुरानी डेट डाल सकते हैं।
+                  </p>
+                </div>
               )}
             </div>
 
