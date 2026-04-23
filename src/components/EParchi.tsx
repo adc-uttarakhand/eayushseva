@@ -742,6 +742,16 @@ const handleDownloadPNG = async (patient: Patient) => {
     }
   }, [hospitalId, activeTab]);
 
+  useEffect(() => {
+    if (isNew && activeTab === 'registration') {
+      generateSerials();
+    }
+  }, [isNew, activeTab]);
+
+  useEffect(() => {
+    generateSerials();
+  }, [hospitalId]);
+
   const fetchDispensingQueue = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -881,6 +891,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       const { count: globalCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
+        .eq('is_new', true)
         .gte('created_at', fyStartDate)
         .lt('created_at', fyEndDate);
 
@@ -888,6 +899,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
+        .eq('is_new', true)
         .gte('created_at', fyStartDate)
         .lt('created_at', fyEndDate);
 
