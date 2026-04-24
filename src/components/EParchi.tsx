@@ -744,13 +744,28 @@ const handleDownloadPNG = async (patient: Patient) => {
 
   useEffect(() => {
     if (isNew && activeTab === 'registration') {
-      generateSerials();
+      const dateToUse = legacyMode && formData.registration_date ? formData.registration_date : undefined;
+      generateSerials(dateToUse);
     }
-  }, [isNew, activeTab]);
+  }, [isNew, activeTab, legacyMode, formData.registration_date]);
 
   useEffect(() => {
-    generateSerials();
+    const dateToUse = legacyMode && formData.registration_date ? formData.registration_date : undefined;
+    generateSerials(dateToUse);
   }, [hospitalId]);
+
+  useEffect(() => {
+    if (isNew && legacyMode && formData.registration_date) {
+      generateSerials(formData.registration_date);
+    }
+  }, [legacyMode, formData.registration_date]);
+
+  useEffect(() => {
+    if (!legacyMode) {
+      const today = new Date().toLocaleDateString('en-CA');
+      setFormData(prev => ({ ...prev, registration_date: today }));
+    }
+  }, [legacyMode]);
 
   const fetchDispensingQueue = async () => {
     try {
@@ -876,8 +891,8 @@ const handleDownloadPNG = async (patient: Patient) => {
       const year = now.getFullYear();
       const month = now.getMonth();
       const fyStartYear = month >= 3 ? year : year - 1;
-      const fyStartDate = new Date(fyStartYear, 3, 1).toISOString();
-      const fyEndDate = new Date(fyStartYear + 1, 3, 1).toISOString();
+      const fyStartDate = `${fyStartYear}-04-01`;
+      const fyEndDate = `${fyStartYear + 1}-04-01`;
       
       const { data: hospitalData } = await supabase
         .from('hospitals')
@@ -892,26 +907,25 @@ const handleDownloadPNG = async (patient: Patient) => {
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('is_new', true)
-        .gte('created_at', fyStartDate)
-        .lt('created_at', fyEndDate);
+        .gte('registration_date', fyStartDate)
+        .lt('registration_date', fyEndDate);
 
       const { count: hospitalCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
         .eq('is_new', true)
-        .gte('created_at', fyStartDate)
-        .lt('created_at', fyEndDate);
+        .gte('registration_date', fyStartDate)
+        .lt('registration_date', fyEndDate);
 
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const todayStr = `${year}-${pad(month + 1)}-${pad(now.getDate())}`;
 
       const { count: dailyCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
-        .gte('created_at', startOfDay)
-        .lte('created_at', endOfDay);
+        .eq('registration_date', todayStr);
 
       const nextGlobal = (globalCount || 0) + 1;
       const nextHospital = (hospitalCount || 0) + 1;
@@ -1036,6 +1050,18 @@ const handleDownloadPNG = async (patient: Patient) => {
 
       const nextRevisitCount = (falseRowsCount || 0) + 1;
       
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      const { count: dailyCount } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('hospital_id', baseRecord.hospital_id)
+        .eq('registration_date', todayStr);
+
+      setDailyOpdNumber((dailyCount! + 1).toString().padStart(2, '0'));
+      
       const registrationDate = new Date(baseRecord.registration_date || baseRecord.created_at);
       const comparisonDate = legacyMode && formData.registration_date ? new Date(formData.registration_date) : new Date();
       const diffDays = Math.ceil(Math.abs(comparisonDate.getTime() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -1104,7 +1130,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         is_new: isNew,
         created_at: actualNow,
         registration_date: isNew 
-          ? actualNow 
+          ? new Date(actualNow).toISOString().split('T')[0]
           : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
         revisit_date: isNew ? null : actualNow,
         status: formData.assigned_doctor_id === 'teleconsultation' ? 'Completed' : 'Waiting',
@@ -1135,6 +1161,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       if (error) throw error;
       
       toast.success(formData.assigned_doctor_id === 'teleconsultation' ? 'Teleconsultation recorded successfully!' : 'Patient registered and sent for consultation successfully!');
+      const legacyDateUsed = legacyMode && formData.registration_date ? formData.registration_date : undefined;
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
         patient_location: '', detailed_address: '',
@@ -1146,7 +1173,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       setLegacyMode(false);
       setOriginalPatient(null);
       setPatientHistory([]);
-      generateSerials(formData.registration_date);
+      generateSerials(legacyDateUsed);
       setIsNew(true);
     } catch (err) {
       console.error('Save error:', err);
@@ -1180,7 +1207,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         is_new: isNew,
         created_at: actualNow,
         registration_date: isNew 
-          ? actualNow 
+          ? new Date(actualNow).toISOString().split('T')[0]
           : (originalPatient?.registration_date || originalPatient?.created_at || formData.registration_date),
         revisit_date: isNew ? null : actualNow,
         status: 'Completed',
@@ -1213,6 +1240,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       window.print();
 
       toast.success('Offline Parchi recorded and PDF generated!');
+      const legacyDateUsed = legacyMode && formData.registration_date ? formData.registration_date : undefined;
       setFormData({
         name: '', age: '', gender: 'Male', mobile: '', aadhar: '',
         patient_location: '', detailed_address: '',
@@ -1223,7 +1251,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       });
       setLegacyMode(false);
       setOriginalPatient(null);
-      generateSerials();
+      generateSerials(legacyDateUsed);
       setIsNew(true);
     } catch (err) {
       console.error('Save error:', err);
@@ -1457,7 +1485,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       age: 'Age',
       gender: 'Gender',
       mobile: 'Mobile Number',
-      aadhar: 'Aadhar Number',
+      aadhar: 'Aadhar (last 4 digits)',
       complaints: 'Complaints',
       diagnosis: 'Diagnosis',
       history: 'History',
@@ -1481,7 +1509,7 @@ const handleDownloadPNG = async (patient: Patient) => {
       age: 'आयु',
       gender: 'लिंग',
       mobile: 'मोबाइल नंबर',
-      aadhar: 'आधार नंबर',
+      aadhar: 'आधार (अंतिम 4 अंक)',
       complaints: 'शिकायतें',
       diagnosis: 'निदान',
       history: 'इतिहास',
@@ -2192,7 +2220,8 @@ const handleDownloadPNG = async (patient: Patient) => {
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-3">{cur.aadhar}</label>
                     <input 
                       value={formData.aadhar}
-                      onChange={e => setFormData({...formData, aadhar: e.target.value})}
+                      onChange={e => setFormData({...formData, aadhar: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})}
+                      maxLength={4}
                       className="w-full bg-neutral-50 border border-gray-100 rounded-lg py-2 px-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 text-sm"
                     />
                   </div>
@@ -2406,15 +2435,13 @@ const handleDownloadPNG = async (patient: Patient) => {
                       const validityDate = new Date(new Date(p.registration_date || p.created_at).getTime() + 14 * 24 * 60 * 60 * 1000);
                       
                       // Show new registrations within validity, OR all revisits (is_new === false)
-                      const isNewValid = (p.is_new === true && validityDate >= new Date(new Date().setHours(0,0,0,0))) || (p.is_new === false);
-                      
                       const matchesSearch = !searchQuery || 
                                  p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                                  p.mobile.includes(searchQuery) ||
                                  (p.aadhar && p.aadhar.includes(searchQuery)) ||
                                  p.hospital_yearly_serial.toLowerCase().includes(searchQuery.toLowerCase());
                       
-                      return matchesSearch && isNewValid;
+                      return matchesSearch;
                     })
                     .map(p => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
@@ -2422,7 +2449,7 @@ const handleDownloadPNG = async (patient: Patient) => {
                         <td className="py-4 px-4 text-sm text-emerald-700 font-bold">{p.hospital_yearly_serial}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{p.mobile}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{p.aadhar || '---'}</td>
-                        <td className="py-4 px-4 text-sm text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600">{p.registration_date ? new Date(p.registration_date).toLocaleDateString() : '---'}</td>
                         <td className="py-4 px-4 text-sm text-slate-600">{p.revisit_date ? new Date(p.revisit_date).toLocaleDateString() : '---'}</td>
                         <td className="py-4 px-4 text-sm">
                           {p.is_new ? (
