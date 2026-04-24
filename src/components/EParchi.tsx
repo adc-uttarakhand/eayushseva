@@ -890,6 +890,12 @@ const handleDownloadPNG = async (patient: Patient) => {
       const now = dateStr ? new Date(dateStr) : new Date();
       const year = now.getFullYear();
       const month = now.getMonth();
+      const day = now.getDate();
+
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const targetDateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+
+      // Financial Year Logic
       const fyStartYear = month >= 3 ? year : year - 1;
       const fyStartDate = `${fyStartYear}-04-01`;
       const fyEndDate = `${fyStartYear + 1}-04-01`;
@@ -918,14 +924,11 @@ const handleDownloadPNG = async (patient: Patient) => {
         .gte('registration_date', fyStartDate)
         .lt('registration_date', fyEndDate);
 
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      const todayStr = `${year}-${pad(month + 1)}-${pad(now.getDate())}`;
-
       const { count: dailyCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
-        .eq('registration_date', todayStr);
+        .eq('registration_date', targetDateStr);
 
       const nextGlobal = (globalCount || 0) + 1;
       const nextHospital = (hospitalCount || 0) + 1;
