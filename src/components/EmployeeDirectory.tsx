@@ -38,7 +38,7 @@ interface Hospital {
 interface EmployeeDirectoryProps {
   hospitals: Hospital[];
   session?: UserSession | null;
-  onStaffClick: (staffId: string) => void;
+  onStaffClick: (staff: Staff) => void;
 }
 
 export default function EmployeeDirectory({ hospitals, session, onStaffClick }: EmployeeDirectoryProps) {
@@ -368,7 +368,7 @@ export default function EmployeeDirectory({ hospitals, session, onStaffClick }: 
                 {filteredStaff.map(s => {
                   const hospital = hospitals.find(h => h.hospital_id === s.hospital_id);
                   return (
-                      <tr key={s.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors cursor-pointer" onClick={() => onStaffClick(s.id)}>
+                      <tr key={s.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors cursor-pointer" onClick={() => onStaffClick(s)}>
                       <td className="py-4 px-6 font-bold text-slate-900">
                         <div className="flex items-center gap-3">
                           {s.photograph_url ? (

@@ -32,7 +32,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, h
         >
           Basic Info
         </button>
-        {!(isAdminMode && employmentType !== 'Permanent') && (
+        {employmentType === 'Permanent' && (
           <button 
             onClick={() => setActiveSubTab('service')}
             className={`pb-3 font-bold text-sm ${activeSubTab === 'service' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}
@@ -40,7 +40,7 @@ export default function ServiceRecordTab({ targetStaffId, isAdminMode, onBack, h
             Service Record
           </button>
         )}
-        {!(isAdminMode && employmentType !== 'Permanent') && (
+        {employmentType === 'Permanent' && (
           <button 
             onClick={() => setActiveSubTab('trainings')}
             className={`pb-3 font-bold text-sm ${activeSubTab === 'trainings' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-900'}`}

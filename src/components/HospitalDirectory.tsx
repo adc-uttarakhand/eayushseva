@@ -79,7 +79,7 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddHospitalOpen, setIsAddHospitalOpen] = useState(false);
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
 
   useEffect(() => {
     fetchHospitals();
@@ -500,10 +500,10 @@ export default function HospitalDirectory({ session, activeSubTab = 'hospitals' 
         )}
 
         {activeTab === 'employees' && session && (
-          selectedStaffId ? (
-            <ServiceRecordTab hospitals={hospitals} targetStaffId={selectedStaffId} isAdminMode={true} onBack={() => setSelectedStaffId(null)} />
+          selectedStaff ? (
+            <ServiceRecordTab hospitals={hospitals} targetStaffId={selectedStaff.id} isAdminMode={true} onBack={() => setSelectedStaff(null)} employmentType={selectedStaff.employment_type} />
           ) : (
-            <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
+            <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaff} />
           )
         )}
       </div>
