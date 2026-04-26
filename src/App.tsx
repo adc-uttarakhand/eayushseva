@@ -31,6 +31,8 @@ import RapidTests from './components/RapidTests';
 import HospitalDetailsModal from './components/HospitalDetailsModal';
 import TransferRequests from './components/TransferRequests';
 import TransferModule from './components/TransferModule';
+import AdminTransferList from './components/AdminTransferList';
+import Sthananataran from './components/Sthananataran';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
@@ -41,7 +43,7 @@ import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 interface Notification {
   id: string;
@@ -153,6 +155,7 @@ export default function App() {
   });
   const hasNotifications = notifications.length > 0;
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const allStaff = hospitals.flatMap(h => (h as any).staff || []);
 
   const handleMarkAllAsRead = () => {
     try {
@@ -226,6 +229,7 @@ export default function App() {
   };
 
   const [isTransferEnabled, setIsTransferEnabled] = useState<boolean>(false);
+  const [isSthananataranEnabled, setIsSthananataranEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     fetchTransferStatus();
@@ -233,14 +237,24 @@ export default function App() {
 
   const fetchTransferStatus = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('global_settings')
-      .select('is_active')
-      .eq('setting_key', 'transfer_module_enabled')
-      .maybeSingle();
+    const { data: transferData } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'transfer_module_active')
+      .maybeSingle();                
     
-    if (data) {
-      setIsTransferEnabled(data.is_active);
+    if (transferData) {
+      setIsTransferEnabled(Boolean(transferData.setting_value));
+    }
+
+    const { data: sthananataranData } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'sthananataran_module_active')
+      .maybeSingle();                
+    
+    if (sthananataranData) {
+      setIsSthananataranEnabled(Boolean(sthananataranData.setting_value));
     }
     setLoading(false);
   };
@@ -250,17 +264,41 @@ export default function App() {
     if (window.confirm(`Are you sure you want to ${newState ? 'enable' : 'disable'} the transfer module for all districts?`)) {
       setLoading(true);
       const { error } = await supabase
-        .from('global_settings')
-        .update({ is_active: newState })
-        .eq('setting_key', 'transfer_module_enabled');
+        .from('system_settings')
+        .update({ setting_value: newState })
+        .eq('setting_key', 'transfer_module_active');
       
       if (!error) {
         setIsTransferEnabled(newState);
+        toast.success(`Transfer module ${newState ? 'enabled' : 'disabled'} successfully.`);
       } else {
         alert('Error updating transfer module status: ' + error.message);
+        toast.error('Error updating transfer module status.');
       }
       setLoading(false);
     }
+  };
+
+  const toggleSthananataranModule = async () => {
+    console.log('toggleSthananataranModule clicked, current state:', isSthananataranEnabled);
+    const newState = !isSthananataranEnabled;
+    
+    setLoading(true);
+    console.log('Updating Supabase with newState:', newState);
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({ setting_key: 'sthananataran_module_active', setting_value: newState }, { onConflict: 'setting_key' });
+    
+    if (!error) {
+      setIsSthananataranEnabled(newState);
+      toast.success(`Sthananataran module ${newState ? 'enabled' : 'disabled'} successfully.`);
+      console.log('Supabase upsert successful');
+    } else {
+      console.error('Error updating Sthananataran module status:', error);
+      alert('Error updating Sthananataran module status: ' + error.message);
+      toast.error('Error updating Sthananataran module status.');
+    }
+    setLoading(false);
   };
 
   const handleDoctorSearch = async (query: string) => {
@@ -1089,18 +1127,34 @@ export default function App() {
             </>
           )}
           {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN') && (
-            <button 
-              onClick={toggleTransferModule}
-              className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all flex flex-col items-start gap-4"
-            >
-              <div className="flex justify-between w-full items-center">
-                <span>Transfer Module Control</span>
-                <div className={`px-3 py-1 rounded-full font-bold text-xs ${isTransferEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                  {isTransferEnabled ? 'LIVE' : 'DISABLED'}
+            <>
+              <button 
+                onClick={toggleTransferModule}
+                className={`bg-white/40 backdrop-blur-xl border p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all flex flex-col items-start gap-4 ${isTransferEnabled ? 'border-emerald-500' : 'border-white/40'}`}
+              >
+                <div className="flex justify-between w-full items-center">
+                  <span>Transfer Module Control</span>
+                  <div className={`px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1 ${isTransferEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {isTransferEnabled && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+                    {isTransferEnabled ? 'LIVE' : 'DISABLED'}
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm text-slate-500 font-normal">Master switch to enable or disable the transfer module for all districts.</p>
-            </button>
+                <p className="text-sm text-slate-500 font-normal">Master switch to enable or disable the transfer module for all districts.</p>
+              </button>
+              <button 
+                onClick={toggleSthananataranModule}
+                className={`bg-white/40 backdrop-blur-xl border p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all flex flex-col items-start gap-4 ${isSthananataranEnabled ? 'border-emerald-500' : 'border-white/40'}`}
+              >
+                <div className="flex justify-between w-full items-center">
+                  <span>Sthananataran Module Control</span>
+                  <div className={`px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1 ${isSthananataranEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {isSthananataranEnabled && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+                    {isSthananataranEnabled ? 'LIVE' : 'DISABLED'}
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500 font-normal">Master switch to enable or disable the Sthananataran module for all districts.</p>
+              </button>
+            </>
           )}
           {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || (session.role === 'DISTRICT_ADMIN' && isTransferEnabled)) && (
             <button 
@@ -1460,7 +1514,7 @@ export default function App() {
                 onBack={() => setSelectedStaffId(null)} 
                 employmentType={
                   (
-                    staff.find(s => s.id === selectedStaffId) || 
+                    allStaff.find(s => s.id === selectedStaffId) || 
                     hospitals.flatMap(h => (h as any).staff || []).find(s => s?.id === selectedStaffId) || 
                     {} as any
                   ).employment_type || 'Permanent'
@@ -1512,6 +1566,11 @@ export default function App() {
         {activeTab === 'transfer_module' && !isTransferEnabled && (
           <motion.div key="transfer_disabled" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-40 text-center">
             <h2 className="text-2xl font-bold text-slate-900">Module disabled by State Admin</h2>
+          </motion.div>
+        )}
+        {activeTab === 'sthanantaran' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="sthanantaran" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <AdminTransferList session={session} />
           </motion.div>
         )}
         {activeTab === 'registrations' && (

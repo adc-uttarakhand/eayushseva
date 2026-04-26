@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Clock, AlertTriangle, Search, Package, FileText, Send, FlaskConical } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle, Search, Package, FileText, Send, FlaskConical, Loader2, FileUp, X, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 
 type SampleTab = 'requests' | 'received' | 'reports' | 'log';
@@ -13,6 +14,13 @@ export default function StateSamplesManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistricts, setSelectedDistricts] = useState<{ [key: string]: boolean }>({});
   const [requestedAmounts, setRequestedAmounts] = useState<{ [key: string]: number }>({});
+  const [receivingSampleId, setReceivingSampleId] = useState<string | null>(null);
+
+  // Bulk upload state
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
+  const [matchedSamples, setMatchedSamples] = useState<any[]>([]);
+  const [unmatchedRows, setUnmatchedRows] = useState<any[]>([]);
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
 
   const groupedOrders = React.useMemo(() => {
     const groups: { [key: string]: any } = {};
@@ -146,6 +154,8 @@ export default function StateSamplesManager() {
   };
 
   const markReceived = async (sampleId: string, receivedAmount: number) => {
+    if (receivingSampleId) return;
+    setReceivingSampleId(sampleId);
     try {
       // 1. Fetch sample request
       const { data: sample, error: fetchErr } = await supabase
@@ -165,7 +175,7 @@ export default function StateSamplesManager() {
 
       const { error: invUpdateErr } = await supabase
         .from('district_inventory')
-        .update({ remaining_qty: inv.remaining_qty - sample.requested_amount })
+        .update({ remaining_qty: inv.remaining_qty - receivedAmount })
         .eq('id', sample.inventory_id);
       if (invUpdateErr) throw invUpdateErr;
 
@@ -184,6 +194,8 @@ export default function StateSamplesManager() {
     } catch (error: any) {
       console.error('Error marking received:', error);
       alert('Failed to update sample.');
+    } finally {
+      setReceivingSampleId(null);
     }
   };
 
@@ -266,11 +278,91 @@ export default function StateSamplesManager() {
         }
       }
 
-      alert('Report submitted successfully!');
-      fetchData();
+      return true;
     } catch (error: any) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report.');
+      throw error;
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      matchReports(data);
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  const matchReports = (excelRows: any[]) => {
+    const pendingSamples = samples.filter(s => s.status === 'Received');
+    const matched: any[] = [];
+    const unmatched: any[] = [];
+    
+    excelRows.forEach(row => {
+      const normalizeString = (str: any) => str?.toString().replace(/[-/\s]/g, '').toLowerCase() || '';
+
+      const match = pendingSamples.find(s => 
+        s.order_no.toString() === row['Order Number']?.toString() &&
+        normalizeString(s.batch_number) === normalizeString(row['Batch Number']) &&
+        s.medicine_name.toLowerCase() === row['Medicine Name']?.toLowerCase()
+      );
+      
+      if (match) {
+        // Count inventory rows affected
+        const affectedInventoryCount = orders.filter(o => 
+          o.order_number === match.order_no && 
+          normalizeString(o.batch_no) === normalizeString(match.batch_number) &&
+          o.medicine_id === match.medicine_id
+        ).length;
+
+        matched.push({
+          sampleId: match.id,
+          medicineName: match.medicine_name,
+          orderNo: match.order_no,
+          batchNo: match.batch_number,
+          medicineId: match.medicine_id,
+          affectedInventoryCount,
+          reportData: {
+            reportStatus: row['Report']
+          }
+        });
+      } else {
+        unmatched.push(row);
+      }
+    });
+    setMatchedSamples(matched);
+    setUnmatchedRows(unmatched);
+    setIsBulkUploadModalOpen(true);
+  };
+
+  const handleBulkSubmit = async () => {
+    setIsProcessingBulk(true);
+    try {
+      await Promise.all(matchedSamples.map(async (item) => {
+        await supabase.rpc('process_bulk_sample_report', {
+            p_order_no: item.orderNo,
+            p_batch_no: item.batchNo,
+            p_medicine_name: item.medicineName,
+            p_report_status: item.reportData.reportStatus
+        });
+      }));
+      
+      alert('Bulk upload completed!');
+      setIsBulkUploadModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed bulk submission.');
+    } finally {
+      setIsProcessingBulk(false);
     }
   };
 
@@ -439,6 +531,7 @@ export default function StateSamplesManager() {
                       </td>
                       <td className="py-3 text-right">
                         <button
+                          disabled={receivingSampleId === sample.id}
                           onClick={() => {
                             const input = document.getElementById(`amount-${sample.id}`) as HTMLInputElement;
                             if (input && input.value) {
@@ -447,10 +540,19 @@ export default function StateSamplesManager() {
                               alert('Please enter received amount');
                             }
                           }}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 ml-auto"
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <CheckCircle size={16} />
-                          Mark Received
+                          {receivingSampleId === sample.id ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              Receiving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle size={16} />
+                              Mark Received
+                            </>
+                          )}
                         </button>
                       </td>
                     </tr>
@@ -468,7 +570,15 @@ export default function StateSamplesManager() {
 
         {activeTab === 'reports' && (
           <div>
-            <h2 className="text-xl font-bold text-slate-800 mb-4">Sample Reports</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-slate-800">Sample Reports</h2>
+              <label className="cursor-pointer px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-medium flex items-center gap-2 hover:bg-indigo-100">
+                <FileUp size={18} />
+                Bulk Upload Reports (Excel)
+                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+              </label>
+            </div>
+            
             <div className="space-y-4">
               {Object.values(samples.filter(s => s.status === 'Received' || s.status === 'Reported').reduce((acc: any, sample: any) => {
                 const key = `${sample.medicine_name}_${sample.batch_number}_${sample.mfg_date}_${sample.expiry_date}`;
@@ -503,15 +613,21 @@ export default function StateSamplesManager() {
                         )}
                         {sample.status === 'Received' && (
                           <form 
-                            onSubmit={(e) => {
+                            onSubmit={async (e) => {
                               e.preventDefault();
                               const formData = new FormData(e.currentTarget);
-                              submitReport(sample.id, {
-                                batchNo: sample.batch_number,
-                                mfgDate: sample.mfg_date,
-                                expiryDate: sample.expiry_date,
-                                reportStatus: formData.get('reportStatus')
-                              });
+                              try {
+                                await submitReport(sample.id, {
+                                  batchNo: sample.batch_number,
+                                  mfgDate: sample.mfg_date,
+                                  expiryDate: sample.expiry_date,
+                                  reportStatus: formData.get('reportStatus')
+                                });
+                                alert('Report submitted successfully!');
+                                fetchData();
+                              } catch (err) {
+                                alert('Failed to submit report.');
+                              }
                             }}
                             className="flex gap-2"
                           >
@@ -534,6 +650,42 @@ export default function StateSamplesManager() {
                 <div className="py-8 text-center text-slate-500">No received samples to report on.</div>
               )}
             </div>
+            {isBulkUploadModalOpen && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[80vh] overflow-y-auto p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">Bulk Upload Summary</h2>
+                    <button onClick={() => setIsBulkUploadModalOpen(false)}><X/></button>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="font-bold text-slate-700">Matched Ready to Update ({matchedSamples.length})</h3>
+                    {matchedSamples.length > 0 && (
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b text-slate-500">
+                             <th className="py-2 text-left">Medicine</th><th>Order No</th><th>Batch</th><th>Status</th><th>Inventory Rows</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matchedSamples.map((s, i) => <tr key={i} className="border-b">
+                            <td className="py-2">{s.medicineName}</td><td>{s.orderNo}</td><td>{s.batchNo}</td><td>{s.reportData.reportStatus}</td><td>{s.affectedInventoryCount}</td>
+                          </tr>)}
+                        </tbody>
+                      </table>
+                    )}
+                    <h3 className="font-bold text-slate-700 mt-6">Unmatched / Errors ({unmatchedRows.length})</h3>
+                    {unmatchedRows.length > 0 && <p className="text-sm text-red-500">Could not find matching sample record for {unmatchedRows.length} rows.</p>}
+                  </div>
+                  <div className="mt-6 flex justify-end gap-2">
+                    <button onClick={() => setIsBulkUploadModalOpen(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                    <button onClick={handleBulkSubmit} disabled={matchedSamples.length === 0 || isProcessingBulk} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2">
+                      {isProcessingBulk ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                      Confirm & Submit Updates
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

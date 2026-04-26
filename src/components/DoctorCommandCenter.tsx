@@ -22,6 +22,7 @@ import YogaModule from './YogaModule';
 import RapidTests from './RapidTests';
 import SpecialTherapyModule from './SpecialTherapyModule';
 import CertificateModule from './CertificateModule';
+import Sthananataran from './Sthananataran';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -52,6 +53,7 @@ const AVAILABLE_MODULES = [
   { id: 'rapid_tests', label: 'Rapid Tests Management' },
   { id: 'special_therapy', label: 'Special Therapy Management' },
   { id: 'certificate', label: 'Certificate Module' },
+  { id: 'sthananataran', label: 'Sthananataran (Transfer) Module' },
 ];
 
 const UTTARAKHAND_DISTRICTS = [
@@ -160,12 +162,12 @@ const EXPERTISE_KEYWORDS = [
   "Gynecological Disorders", "ENT Disorders", "Eye Disorders", "GI Disorders", "Skin Diseases", "Psoriasis", 
   "Auto immune Disorders", "Chronic Pain Management", "Osteoarthritis", "Neurological Disorders", "Spine Disorders", 
   "Reproductive System Disorders", "Infertility", "Psychiatry", "Endocrine Disorders", "Preventive Medicine", 
-  "Cancer Rehab", "Cancer Management", "Yoga"
+  "Cancer Rehab", "Cancer Management", "Yoga", "Naadi Pareekshan"
 ];
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -292,6 +294,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const [isCheckingMobile, setIsCheckingMobile] = useState(false);
   const [selectedModules, setSelectedModules] = useState<string[]>(session.activeModules || ['profile']);
   const [isModuleActive, setIsModuleActive] = useState(true);
+  const [transferModuleActive, setTransferModuleActive] = useState(false);
+  const [sthananataranModuleActive, setSthananataranModuleActive] = useState(false);
+  const [loadingTransferStatus, setLoadingTransferStatus] = useState(true);
 
   // Dashboard Stats State
   const [todayOpd, setTodayOpd] = useState<number | null>(null);
@@ -347,6 +352,36 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       }
     };
     fetchModuleStatus();
+
+    const fetchModuleStatuses = async () => {
+      try {
+        const { data: transferData } = await supabase
+          .from('system_settings')
+          .select('setting_value')
+          .eq('setting_key', 'transfer_module_active')
+          .maybeSingle();
+
+        if (transferData) {
+          setTransferModuleActive(Boolean(transferData.setting_value));
+        }
+
+        const { data: sthanData } = await supabase
+          .from('system_settings')
+          .select('setting_value')
+          .eq('setting_key', 'sthananataran_module_active')
+          .maybeSingle();
+
+        console.log('Fetched sthananataran module status:', sthanData);
+        if (sthanData) {
+          setSthananataranModuleActive(Boolean(sthanData.setting_value));
+        }
+      } catch (err) {
+        console.error('Error fetching module statuses:', err);
+      } finally {
+        setLoadingTransferStatus(false);
+      }
+    };
+    fetchModuleStatuses();
   }, []);
 
   useEffect(() => {
@@ -406,7 +441,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       if (staffData?.hospital_id) {
         const { data: hData } = await supabase
           .from('hospitals')
-          .select('facility_name, system')
+          .select('facility_name, system, district')
           .eq('hospital_id', staffData.hospital_id)
           .maybeSingle();
         hospitalInfo = hData;
@@ -433,7 +468,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         gender: staffData?.gender || 'Male',
         dob: formatDateForUI(staffData?.dob || ''),
         currentPostingJoiningDate: formatDateForUI(staffData?.current_posting_joining_date || ''),
-        presentDistrict: staffData?.present_district || '',
+        presentDistrict: hospitalInfo?.district || staffData?.present_district || '',
         bloodGroup: staffData?.blood_group || '',
         permanentAddress: staffData?.permanent_address || '',
         currentResidentialAddress: staffData?.current_residential_address || '',
@@ -442,6 +477,15 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         hospitalConnectedId: session.activeHospitalId || session.hospitalId || staffData?.hospital_id || '',
         mainPostingName: hospitalInfo?.facility_name || '',
         mainPostingId: staffData?.hospital_id || '',
+        currentPostingType: staffData?.postings?.[staffData.postings.length - 1]?.status || 'Sugam',
+        currentPostingAbove7000: staffData?.postings?.[staffData.postings.length - 1]?.above7000 || 'No',
+        totalAttachmentSugam: staffData?.attachment_sugam_days || 0,
+        totalAttachmentDurgamBelow7000: staffData?.attachment_durgam_below_7000_days || 0,
+        totalAttachmentDurgamAbove7000: staffData?.attachment_durgam_above_7000_days || 0,
+        longLeavesDays: staffData?.long_leaves_days || 0,
+        totalSugamDays: staffData?.total_sugam_days || 0,
+        totalDurgamBelow7000Days: staffData?.total_durgam_below_7000_days || 0,
+        totalDurgamAbove7000Days: staffData?.total_durgam_above_7000_days || 0,
         attachedHospitals: staffData?.secondary_hospitals ? staffData.secondary_hospitals.map((h: any) => {
           const hosp = hospitals.find(hp => hp.hospital_id === h.hospital_id);
           return {
@@ -1025,7 +1069,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         total_sugam_days: serviceDays.totalSugam,
         total_durgam_below_7000_days: serviceDays.totalDurgam,
         total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
-        last_edited_on: new Date().toISOString()
+        last_edited_on: new Date().toISOString(),
+        is_verified: new Date().toISOString() > (staffData?.last_verified_on || '1970-01-01')
       }, { onConflict: 'id' });
 
       if (staffError) {
@@ -1928,6 +1973,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <Stethoscope size={18} /> {activeTab === 'special_therapy' && 'Special Therapy'}
               </button>
             )}
+            {sthananataranModuleActive && (
+              <button onClick={() => setActiveTab('sthananataran')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'sthananataran' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <Truck size={18} /> {activeTab === 'sthananataran' && 'Sthananataran'}
+              </button>
+            )}
             {isIncharge && (
               <button onClick={() => setActiveTab('certificate')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'certificate' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
                 <FileText size={18} /> {activeTab === 'certificate' && 'Certificate Module'}
@@ -2489,6 +2539,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'special_therapy' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
             <SpecialTherapyModule session={session} />
+          </div>
+        )}
+        {activeTab === 'sthananataran' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <Sthananataran session={session} profile={profile} />
           </div>
         )}
         {activeTab === 'certificate' && (

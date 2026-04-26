@@ -326,7 +326,6 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         employmentType: staffData.employment_type || 'Permanent',
         gender: staffData.gender || 'Male',
         dob: formatDateForUI(staffData.dob || ''),
-        currentPostingJoiningDate: formatDateForUI(staffData.current_posting_joining_date || ''),
         presentDistrict: staffData.present_district || '',
         bloodGroup: staffData.blood_group || '',
         permanentAddress: staffData.permanent_address || '',
@@ -380,6 +379,9 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         last_edited_on: staffData.last_edited_on || '',
         is_locked: staffData.is_locked || false
       };
+      
+      newProfile.currentPostingJoiningDate = formatDateForUI(staffData.current_posting_joining_date || '') || (newProfile.postings[0]?.fromDate || '');
+      
       setProfile(newProfile);
       setInitialProfile(newProfile);
       setIsDirty(false);
@@ -806,6 +808,12 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
               <div className="flex items-center gap-4">
                   {(profile.last_verified_on || profile.last_edited_on) && (
                     <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold uppercase ${profile.is_verified ? 'text-green-600' : 'text-gray-500'}`}>
+                          {profile.is_verified ? 'Verified' : 'Unverified'}
+                        </span>
+                        <span className={`w-2 h-2 rounded-full ${profile.is_verified ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      </div>
                       {profile.last_verified_on && (
                         <span className="text-[10px] font-bold text-emerald-600 uppercase">
                           Verified on: {new Date(profile.last_verified_on).toLocaleString()}
@@ -881,6 +889,10 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                 <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.dateOfFirstJoiningDepartment} onChange={e => setProfile({...profile, dateOfFirstJoiningDepartment: maskDate(e.target.value)})} className={`w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
               <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">Present Posting Joining Date</label>
+                <input disabled={true} type="text" value={profile.currentPostingJoiningDate} className="w-full bg-slate-100 border border-gray-100 rounded-2xl py-3 px-4 focus:outline-none cursor-not-allowed text-slate-500 font-bold" />
+              </div>
+              <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">First Posting Place</label>
                 <div className={profile.is_locked && userRole !== 'ADMIN' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}>
                   <HospitalSearchInput value={profile.firstPostingPlace} onChange={(val: any) => setProfile({...profile, firstPostingPlace: val})} hospitals={hospitals} className="w-full bg-slate-50 border-gray-100 rounded-2xl py-3 px-4 h-20" isTextarea={true} />
@@ -939,9 +951,10 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                     <div className="space-y-1 md:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 ml-4">From Date</label>
                       <input disabled={profile.is_locked && userRole !== 'ADMIN'} type="text" placeholder="DD-MMM-YYYY" value={profile.postings[0]?.fromDate || ''} onChange={e => {
+                        const newMaskedDate = maskDate(e.target.value);
                         const newPostings = [...profile.postings];
-                        newPostings[0] = { ...newPostings[0], fromDate: maskDate(e.target.value) };
-                        setProfile({ ...profile, postings: newPostings });
+                        newPostings[0] = { ...newPostings[0], fromDate: newMaskedDate };
+                        setProfile({ ...profile, postings: newPostings, currentPostingJoiningDate: newMaskedDate });
                       }} className={`w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${(profile.is_locked && userRole !== 'ADMIN') ? 'opacity-50 cursor-not-allowed' : ''}`} />
                     </div>
                     <div className="space-y-1 md:col-span-2">

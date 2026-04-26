@@ -261,7 +261,7 @@ export default function DistrictSupplyManager({ session }: DistrictSupplyManager
           .reduce((sum, d) => sum + d.quantity, 0) || 0;
 
         const unclearedSampling = samples
-          ?.filter(s => (s.inventory_id === item.id || (s.medicine_name === item.medicine_master?.medicine_name && s.batch_number === item.batch_no && s.order_no === item.order_number)) && s.status === 'Sent')
+          ?.filter(s => (s.inventory_id === item.id || (s.medicine_name === item.medicine_master?.medicine_name && s.batch_number === item.batch_no && s.order_no === item.order_number)) && (s.status === 'Sent' || s.status === 'Pending'))
           .reduce((sum, s) => sum + (s.requested_amount || 0), 0) || 0;
 
         const unclearedQty = unclearedHospital + unclearedSampling;

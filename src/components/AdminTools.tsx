@@ -30,34 +30,35 @@ interface AdminToolsProps {
 
 export default function AdminTools({ session, setActiveTab, onAddMedicine }: AdminToolsProps) {
   const [isTransferEnabled, setIsTransferEnabled] = useState<boolean | null>(null);
+  const [isSthananataranEnabled, setIsSthananataranEnabled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [pendingToggleState, setPendingToggleState] = useState<boolean | null>(null);
+  const [pendingToggleState, setPendingToggleState] = useState<{key: string, value: boolean} | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchTransferStatus();
+    fetchModuleStatuses();
   }, []);
 
-  const fetchTransferStatus = async () => {
+  const fetchModuleStatuses = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('global_settings')
-      .select('is_active')
-      .eq('setting_key', 'transfer_module_enabled')
-      .maybeSingle();
-    
-    if (data) {
-      setIsTransferEnabled(data.is_active);
-    } else {
-      setIsTransferEnabled(false);
+    const { data: settings, error } = await supabase
+      .from('system_settings')
+      .select('setting_key, setting_value')
+      .in('setting_key', ['transfer_module_active', 'sthananataran_module_active']);
+
+    if (settings) {
+      const transfer = settings.find(s => s.setting_key === 'transfer_module_active');
+      const sthananataran = settings.find(s => s.setting_key === 'sthananataran_module_active');
+      setIsTransferEnabled(transfer?.setting_value === 'true');
+      setIsSthananataranEnabled(sthananataran?.setting_value === 'true');
     }
     setLoading(false);
   };
 
-  const toggleTransferModule = () => {
-    const newState = !isTransferEnabled;
-    setPendingToggleState(newState);
+  const toggleModule = (key: string, currentValue: boolean | null) => {
+    const newState = !currentValue;
+    setPendingToggleState({ key, value: newState });
     setIsConfirmModalOpen(true);
   };
 
@@ -66,14 +67,15 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
     
     setLoading(true);
     const { error } = await supabase
-      .from('global_settings')
-      .update({ is_active: pendingToggleState })
-      .eq('setting_key', 'transfer_module_enabled');
+      .from('system_settings')
+      .update({ setting_value: pendingToggleState.value ? 'true' : 'false' })
+      .eq('setting_key', pendingToggleState.key);
     
     if (!error) {
-      setIsTransferEnabled(pendingToggleState);
+      if (pendingToggleState.key === 'transfer_module_active') setIsTransferEnabled(pendingToggleState.value);
+      else setIsSthananataranEnabled(pendingToggleState.value);
     } else {
-      alert('Error updating transfer module status: ' + error.message);
+      alert('Error updating module status: ' + error.message);
     }
     setLoading(false);
     setIsConfirmModalOpen(false);
@@ -142,14 +144,26 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       action: () => setIsDeleteModalOpen(true)
     },
     {
+      id: 'sthananataran_control',
+      label: 'Sthananataran Module Control',
+      description: 'Master switch to enable or disable the Sthananataran (Transfer) module for all districts.',
+      icon: Settings,
+      color: 'blue',
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN',
+      action: () => toggleModule('sthananataran_module_active', isSthananataranEnabled),
+      isToggle: true,
+      isEnabled: isSthananataranEnabled
+    },
+    {
       id: 'transfer_control',
       label: 'Transfer Module Control',
       description: 'Master switch to enable or disable the transfer module for all districts.',
       icon: Settings,
       color: 'orange',
       show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN',
-      action: toggleTransferModule,
-      isToggle: true
+      action: () => toggleModule('transfer_module_active', isTransferEnabled),
+      isToggle: true,
+      isEnabled: isTransferEnabled
     }
   ];
 
@@ -216,9 +230,9 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-bold text-slate-900">{tool.label}</h3>
                     {tool.isToggle ? (
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-bold text-xs ${isTransferEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                        {isTransferEnabled ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                        {isTransferEnabled ? 'LIVE' : 'DISABLED'}
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-bold text-xs ${tool.isEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                        {tool.isEnabled ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                        {tool.isEnabled ? 'LIVE' : 'DISABLED'}
                       </div>
                     ) : (
                       <ChevronRight size={20} className="text-slate-300 group-hover:text-slate-900 transition-colors" />

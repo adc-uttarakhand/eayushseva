@@ -253,6 +253,7 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
   const [stats, setStats] = useState({
     totalOPD: 0,
     newPatients: 0,
+    oldPatients: 0,
     femalePatients: 0,
     aadharSeeded: 0,
     mobileSeeded: 0,
@@ -373,9 +374,10 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
 
       setStats({
         totalOPD: records.length,
-        newPatients: records.filter(p => !p.global_serial.includes('revisit')).length,
+        newPatients: records.filter(p => p.is_new).length,
+        oldPatients: records.filter(p => !p.is_new).length,
         femalePatients: records.filter(p => p.gender === 'Female').length,
-        aadharSeeded: records.filter(p => p.aadhar && p.aadhar.length === 12).length,
+        aadharSeeded: records.filter(p => p.aadhar && p.aadhar.length === 4).length,
         mobileSeeded: records.filter(p => p.mobile && p.mobile.length === 10).length,
         totalFees: records.reduce((sum, p) => sum + (p.fee_amount || 0), 0)
       });
@@ -786,6 +788,7 @@ export default function PatientList({ hospitalId, hospitalName: initialHospitalN
         {[
           { label: 'Total OPD', value: stats.totalOPD, icon: Users, color: 'emerald' },
           { label: 'New Patients', value: stats.newPatients, icon: UserPlus, color: 'blue' },
+          { label: 'Old Patients', value: stats.oldPatients, icon: UserCheck, color: 'amber' },
           { label: 'Female Patients', value: stats.femalePatients, icon: UserCheck, color: 'pink' },
           { label: 'Aadhar Seeded', value: stats.aadharSeeded, icon: CreditCard, color: 'purple' },
           { label: 'Mobile Seeded', value: stats.mobileSeeded, icon: Phone, color: 'orange' },
