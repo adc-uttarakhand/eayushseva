@@ -377,9 +377,6 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
           setHomeDistrict(profile.home_district || '');
           setPresentDistrict(profile.present_posting || '');
           // ... populate other fields similarly ...
-          
-          // Mark as locked
-          setIsLocked(true);
       }
       if (profile && (profile.empId || profile.fullName)) {
         if (!staffId && session?.id) setStaffId(session.id);
@@ -535,7 +532,6 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
 
   useEffect(() => {
     setProfileData(profile);
-    setIsLocked(!!profile);
   }, [profile]);
 
   const fetchLatestStaffData = async () => {
@@ -878,7 +874,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       
       {isLocked && (
         <div className="max-w-[1400px] mx-auto mb-6">
-          <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-center gap-3 animate-pulse">
+          <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-center gap-3">
             <CheckCircle size={24} />
             <span className="text-lg font-bold">FORM SUBMITTED FOR TRANSFER SESSION ({new Date().getFullYear()})</span>
           </div>
