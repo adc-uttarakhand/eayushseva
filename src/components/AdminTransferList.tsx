@@ -24,15 +24,21 @@ export default function AdminTransferList({ session }: { session: any }) {
     }, [applications]);
 
     const filteredApplications = React.useMemo(() => {
+        const isAdmin = session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN';
+        const accessDistricts = session?.access_districts || [];
+
         return applications.filter(a => {
+            const matchesAdminDistrict = isAdmin || 
+                (accessDistricts.length > 0 && accessDistricts.includes(a.present_posting));
+            
             const matchesSearch = a.applicant_name?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesRole = !selectedRole || a.category === selectedRole;
             const matchesDistrict = !selectedDistrict || a.present_posting === selectedDistrict;
             const matchesCategory = !selectedCategory || a.application_type === selectedCategory;
             const matchesSubCategory = !selectedSubCategory || a.transfer_category === selectedSubCategory;
-            return matchesSearch && matchesRole && matchesDistrict && matchesCategory && matchesSubCategory;
+            return matchesAdminDistrict && matchesSearch && matchesRole && matchesDistrict && matchesCategory && matchesSubCategory;
         });
-    }, [applications, searchTerm, selectedRole, selectedDistrict, selectedCategory, selectedSubCategory]);
+    }, [applications, searchTerm, selectedRole, selectedDistrict, selectedCategory, selectedSubCategory, session]);
 
     useEffect(() => {
         const fetchApplications = async () => {
