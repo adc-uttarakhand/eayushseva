@@ -386,15 +386,24 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         if (profile.full_name || profile.fullName) setApplicantName(profile.full_name || profile.fullName);
         if (profile.father_name || profile.fatherName) setFatherHusbandName(profile.father_name || profile.fatherName);
         if (profile.dob) {
-          try {
-            const d = new Date(profile.dob);
-            if (!isNaN(d.getTime())) setDob(d.toISOString().split('T')[0]);
-            else setDob(profile.dob);
-          } catch { setDob(profile.dob); }
+            const dobStr = typeof profile.dob === 'string' ? profile.dob : new Date(profile.dob).toISOString();
+            setDob(dobStr.split('T')[0]);
         }
         if (profile.home_district || profile.homeDistrict) setHomeDistrict(profile.home_district || profile.homeDistrict);
         if (profile.present_district || profile.presentDistrict) setPresentDistrict(profile.present_district || profile.presentDistrict);
-        return;
+      }
+
+      // NEW: Fetch DOB if not already set
+      if (staffId && !dob) {
+        const { data: staffDobData } = await supabase
+          .from('staff')
+          .select('dob')
+          .eq('id', staffId)
+          .maybeSingle();
+        if (staffDobData?.dob) {
+           const dobStr = typeof staffDobData.dob === 'string' ? staffDobData.dob : new Date(staffDobData.dob).toISOString();
+           setDob(dobStr.split('T')[0]);
+        }
       }
 
       if (session?.user?.email) {
@@ -413,11 +422,8 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             if (staffData.full_name) setApplicantName(staffData.full_name);
             if (staffData.father_name) setFatherHusbandName(staffData.father_name);
             if (staffData.dob) {
-              try {
-                const d = new Date(staffData.dob);
-                if (!isNaN(d.getTime())) setDob(d.toISOString().split('T')[0]);
-                else setDob(staffData.dob);
-              } catch { setDob(staffData.dob); }
+              const dobStr = typeof staffData.dob === 'string' ? staffData.dob : new Date(staffData.dob).toISOString();
+              setDob(dobStr.split('T')[0]);
             }
             if (staffData.home_district) setHomeDistrict(staffData.home_district);
             if (staffData.present_district) setPresentDistrict(staffData.present_district);
