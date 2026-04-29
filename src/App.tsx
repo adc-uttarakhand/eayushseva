@@ -12,7 +12,6 @@ import FacilityCard from './components/FacilityCard';
 import BentoGrid from './components/BentoGrid';
 import BottomNav, { TabId } from './components/BottomNav';
 import LoginModal, { UserSession } from './components/LoginModal';
-import ForcePasswordChange, { isWeakPassword } from './components/ForcePasswordChange';
 import EditHospitalModal from './components/EditHospitalModal';
 import EParchi from './components/EParchi';
 import PatientList from './components/PatientList';
@@ -43,7 +42,7 @@ import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard } from 'lucide-react';
-import { supabase, restoreSupabaseToken, clearSupabaseToken } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import { Toaster, toast } from 'react-hot-toast';
 
 interface Notification {
@@ -113,7 +112,6 @@ export default function App() {
   const [requestsSubTab, setRequestsSubTab] = useState<'transfer_requests' | 'registration_requests'>('transfer_requests');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
-  const [showForcePasswordChange, setShowForcePasswordChange] = useState(false);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -411,28 +409,20 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Restore session on page refresh
-    const savedSession = localStorage.getItem('ayush_session');
+    const savedSession = localStorage.getItem('session');
     if (savedSession) {
       setSession(JSON.parse(savedSession));
     }
-    // Restore JWT token so Supabase queries stay authenticated
-    restoreSupabaseToken();
   }, []);
 
   const handleLogin = (sess: UserSession) => {
     setSession(sess);
-    localStorage.setItem('ayush_session', JSON.stringify(sess));
-    // Check if password change is needed
-    if (sess.requiresPasswordChange) {
-      setShowForcePasswordChange(true);
-    }
+    localStorage.setItem('session', JSON.stringify(sess));
   };
 
   const handleLogout = () => {
     setSession(null);
-    localStorage.removeItem('ayush_session');
-    clearSupabaseToken();
+    localStorage.removeItem('session');
   };
 
   const isAdmin = session?.role === 'SUPER_ADMIN';
@@ -1419,15 +1409,6 @@ export default function App() {
         onClose={() => setIsLoginOpen(false)} 
         onLogin={handleLogin} 
       />
-
-      {showForcePasswordChange && session && (
-        <ForcePasswordChange
-          session={session}
-          onPasswordChanged={() => {
-            setShowForcePasswordChange(false);
-          }}
-        />
-      )}
 
       <EditHospitalModal
         hospital={editingHospital}

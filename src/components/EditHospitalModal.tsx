@@ -141,7 +141,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
           .from(tableName)
           .update(updatePayload)
           .eq('hospital_id', targetId)
-          .select('hospital_id');
+          .select();
 
         if (!updateError && data && data.length > 0) {
           updateSuccess = true;
@@ -153,7 +153,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
           .from(tableName)
           .update(updatePayload)
           .eq('sr_no', targetSr)
-          .select('hospital_id');
+          .select();
         
         if (!retryError && retryData && retryData.length > 0) {
           updateSuccess = true;
@@ -166,7 +166,7 @@ export default function EditHospitalModal({ hospital, isOpen, onClose, onUpdate,
             .from(tableName)
             .update(updatePayload)
             .eq('id', (formData as any).id)
-            .select('hospital_id');
+            .select();
           if (!idError && idData && idData.length > 0) {
             updateSuccess = true;
             break;

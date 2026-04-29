@@ -236,6 +236,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     designation: '',
     empId: '',
     mobile: '',
+    password: '',
     fatherName: '',
     photograph: '',
     email: '',
@@ -432,7 +433,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       // Fetch from staff table
       const { data: staffData } = await supabase
         .from('staff')
-        .select('id, full_name, role, designation, employee_id, mobile_number, father_name, photograph_url, email_id, employment_class, employment_type, gender, dob, current_posting_joining_date, present_district, blood_group, permanent_address, current_residential_address, hospital_id, bcp_registration_no, trainings, date_of_first_appointment, first_joining_date, first_posting_place, home_district, long_leaves, postings, attachments, secondary_hospitals, attachment_sugam_days, attachment_durgam_below_7000_days, attachment_durgam_above_7000_days, long_leaves_days, total_sugam_days, total_durgam_below_7000_days, total_durgam_above_7000_days, is_incharge')
+        .select('*')
         .eq('id', session.id)
         .maybeSingle();
 
@@ -458,6 +459,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         designation: staffData?.role || staffData?.designation || '',
         empId: staffData?.employee_id || '',
         mobile: staffData?.mobile_number || '',
+        password: staffData?.login_password || '',
         fatherName: staffData?.father_name || '',
         photograph: staffData?.photograph_url || '',
         email: staffData?.email_id || '',
@@ -601,7 +603,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       if (!targetHospitalId) return;
       const { data, error } = await supabase
         .from('staff')
-        .select('id, full_name, mobile_number, employee_id, role, designation, assigned_modules, secondary_hospitals, hospital_id')
+        .select('*')
         .or(`hospital_id.eq.${targetHospitalId},secondary_hospitals.cs.[{"hospital_id":"${targetHospitalId}"}]`)
         .range(0, 5000);
 
@@ -1033,6 +1035,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         full_name: profile.fullName,
         mobile_number: profile.mobile,
         employee_id: profile.empId || null,
+        login_password: profile.password,
         father_name: profile.fatherName,
         photograph_url: profile.photograph,
         email_id: profile.email,
@@ -1391,6 +1394,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       fullName: staff.full_name || staff.name || '', 
       mobile: staff.mobile_number || staff.mobile || '', 
       role: staff.role || 'Pharmacist', 
+      password: '',
       firstPostingPlace: staff.first_posting_place || ''
     });
 
@@ -1491,7 +1495,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       // Check if staff is being transferred from another hospital or just assigned secondarily
       const { data: currentStaff } = await supabase
         .from('staff')
-        .select('id, hospital_id, secondary_hospitals')
+        .select('*')
         .eq('id', editingStaffId)
         .single();
 
@@ -1573,7 +1577,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     try {
       const { data, error } = await supabase
         .from('staff')
-        .select('id, full_name, mobile_number, employee_id, role, designation, assigned_modules, secondary_hospitals, hospital_id, photograph_url, is_incharge')
+        .select('*')
         .or(`full_name.ilike.%${staffSearchQuery}%,employee_id.eq.${staffSearchQuery},mobile_number.eq.${staffSearchQuery}`);
       
       if (data) {
