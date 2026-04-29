@@ -1687,11 +1687,21 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
   const canViewQueue = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_queue');
   const canDispense = isIncharge || isHospital || activeModules.includes('e_parchi') || activeModules.includes('eparchi_pharmacy');
 
+  const hasSetDefaultTab = React.useRef(false);
+
   // Set default active tab based on permissions
   React.useEffect(() => {
-    if (activeTab === 'dashboard' && !showDashboard && showProfile) {
-      setActiveTab('profile');
+    if (!hasSetDefaultTab.current && !loadingTransferStatus) {
+      if (activeTab === 'dashboard' && !isHospital && sthananataranModuleActive) {
+        setActiveTab('sthananataran');
+      } else if (activeTab === 'dashboard' && !showDashboard && showProfile) {
+        setActiveTab('profile');
+      }
+      hasSetDefaultTab.current = true;
     }
+  }, [loadingTransferStatus, sthananataranModuleActive, isHospital, showDashboard, showProfile, activeTab]);
+
+  React.useEffect(() => {
     if (activeTab === 'medicine_demand' && !showMedicineDemand) {
       setActiveTab(showDashboard ? 'dashboard' : 'profile');
     }
@@ -1701,7 +1711,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
     if (activeTab === 'special_therapy' && !showSpecialTherapy) {
       setActiveTab(showDashboard ? 'dashboard' : 'profile');
     }
-  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement, showSpecialTherapy]);
+  }, [showDashboard, showProfile, showMedicineDemand, showMedicineManagement, showSpecialTherapy, activeTab]);
 
   const calculateDuration = (startDateStr: string) => {
     if (!startDateStr) return '---';
