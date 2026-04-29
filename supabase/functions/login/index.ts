@@ -23,18 +23,6 @@ async function generateJWT(payload: any) {
   return create({ alg: "HS512", typ: "JWT" }, { ...payload, exp: getNumericDate(60 * 60 * 24) }, key); // 24 hours
 }
 
-const WEAK_PASSWORDS = [
-  'ayush@123', 'ayush123', 'ABCD_1234', 'abcd1234',
-  'password', 'password123', '123456', '12345678',
-  'admin@123', 'admin123', 'test@123', '1234'
-];
-
-function isWeakPassword(password: string): boolean {
-  if (!password) return true;
-  if (password.length < 8) return true;
-  return WEAK_PASSWORDS.includes(password) || WEAK_PASSWORDS.includes(password.toLowerCase());
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -90,7 +78,6 @@ serve(async (req) => {
         access_districts: adminData.access_districts || [],
         access_systems: adminData.access_systems || [],
         district: adminData.district,
-        requiresPasswordChange: isWeakPassword(password),
       };
 
       const token = await generateJWT(userDetails);
@@ -107,7 +94,7 @@ serve(async (req) => {
       .select('*')
       .or(`mobile_number.eq."${trimmedUsername}",employee_id.eq."${trimmedUsername}"`);
 
-      if (staffDataList && staffDataList.length > 0) {
+    if (staffDataList && staffDataList.length > 0) {
       // Check password using the first matched staff
       const firstStaff = staffDataList[0];
       if (firstStaff.login_password === password || firstStaff.password === password) {
@@ -153,10 +140,8 @@ serve(async (req) => {
         const allLinks = Array.from(allLinksMap.values());
 
         // We sanitize staffRecord to avoid returning passwords
-        const sanitizeStaff = (staff: any, hospitalId: string) => {
+        const sanitizeStaff = (staff: any) => {
           const { login_password, password, ...safe } = staff;
-          // Check if this record is the incharge for this hospital
-          safe.is_incharge = !!safe.is_incharge || inchargeHospitals?.some(h => h.hospital_id === hospitalId && h.incharge_staff_id === staff.id);
           return safe;
         };
 
@@ -170,35 +155,23 @@ serve(async (req) => {
           const options = allLinks.map(l => {
             const hosp = hospitals?.find(h => h.hospital_id === l.hospitalId);
             return {
-              ...sanitizeStaff(l.staffRecord, l.hospitalId),
+              ...sanitizeStaff(l.staffRecord),
               hospital_id: l.hospitalId,
               hospitalName: hosp?.facility_name || 'Unknown Hospital',
               location: hosp ? `${hosp.block}, ${hosp.district}` : 'Unknown Location'
             };
           });
 
-          const staffTokenPayload = { role: 'STAFF', id: firstStaff.id, name: firstStaff.full_name };
-          const token = await generateJWT(staffTokenPayload);
-
           return new Response(
-            JSON.stringify({ options, token, type: 'staff_multiple' }),
+            JSON.stringify({ options, type: 'staff_multiple' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
           );
         } else if (allLinks.length === 1) {
           const singleLink = allLinks[0];
-          const staffRecord = sanitizeStaff(singleLink.staffRecord, singleLink.hospitalId);
-          const staffTokenPayload = { role: 'STAFF', id: staffRecord.id, name: staffRecord.full_name };
-          const token = await generateJWT(staffTokenPayload);
+          const staffRecord = sanitizeStaff(singleLink.staffRecord);
+          // Return safe record
           return new Response(
-            JSON.stringify({ 
-              record: { 
-                ...staffRecord, 
-                hospital_id: singleLink.hospitalId,
-                requiresPasswordChange: isWeakPassword(password)
-              }, 
-              token, 
-              type: 'staff_single' 
-            }),
+            JSON.stringify({ record: { ...staffRecord, hospital_id: singleLink.hospitalId }, type: 'staff_single' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
           );
         }
@@ -218,7 +191,6 @@ serve(async (req) => {
         id: hospitalLoginData.hospital_id,
         name: hospitalLoginData.facility_name,
         district: hospitalLoginData.district,
-        requiresPasswordChange: isWeakPassword(password),
       };
 
       const token = await generateJWT(userDetails);
