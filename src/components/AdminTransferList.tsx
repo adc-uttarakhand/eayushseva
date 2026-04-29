@@ -82,7 +82,7 @@ export default function AdminTransferList({ session }: { session: any }) {
         const headers = [
             'Applicant Name', 'Home District', 'Present District', 'Posting Place', 
             'Posting Since', 'Category', 'Sub-category', 'Sugam Days', 
-            'Durgam (<7000ft) Days', 'Durgam (>7000ft) Days', 'Status'
+            'Durgam (<7000ft) Days', 'Durgam (>7000ft) Days', 'Choices', 'Status'
         ];
         
         const csvContent = [
@@ -98,6 +98,10 @@ export default function AdminTransferList({ session }: { session: any }) {
                 app.calculated_sugam_days || 0,
                 app.calculated_durgam_below_7000_days || 0,
                 app.calculated_durgam_above_7000_days || 0,
+                `"${([app.choice_1, app.choice_2, app.choice_3, app.choice_4, app.choice_5, app.choice_6, app.choice_7, app.choice_8, app.choice_9, app.choice_10]
+                    .filter(c => c)
+                    .map((c, i) => `${i + 1}. ${getChoiceName(c)}`)
+                    .join(', ')).replace(/"/g, '""')}"`,
                 app.form_submitted ? 'Submitted' : 'Draft'
             ].join(','))
         ].join('\n');
@@ -115,7 +119,14 @@ export default function AdminTransferList({ session }: { session: any }) {
 
     const getChoiceName = (choice: any) => {
         if (!choice) return '-';
-        return typeof choice === 'object' ? choice.hospital_name || choice.name || '-' : choice;
+        if (typeof choice === 'object') {
+            const name = choice.hospital_name || choice.name || '-';
+            if (choice.district) {
+                return `${name} (${choice.district})`;
+            }
+            return name;
+        }
+        return choice;
     };
 
     return (
@@ -205,17 +216,50 @@ export default function AdminTransferList({ session }: { session: any }) {
                                     <td className="p-4">{app.calculated_sugam_days || 0}</td>
                                     <td className="p-4">{app.calculated_durgam_below_7000_days || 0}</td>
                                     <td className="p-4">{app.calculated_durgam_above_7000_days || 0}</td>
-                                    <td className="p-4 truncate max-w-xs">
-                                        {[app.choice_1, app.choice_2, app.choice_3, app.choice_4, app.choice_5, app.choice_6, app.choice_7, app.choice_8, app.choice_9, app.choice_10]
-                                            .filter(c => c)
-                                            .map((c, i) => `${i + 1}. ${getChoiceName(c)}`)
-                                            .join(', ')}
+                                    <td className="p-4 max-w-xs">
+                                        <div className="flex flex-col gap-1 text-xs">
+                                            {[app.choice_1, app.choice_2, app.choice_3, app.choice_4, app.choice_5, app.choice_6, app.choice_7, app.choice_8, app.choice_9, app.choice_10]
+                                                .filter(c => c)
+                                                .map((c, i) => (
+                                                    <div key={i} className="truncate" title={getChoiceName(c)}>
+                                                        {i + 1}. {getChoiceName(c)}
+                                                    </div>
+                                                ))}
+                                        </div>
                                     </td>
                                     <td className="p-4">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 w-max ${app.form_submitted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                            {app.form_submitted ? <CheckCircle size={12} /> : <Clock size={12} /> }
-                                            {app.form_submitted ? 'Submitted' : 'Draft'}
-                                        </span>
+                                        <div className="flex flex-col gap-2 w-max">
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center justify-center gap-1 ${app.form_submitted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {app.form_submitted ? <CheckCircle size={12} /> : <Clock size={12} /> }
+                                                {app.form_submitted ? 'Submitted' : 'Draft'}
+                                            </span>
+                                            {app.vikalp_patra_path && (
+                                                <a 
+                                                    href={supabase.storage.from('transfer_documents').getPublicUrl(app.vikalp_patra_path).data.publicUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded flex items-center gap-1 transition-colors"
+                                                    title="Download Vikalp Patra"
+                                                >
+                                                    <Download size={12} />
+                                                    Vikalp Patra
+                                                </a>
+                                            )}
+                                            {app.proof_document_path && (
+                                                <a 
+                                                    href={supabase.storage.from('proof_documents').getPublicUrl(app.proof_document_path).data.publicUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded flex items-center gap-1 transition-colors"
+                                                    title="Download Proof Document"
+                                                >
+                                                    <Download size={12} />
+                                                    Proof Doc
+                                                </a>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

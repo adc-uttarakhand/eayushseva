@@ -107,7 +107,7 @@ const A4Preview = ({
   homeDistrict, presentDistrict, mainPostingName, currentPostingJoiningDate,
   currentPostingType, currentPostingAbove7000,
   applicationType, transferCategory, exemptionCategory, mandatoryTransferSubOption,
-  choices, hospitals, calculatedWeightedSugam, calculatedWeightedDurgamBelow, calculatedWeightedDurgamAbove
+  choices, hospitals, calculatedWeightedSugam, calculatedWeightedDurgamBelow, calculatedWeightedDurgamAbove, submittedAt
 }: any) => {
 
   const transferYear = new Date().getFullYear();
@@ -284,7 +284,7 @@ const A4Preview = ({
                   <tr key={i}>
                     <td style={{ border: '1px solid #ddd', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle', color: '#888', fontWeight: 'bold' }}>{i + 1}</td>
                     <td style={{ border: '1px solid #ddd', padding: '4px 6px', verticalAlign: 'middle', color: choiceName ? '#1a1a1a' : '#bbb', fontStyle: choiceName ? 'normal' : 'italic', fontWeight: choiceName ? 500 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {choiceName || '—'}
+                      {choiceName ? (hosp?.district ? `${choiceName} (${hosp.district})` : choiceName) : '—'}
                     </td>
                     <td style={{ border: '1px solid #ddd', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
                       {hosp ? (
@@ -329,8 +329,15 @@ const A4Preview = ({
           <strong style={{ color: '#1a7a4a' }}>I hereby Certify that</strong> submitting False information will lead to cancellation of my transfer application and disciplinary action may be taken as per government rules. All preferences and categories selected are true to my knowledge and accompanied by valid proofs.
         </div>
 
-        {/* Signature Box */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
+        {/* Bottom Area */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '32px' }}>
+          
+          <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic', marginBottom: '6px' }}>
+            {submittedAt && (
+              <span>Submitted On: <strong style={{ color: '#1a1a1a' }}>{new Date(submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} (IST)</strong></span>
+            )}
+          </div>
+
           <div style={{ textAlign: 'center', width: '200px' }}>
             <div style={{ borderTop: '1.5px solid #1a1a1a', paddingTop: '6px' }}>
               <div style={{
@@ -356,6 +363,7 @@ const A4Preview = ({
 export default function Sthananataran({ session, profile }: { session?: any; profile?: any }) {
 
   // Section 1 State
+  const [submittedData, setSubmittedData] = useState<any>(null);
   const [staffId, setStaffId] = useState(session?.id || session?.user?.id || '');
   const [email, setEmail] = useState(session?.user?.email || '');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -365,19 +373,59 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const [dob, setDob] = useState('');
   const [homeDistrict, setHomeDistrict] = useState('');
   const [presentDistrict, setPresentDistrict] = useState('');
-  const mainPostingName = profile?.mainPostingName || '';
+  const [mainPostingNameState, setMainPostingNameState] = useState(profile?.mainPostingName || '');
+  const mainPostingName = submittedData?.present_posting_place || mainPostingNameState || '';
 
   useEffect(() => {
     const fetchStaffData = async () => {
-      if (profile) {
-          // Pre-fill form from profile object passed by admin view
+      // Admin list passes a transfer_applications object as profile
+      if (profile && profile.application_type && profile.staff_id) {
+          setStaffId(profile.staff_id || '');
           setApplicantName(profile.applicant_name || '');
           setFatherHusbandName(profile.father_husband_name || '');
-          setDob(profile.dob || '');
+          if (profile.dob) {
+            const dobStr = typeof profile.dob === 'string' ? profile.dob : new Date(profile.dob).toISOString();
+            setDob(dobStr.split('T')[0]);
+          }
           setHomeDistrict(profile.home_district || '');
           setPresentDistrict(profile.present_posting || '');
-          // ... populate other fields similarly ...
+          setMobileNumber(profile.mobile_number || '');
+          setEmail(profile.email || '');
+          setRole(profile.category || '');
+          setMainPostingNameState(profile.present_posting_place || '');
+          
+          setApplicationType(profile.application_type || '');
+          if (profile.application_type === 'Anivarya Sthananataran') setMandatoryTransferSubOption(profile.transfer_category || '');
+          if (profile.application_type === 'Anurodh') setTransferCategory(profile.transfer_category || '');
+          if (profile.application_type === 'Need Exemption from Transfer') setExemptionCategory(profile.transfer_category || '');
+          
+          const newChoices = [...choices];
+          for (let i = 0; i < 10; i++) {
+            const raw = profile[`choice_${i + 1}`];
+            if (raw && typeof raw === 'object') newChoices[i] = raw.hospital_name || '';
+            else newChoices[i] = raw || '';
+          }
+          setChoices(newChoices);
+          
+          setProfileData({
+            currentPostingJoiningDate: profile.present_posting_since,
+            currentPostingType: profile.present_posting_place_status,
+            currentPostingAbove7000: profile.present_posting_place_above_7000,
+            attachment_sugam_days: profile.attachment_sugam_days,
+            attachment_durgam_days: profile.attachment_durgam_days,
+            attachment_durgam_above_7000_days: profile.attachment_durgam_above_7000_days,
+            total_sugam_days: profile.total_sugam_days,
+            total_durgam_below_7000_days: profile.total_durgam_below_7000_days,
+            total_durgam_above_7000_days: profile.total_durgam_above_7000_days,
+            long_leaves_count: profile.long_leaves_count,
+            last_edited_on: profile.profile_last_edited_on
+          });
+          
+          setSubmittedData(profile);
+          setIsLocked(true);
+          return;
       }
+
       if (profile && (profile.empId || profile.fullName)) {
         if (!staffId && session?.id) setStaffId(session.id);
         setMobileNumber(profile.mobile_number || profile.mobile || '');
@@ -391,6 +439,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         }
         if (profile.home_district || profile.homeDistrict) setHomeDistrict(profile.home_district || profile.homeDistrict);
         if (profile.present_district || profile.presentDistrict) setPresentDistrict(profile.present_district || profile.presentDistrict);
+        if (profile.mainPostingName) setMainPostingNameState(profile.mainPostingName);
       }
 
       // NEW: Fetch DOB if not already set
@@ -445,7 +494,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
 
   useEffect(() => {
     const fetchHospitals = async () => {
-      const { data } = await supabase.from('hospitals').select('hospital_id, facility_name, status, above_7000_feet');
+      const { data } = await supabase.from('hospitals').select('hospital_id, facility_name, status, above_7000_feet, district');
       if (data) setHospitals(data);
     };
     fetchHospitals();
@@ -534,7 +583,30 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const [profileData, setProfileData] = useState(profile);
   const [isLocked, setIsLocked] = useState(false);
   const isFormLocked = isLocked || !!profile;
-  const [submittedData, setSubmittedData] = useState<any>(null);
+  const [useLatestLocalComputedData, setUseLatestLocalComputedData] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setFile: React.Dispatch<React.SetStateAction<File | null>>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setFile(null);
+      return;
+    }
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      toast.error('File size must be less than 5MB');
+      e.target.value = '';
+      setFile(null);
+      return;
+    }
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only PDF, PNG, and JPG files are permitted');
+      e.target.value = '';
+      setFile(null);
+      return;
+    }
+    setFile(file);
+  };
 
   useEffect(() => {
     setProfileData(profile);
@@ -551,6 +623,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         .maybeSingle();
       if (staffData) {
         setProfileData(staffData);
+        setUseLatestLocalComputedData(true);
         toast.success('Service details updated from server.');
       }
     } catch (err) {
@@ -559,6 +632,41 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
     } finally {
       setIsFetchingLocal(false);
     }
+  };
+
+  const getActiveMetrics = () => {
+    const useDraftOrSubmitted = (!useLatestLocalComputedData && submittedData);
+    
+    const profileAttachmentSugam = Number(profileData?.totalAttachmentSugam || profileData?.attachment_sugam_days) || 0;
+    const profileAttachmentDurgamBelow = Number(profileData?.totalAttachmentDurgamBelow7000 || profileData?.attachment_durgam_below_7000_days) || 0;
+    const profileAttachmentDurgamAbove = Number(profileData?.totalAttachmentDurgamAbove7000 || profileData?.attachment_durgam_above_7000_days) || 0;
+    
+    const profileTotalSugam = Number(profileData?.totalSugamDays || profileData?.total_sugam_days) || 0;
+    const profileTotalDurgamBelow = Number(profileData?.totalDurgamBelow7000Days || profileData?.total_durgam_below_7000_days) || 0;
+    const profileTotalDurgamAbove = Number(profileData?.totalDurgamAbove7000Days || profileData?.total_durgam_above_7000_days) || 0;
+    
+    const profileLongLeaves = Number(profileData?.longLeavesDays || profileData?.long_leaves_days) || 0;
+    const profileLastEdited = profileData?.last_edited_on || 'N/A';
+
+    return {
+      attachment_sugam_days: useDraftOrSubmitted && submittedData.attachment_sugam_days != null ? Number(submittedData.attachment_sugam_days) : profileAttachmentSugam,
+      attachment_durgam_days: useDraftOrSubmitted && submittedData.attachment_durgam_days != null ? Number(submittedData.attachment_durgam_days) : profileAttachmentDurgamBelow,
+      attachment_durgam_above_7000_days: useDraftOrSubmitted && submittedData.attachment_durgam_above_7000_days != null ? Number(submittedData.attachment_durgam_above_7000_days) : profileAttachmentDurgamAbove,
+      
+      total_sugam_days: useDraftOrSubmitted && submittedData.total_sugam_days != null ? Number(submittedData.total_sugam_days) : profileTotalSugam,
+      total_durgam_below_7000_days: useDraftOrSubmitted && submittedData.total_durgam_below_7000_days != null ? Number(submittedData.total_durgam_below_7000_days) : profileTotalDurgamBelow,
+      total_durgam_above_7000_days: useDraftOrSubmitted && submittedData.total_durgam_above_7000_days != null ? Number(submittedData.total_durgam_above_7000_days) : profileTotalDurgamAbove,
+      
+      long_leaves_count: useDraftOrSubmitted && submittedData.long_leaves_count != null ? Number(submittedData.long_leaves_count) : profileLongLeaves,
+      profile_last_edited_on: useDraftOrSubmitted && submittedData.profile_last_edited_on != null ? submittedData.profile_last_edited_on : (useDraftOrSubmitted && submittedData.last_edited_on ? submittedData.last_edited_on : profileLastEdited),
+      
+      postingType: useDraftOrSubmitted && submittedData.present_posting_place_status != null ? submittedData.present_posting_place_status : profile?.currentPostingType,
+      above7000: useDraftOrSubmitted && submittedData.present_posting_place_above_7000 != null ? submittedData.present_posting_place_above_7000 : profile?.currentPostingAbove7000,
+      
+      calculated_sugam_days: useDraftOrSubmitted && submittedData.calculated_sugam_days != null ? Number(submittedData.calculated_sugam_days) : null,
+      calculated_durgam_below_7000_days: useDraftOrSubmitted && submittedData.calculated_durgam_below_7000_days != null ? Number(submittedData.calculated_durgam_below_7000_days) : null,
+      calculated_durgam_above_7000_days: useDraftOrSubmitted && submittedData.calculated_durgam_above_7000_days != null ? Number(submittedData.calculated_durgam_above_7000_days) : null,
+    };
   };
 
   useEffect(() => {
@@ -617,6 +725,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         .maybeSingle();
 
       if (data && !error) {
+        setSubmittedData(data);
         if (data.mobile_number) setMobileNumber(data.mobile_number);
         if (data.email) setEmail(data.email);
         if (data.category) setRole(data.category);
@@ -654,23 +763,27 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const getChoiceData = (hospName: string) => {
     if (!hospName) return null;
     const hosp = hospitals.find(x => x.facility_name === hospName);
-    return { hospital_name: hospName, status: hosp?.status || null, above_7000ft: hosp?.above_7000_feet || null };
+    return { hospital_name: hospName, district: hosp?.district || null, status: hosp?.status || null, above_7000ft: hosp?.above_7000_feet || null };
   };
 
   const getCalculatedWeightedDays = () => {
-    if (isLocked && submittedData) {
+    const metrics = getActiveMetrics();
+
+    // If we have calculated metrics loaded directly from draft/submitted and we are not using latest local computed data
+    if (!useLatestLocalComputedData && submittedData && metrics.calculated_sugam_days !== null) {
       return {
-        weightedSugam: submittedData.calculated_sugam_days || 0,
-        weightedDurgamBelow: submittedData.calculated_durgam_below_7000_days || 0,
-        weightedDurgamAbove: submittedData.calculated_durgam_above_7000_days || 0
+        weightedSugam: metrics.calculated_sugam_days,
+        weightedDurgamBelow: metrics.calculated_durgam_below_7000_days || 0,
+        weightedDurgamAbove: metrics.calculated_durgam_above_7000_days || 0
       };
     }
-    let sugam = Number(profileData?.totalSugamDays || profileData?.total_sugam_days) || 0;
-    let durgamBelow = Number(profileData?.totalDurgamBelow7000Days || profileData?.total_durgam_below_7000_days) || 0;
-    let durgamAbove = Number(profileData?.totalDurgamAbove7000Days || profileData?.total_durgam_above_7000_days) || 0;
 
-    if (profileData?.last_edited_on && profileData?.last_edited_on !== 'N/A') {
-      const lastEditedDate = new Date(profileData.last_edited_on);
+    let sugam = metrics.total_sugam_days;
+    let durgamBelow = metrics.total_durgam_below_7000_days;
+    let durgamAbove = metrics.total_durgam_above_7000_days;
+
+    if (metrics.profile_last_edited_on && metrics.profile_last_edited_on !== 'N/A') {
+      const lastEditedDate = new Date(metrics.profile_last_edited_on);
       const currentYear = new Date().getFullYear();
       const may31Date = new Date(currentYear, 4, 31);
 
@@ -678,8 +791,8 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         const diffTime = may31Date.getTime() - lastEditedDate.getTime();
         const extraDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        const postingType = profile?.currentPostingType;
-        const above7000 = profile?.currentPostingAbove7000;
+        const postingType = metrics.postingType;
+        const above7000 = metrics.above7000;
 
         if (postingType === 'Sugam') sugam += extraDays;
         else if (postingType === 'Durgam' && above7000 !== 'Yes') durgamBelow += extraDays;
@@ -715,7 +828,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         present_posting_since: profile?.currentPostingJoiningDate || '',
         present_posting_place_status: profile?.currentPostingType || '',
         present_posting_place_above_7000: profile?.currentPostingAbove7000 || '',
-        profile_last_edited_on: profileData?.last_edited_on || null,
+        profile_last_edited_on: getActiveMetrics().profile_last_edited_on,
         application_type: applicationType,
         transfer_category:
           applicationType === 'Anivarya Sthananataran' ? mandatoryTransferSubOption :
@@ -729,13 +842,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         calculated_sugam_days: calcDays.weightedSugam,
         calculated_durgam_below_7000_days: calcDays.weightedDurgamBelow,
         calculated_durgam_above_7000_days: calcDays.weightedDurgamAbove,
-        attachment_sugam_days: profileData?.totalAttachmentSugam || profileData?.attachment_sugam_days || 0,
-        attachment_durgam_days: profileData?.totalAttachmentDurgamBelow7000 || profileData?.attachment_durgam_below_7000_days || 0,
-        attachment_durgam_above_7000_days: profileData?.totalAttachmentDurgamAbove7000 || profileData?.attachment_durgam_above_7000_days || 0,
-        total_sugam_days: profileData?.totalSugamDays || profileData?.total_sugam_days || 0,
-        total_durgam_below_7000_days: profileData?.totalDurgamBelow7000Days || profileData?.total_durgam_below_7000_days || 0,
-        total_durgam_above_7000_days: profileData?.totalDurgamAbove7000Days || profileData?.total_durgam_above_7000_days || 0,
-        long_leaves_count: profileData?.longLeavesDays || profileData?.long_leaves_days || 0,
+        attachment_sugam_days: getActiveMetrics().attachment_sugam_days,
+        attachment_durgam_days: getActiveMetrics().attachment_durgam_days,
+        attachment_durgam_above_7000_days: getActiveMetrics().attachment_durgam_above_7000_days,
+        total_sugam_days: getActiveMetrics().total_sugam_days,
+        total_durgam_below_7000_days: getActiveMetrics().total_durgam_below_7000_days,
+        total_durgam_above_7000_days: getActiveMetrics().total_durgam_above_7000_days,
+        long_leaves_count: getActiveMetrics().long_leaves_count,
         form_submitted: false, save_draft_at: timestamp
       };
 
@@ -773,6 +886,20 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
     if (!vikalpPatra) {
       toast.error('Please upload your signed Vikalp Patra.'); return;
     }
+    
+    if (!applicationType) {
+      toast.error('Please select an Application Type.'); return;
+    }
+    if (applicationType === 'Anivarya Sthananataran' && !mandatoryTransferSubOption) {
+      toast.error('Please select an Anivaryta Sub-Category.'); return;
+    }
+    if (applicationType === 'Anurodh' && !transferCategory) {
+      toast.error('Please select an Anurodh Sub-Category.'); return;
+    }
+    if (applicationType === 'Need Exemption from Transfer' && !exemptionCategory) {
+      toast.error('Please select an Exemption Sub Category.'); return;
+    }
+
     setIsSubmitting(true);
     try {
       let proofDocPath = null;
@@ -783,7 +910,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         const fileExt = proofDocument.name.split('.').pop();
         const fileName = `${applicantName.replace(/\s+/g, '_')}_proof_${timestamp}.${fileExt}`;
         const { data: proofUpload, error: proofError } = await supabase.storage
-          .from('transfer_documents').upload(`proofs/${fileName}`, proofDocument);
+          .from('proof_documents').upload(fileName, proofDocument, { upsert: true });
         if (proofError) throw new Error('Failed to upload proof document: ' + proofError.message);
         proofDocPath = proofUpload.path;
       }
@@ -792,7 +919,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         const fileExt = vikalpPatra.name.split('.').pop();
         const fileName = `${applicantName.replace(/\s+/g, '_')}_vikalp_${timestamp}.${fileExt}`;
         const { data: vikalpUpload, error: vikalpError } = await supabase.storage
-          .from('transfer_documents').upload(`vikalp_patras/${fileName}`, vikalpPatra);
+          .from('transfer_documents').upload(fileName, vikalpPatra, { upsert: true });
         if (vikalpError) throw new Error('Failed to upload Vikalp Patra: ' + vikalpError.message);
         vikalpPatraPath = vikalpUpload.path;
       }
@@ -811,7 +938,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         present_posting_since: profile?.currentPostingJoiningDate || '',
         present_posting_place_status: profile?.currentPostingType || '',
         present_posting_place_above_7000: profile?.currentPostingAbove7000 || '',
-        profile_last_edited_on: profileData?.last_edited_on || null,
+        profile_last_edited_on: getActiveMetrics().profile_last_edited_on,
         application_type: applicationType,
         transfer_category:
           applicationType === 'Anivarya Sthananataran' ? mandatoryTransferSubOption :
@@ -825,13 +952,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         calculated_sugam_days: calcDays.weightedSugam,
         calculated_durgam_below_7000_days: calcDays.weightedDurgamBelow,
         calculated_durgam_above_7000_days: calcDays.weightedDurgamAbove,
-        attachment_sugam_days: profileData?.totalAttachmentSugam || profileData?.attachment_sugam_days || 0,
-        attachment_durgam_days: profileData?.totalAttachmentDurgamBelow7000 || profileData?.attachment_durgam_below_7000_days || 0,
-        attachment_durgam_above_7000_days: profileData?.totalAttachmentDurgamAbove7000 || profileData?.attachment_durgam_above_7000_days || 0,
-        total_sugam_days: profileData?.totalSugamDays || profileData?.total_sugam_days || 0,
-        total_durgam_below_7000_days: profileData?.totalDurgamBelow7000Days || profileData?.total_durgam_below_7000_days || 0,
-        total_durgam_above_7000_days: profileData?.totalDurgamAbove7000Days || profileData?.total_durgam_above_7000_days || 0,
-        long_leaves_count: profileData?.longLeavesDays || profileData?.long_leaves_days || 0,
+        attachment_sugam_days: getActiveMetrics().attachment_sugam_days,
+        attachment_durgam_days: getActiveMetrics().attachment_durgam_days,
+        attachment_durgam_above_7000_days: getActiveMetrics().attachment_durgam_above_7000_days,
+        total_sugam_days: getActiveMetrics().total_sugam_days,
+        total_durgam_below_7000_days: getActiveMetrics().total_durgam_below_7000_days,
+        total_durgam_above_7000_days: getActiveMetrics().total_durgam_above_7000_days,
+        long_leaves_count: getActiveMetrics().long_leaves_count,
         proof_document_path: proofDocPath,
         vikalp_patra_path: vikalpPatraPath,
         form_submitted: true,
@@ -893,11 +1020,11 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         <p className="text-slate-500 mt-2">Ayurvedic &amp; Unani Services, Uttarakhand</p>
       </div>
 
-      {/* Two-column layout: Form (left) + A4 Preview (right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 max-w-[1400px] mx-auto items-start">
+      {/* Layout: Form top, A4 Preview bottom */}
+      <div className="flex flex-col gap-12 max-w-4xl mx-auto w-full items-center">
 
-        {/* ── LEFT: FORM ── */}
-        <form onSubmit={handleSubmit} className="space-y-8">
+        {/* ── TOP: FORM ── */}
+        <form onSubmit={handleSubmit} className="space-y-8 w-full max-w-4xl">
 
           {/* Top action buttons */}
           <div className="flex justify-end gap-3">
@@ -947,11 +1074,11 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Employee ID</label>
-                <input type="text" value={profile?.empId || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Employee ID" />
+                <input type="text" value={submittedData?.employee_id || profile?.empId || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Employee ID" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Employee Type</label>
-                <input type="text" value={profile?.employmentType || 'Permanent'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                <input type="text" value={submittedData?.employment_type || profile?.employmentType || 'Permanent'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
@@ -1004,19 +1131,19 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Hospital</label>
-                <input type="text" value={profile?.mainPostingName || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Posting Name" />
+                <input type="text" value={submittedData?.present_posting_place || profile?.mainPostingName || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Posting Name" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Since</label>
-                <input type="text" value={profile?.currentPostingJoiningDate || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                <input type="text" value={submittedData?.present_posting_since || profile?.currentPostingJoiningDate || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Place Type</label>
-                <input type="text" value={profile?.currentPostingType || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Sugam / Durgam" />
+                <input type="text" value={submittedData?.present_posting_place_status || profile?.currentPostingType || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Sugam / Durgam" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Place Above 7000 Feet</label>
-                <input type="text" value={profile?.currentPostingAbove7000 || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Yes / No" />
+                <input type="text" value={submittedData?.present_posting_place_above_7000 || profile?.currentPostingAbove7000 || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Yes / No" />
               </div>
             </div>
           </div>
@@ -1046,15 +1173,15 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Edited On</label>
-                <input type="text" value={profileData?.last_edited_on || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                <input type="text" value={getActiveMetrics().profile_last_edited_on !== 'N/A' && getActiveMetrics().profile_last_edited_on ? new Date(getActiveMetrics().profile_last_edited_on).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) + ' (IST)' : 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
               {[
-                { label: 'Total Attachment days (Sugam)', value: profileData?.totalAttachmentSugam || profileData?.attachment_sugam_days || 0 },
-                { label: 'Total Attachment days (Durgam < 7000ft)', value: profileData?.totalAttachmentDurgamBelow7000 || profileData?.attachment_durgam_below_7000_days || 0 },
-                { label: 'Total Attachment days (Durgam > 7000ft)', value: profileData?.totalAttachmentDurgamAbove7000 || profileData?.attachment_durgam_above_7000_days || 0 },
-                { label: 'Long Leaves days', value: profileData?.longLeavesDays || profileData?.long_leaves_days || 0 },
+                { label: 'Total Attachment days (Sugam)', value: getActiveMetrics().attachment_sugam_days },
+                { label: 'Total Attachment days (Durgam < 7000ft)', value: getActiveMetrics().attachment_durgam_days },
+                { label: 'Total Attachment days (Durgam > 7000ft)', value: getActiveMetrics().attachment_durgam_above_7000_days },
+                { label: 'Long Leaves days', value: getActiveMetrics().long_leaves_count },
               ].map((item, idx) => (
                 <div key={idx}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{item.label}</label>
@@ -1064,9 +1191,9 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { label: 'Total Sugam days', value: profileData?.totalSugamDays || profileData?.total_sugam_days || 0 },
-                { label: 'Total Durgam days (Below 7000ft)', value: profileData?.totalDurgamBelow7000Days || profileData?.total_durgam_below_7000_days || 0 },
-                { label: 'Total Durgam days (Above 7000ft)', value: profileData?.totalDurgamAbove7000Days || profileData?.total_durgam_above_7000_days || 0 },
+                { label: 'Total Sugam days', value: getActiveMetrics().total_sugam_days },
+                { label: 'Total Durgam days (Below 7000ft)', value: getActiveMetrics().total_durgam_below_7000_days },
+                { label: 'Total Durgam days (Above 7000ft)', value: getActiveMetrics().total_durgam_above_7000_days },
               ].map((item, idx) => (
                 <div key={idx}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{item.label}</label>
@@ -1174,6 +1301,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               <div className="grid grid-cols-1 gap-4">
                 {choices.map((choice, index) => {
                   const selectedHospital = hospitals.find(h => h.facility_name === choice);
+                  const district = selectedHospital ? (selectedHospital.district || 'Unknown') : null;
                   const status = selectedHospital ? (selectedHospital.status || 'Sugam') : null;
                   const above7000 = selectedHospital ? (selectedHospital.above_7000_feet || 'No') : null;
                   return (
@@ -1191,6 +1319,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
                       </div>
                       {selectedHospital && (
                         <div className="flex items-center gap-3 sm:mb-[5px]">
+                          <span className="text-xs font-semibold text-slate-600 bg-white px-3 py-2 rounded-lg border border-slate-200">District: {district}</span>
                           <span className={`text-xs font-bold px-3 py-2 rounded-lg ${status === 'Durgam' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{status}</span>
                           <span className="text-xs font-semibold text-slate-600 bg-white px-3 py-2 rounded-lg border border-slate-200">Above 7000 ft: {above7000}</span>
                         </div>
@@ -1219,9 +1348,10 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
 
             <div className="mb-8 p-6 bg-slate-50 rounded-xl border border-slate-200">
               <label className="block text-sm font-semibold text-slate-800 mb-2">Upload Signed copy of Physical Vikalp Patra <span className="text-red-500">*</span></label>
-              <p className="text-xs text-slate-500 mb-3">Please print the physical copy, sign it, and upload the scanned version here.</p>
-              <input type="file" onChange={(e) => setVikalpPatra(e.target.files?.[0] || null)}
+              <p className="text-xs text-slate-500 mb-3">Please print the physical copy, sign it, and upload the scanned version here (PDF, PNG, JPG, Max 5MB).</p>
+              <input type="file" onChange={(e) => handleFileChange(e, setVikalpPatra)}
                 disabled={isLocked}
+                accept=".pdf,.png,.jpg,.jpeg"
                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70" required={!isLocked} />
             </div>
 
@@ -1230,9 +1360,10 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
                 <label className="block text-sm font-semibold text-slate-800 mb-2">
                   {applicationType === 'Need Exemption from Transfer' ? 'Upload Proof for Exemption' : 'Proof For Anurodh Request'}
                 </label>
-                <p className="text-xs text-slate-500 mb-3">Please provide the supporting document for your request.</p>
-                <input type="file" onChange={(e) => setProofDocument(e.target.files?.[0] || null)}
+                <p className="text-xs text-slate-500 mb-3">Please provide the supporting document for your request (PDF, PNG, JPG, Max 5MB).</p>
+                <input type="file" onChange={(e) => handleFileChange(e, setProofDocument)}
                   disabled={isLocked}
+                  accept=".pdf,.png,.jpg,.jpeg"
                   className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70" />
               </div>
             )}
@@ -1263,13 +1394,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
           )}
         </form>
 
-        {/* ── RIGHT: A4 LIVE PREVIEW ── */}
-        <div className="xl:sticky xl:top-6 xl:max-h-screen xl:overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
+        {/* ── BOTTOM: A4 LIVE PREVIEW & ATTACHMENTS ── */}
+        <div className="w-full flex flex-col justify-center items-center overflow-x-auto pb-10">
+          <div className="flex items-center justify-between mb-4 w-[794px] max-w-full">
             <h2 className="text-lg font-bold text-slate-700">Live Preview (A4)</h2>
             <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">Updates as you fill the form</span>
           </div>
-          <div ref={a4PreviewRef} id="a4-preview-print-target">
+          <div ref={a4PreviewRef} id="a4-preview-print-target" className="overflow-x-auto min-w-[794px]">
           <A4Preview
             applicantName={applicantName}
             fatherHusbandName={fatherHusbandName}
@@ -1280,10 +1411,10 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             email={email}
             homeDistrict={homeDistrict}
             presentDistrict={presentDistrict}
-            mainPostingName={profile?.mainPostingName}
-            currentPostingJoiningDate={profile?.currentPostingJoiningDate}
-            currentPostingType={profile?.currentPostingType}
-            currentPostingAbove7000={profile?.currentPostingAbove7000}
+            mainPostingName={mainPostingName}
+            currentPostingJoiningDate={submittedData?.present_posting_since || profile?.currentPostingJoiningDate}
+            currentPostingType={submittedData?.present_posting_place_status || profile?.currentPostingType}
+            currentPostingAbove7000={submittedData?.present_posting_place_above_7000 || profile?.currentPostingAbove7000}
             applicationType={applicationType}
             transferCategory={transferCategory}
             exemptionCategory={exemptionCategory}
@@ -1293,8 +1424,39 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             calculatedWeightedSugam={getCalculatedWeightedDays().weightedSugam}
             calculatedWeightedDurgamBelow={getCalculatedWeightedDays().weightedDurgamBelow}
             calculatedWeightedDurgamAbove={getCalculatedWeightedDays().weightedDurgamAbove}
+            submittedAt={submittedData?.submitted_at}
           />
           </div>
+          
+          {submittedData && (submittedData.vikalp_patra_path || submittedData.proof_document_path) && (
+            <div className="w-[794px] max-w-full mt-8 p-6 bg-white border border-slate-200 rounded-xl shadow-sm self-center">
+              <h3 className="text-lg font-bold text-slate-700 mb-4">Uploaded Documents</h3>
+              <div className="flex flex-col gap-3">
+                {submittedData.vikalp_patra_path && (
+                  <a
+                    href={supabase.storage.from('transfer_documents').getPublicUrl(submittedData.vikalp_patra_path).data.publicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-medium bg-emerald-50 py-3 px-4 rounded-lg hover:bg-emerald-100 transition-colors"
+                  >
+                    <FileText size={20} />
+                    View Vikalp Patra
+                  </a>
+                )}
+                {submittedData.proof_document_path && (
+                  <a
+                    href={supabase.storage.from('proof_documents').getPublicUrl(submittedData.proof_document_path).data.publicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-medium bg-emerald-50 py-3 px-4 rounded-lg hover:bg-emerald-100 transition-colors"
+                  >
+                    <FileText size={20} />
+                    View Proof Document
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

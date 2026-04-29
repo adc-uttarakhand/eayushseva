@@ -1070,7 +1070,7 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         total_durgam_below_7000_days: serviceDays.totalDurgam,
         total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
         last_edited_on: new Date().toISOString(),
-        is_verified: new Date().toISOString() > (staffData?.last_verified_on || '1970-01-01')
+        is_verified: false
       }, { onConflict: 'id' });
 
       if (staffError) {

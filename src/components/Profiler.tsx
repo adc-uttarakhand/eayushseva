@@ -380,7 +380,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         is_locked: staffData.is_locked || false
       };
       
-      newProfile.currentPostingJoiningDate = formatDateForUI(staffData.current_posting_joining_date || '') || (newProfile.postings[0]?.fromDate || '');
+      (newProfile as any).currentPostingJoiningDate = formatDateForUI(staffData.current_posting_joining_date || '') || (newProfile.postings[0]?.fromDate || '');
       
       setProfile(newProfile);
       setInitialProfile(newProfile);
