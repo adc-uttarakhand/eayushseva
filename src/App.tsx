@@ -12,6 +12,7 @@ import FacilityCard from './components/FacilityCard';
 import BentoGrid from './components/BentoGrid';
 import BottomNav, { TabId } from './components/BottomNav';
 import LoginModal, { UserSession } from './components/LoginModal';
+import ForcePasswordChange, { isWeakPassword } from './components/ForcePasswordChange';
 import EditHospitalModal from './components/EditHospitalModal';
 import EParchi from './components/EParchi';
 import PatientList from './components/PatientList';
@@ -112,6 +113,7 @@ export default function App() {
   const [requestsSubTab, setRequestsSubTab] = useState<'transfer_requests' | 'registration_requests'>('transfer_requests');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
+  const [showForcePasswordChange, setShowForcePasswordChange] = useState(false);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -421,6 +423,10 @@ export default function App() {
   const handleLogin = (sess: UserSession) => {
     setSession(sess);
     localStorage.setItem('ayush_session', JSON.stringify(sess));
+    // Check if password change is needed
+    if (sess.requiresPasswordChange) {
+      setShowForcePasswordChange(true);
+    }
   };
 
   const handleLogout = () => {
@@ -1413,6 +1419,15 @@ export default function App() {
         onClose={() => setIsLoginOpen(false)} 
         onLogin={handleLogin} 
       />
+
+      {showForcePasswordChange && session && (
+        <ForcePasswordChange
+          session={session}
+          onPasswordChanged={() => {
+            setShowForcePasswordChange(false);
+          }}
+        />
+      )}
 
       <EditHospitalModal
         hospital={editingHospital}
