@@ -46,7 +46,8 @@ export default function AdminTransferList({ session }: { session: any }) {
             const { data, error } = await supabase
                 .from('transfer_applications')
                 .select('*')
-                .eq('transfer_year', currentYear.toString());
+                .eq('transfer_year', currentYear.toString())
+                .eq('form_submitted', true);
             
             if (error) {
                 console.error('Error fetching applications:', error);

@@ -237,7 +237,7 @@ const A4Preview = ({
       </Section>
 
       {/* Section 2.2: Calculated Service Details */}
-      <Section title="2.2 Calculated Service Details (As on 31st May)">
+      <Section title="2.2 Calculated Service Details (As on 31st May) (Only for reference, will be cross verified with District verified data)">
         <div style={grid3}>
           <Field label="Calculated Sugam days" value={calculatedWeightedSugam} />
           <Field label="Calculated Durgam days (Below 7000ft)" value={calculatedWeightedDurgamBelow} />
@@ -1210,7 +1210,9 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
           <div className="bg-indigo-50 rounded-2xl shadow-sm border border-indigo-100 p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-indigo-100 text-indigo-700 p-2 rounded-lg"><FileText size={24} /></div>
-              <h2 className="text-xl font-bold text-indigo-800">Calculated Service Details (As on 31st May)</h2>
+              <h2 className="text-xl font-bold text-indigo-800">
+                Calculated Service Details (As on 31st May) <span className="text-sm font-normal text-indigo-600 block sm:inline mt-1 sm:mt-0">(Only for reference, will be cross verified with District verified data)</span>
+              </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
