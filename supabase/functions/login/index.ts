@@ -23,6 +23,18 @@ async function generateJWT(payload: any) {
   return create({ alg: "HS512", typ: "JWT" }, { ...payload, exp: getNumericDate(60 * 60 * 24) }, key); // 24 hours
 }
 
+const WEAK_PASSWORDS = [
+  'ayush@123', 'ayush123', 'ABCD_1234', 'abcd1234',
+  'password', 'password123', '123456', '12345678',
+  'admin@123', 'admin123', 'test@123', '1234'
+];
+
+function isWeakPassword(password: string): boolean {
+  if (!password) return true;
+  if (password.length < 8) return true;
+  return WEAK_PASSWORDS.includes(password) || WEAK_PASSWORDS.includes(password.toLowerCase());
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -78,6 +90,7 @@ serve(async (req) => {
         access_districts: adminData.access_districts || [],
         access_systems: adminData.access_systems || [],
         district: adminData.district,
+        requiresPasswordChange: isWeakPassword(password),
       };
 
       const token = await generateJWT(userDetails);
@@ -177,7 +190,15 @@ serve(async (req) => {
           const staffTokenPayload = { role: 'STAFF', id: staffRecord.id, name: staffRecord.full_name };
           const token = await generateJWT(staffTokenPayload);
           return new Response(
-            JSON.stringify({ record: { ...staffRecord, hospital_id: singleLink.hospitalId }, token, type: 'staff_single' }),
+            JSON.stringify({ 
+              record: { 
+                ...staffRecord, 
+                hospital_id: singleLink.hospitalId,
+                requiresPasswordChange: isWeakPassword(password)
+              }, 
+              token, 
+              type: 'staff_single' 
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
           );
         }
@@ -197,6 +218,7 @@ serve(async (req) => {
         id: hospitalLoginData.hospital_id,
         name: hospitalLoginData.facility_name,
         district: hospitalLoginData.district,
+        requiresPasswordChange: isWeakPassword(password),
       };
 
       const token = await generateJWT(userDetails);
