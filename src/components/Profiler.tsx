@@ -302,7 +302,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         return dateStr;
       };
 
-      const { data: staffData } = await supabase.from('staff').select('*').eq('id', staffId).maybeSingle();
+      const { data: staffData } = await supabase.from('staff').select('id, full_name, role, designation, employee_id, mobile_number, father_name, photograph_url, email_id, employment_class, employment_type, gender, dob, current_posting_joining_date, present_district, blood_group, permanent_address, current_residential_address, hospital_id, bcp_registration_no, trainings, date_of_first_appointment, first_joining_date, first_posting_place, home_district, long_leaves, postings, attachments, secondary_hospitals, attachment_sugam_days, attachment_durgam_below_7000_days, attachment_durgam_above_7000_days, long_leaves_days, total_sugam_days, total_durgam_below_7000_days, total_durgam_above_7000_days').eq('id', staffId).maybeSingle();
       if (!staffData) { setLoading(false); return; }
 
       let hospitalInfo = null;
@@ -318,7 +318,6 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         designation: staffData.role || staffData.designation || '',
         empId: staffData.employee_id || '',
         mobile: staffData.mobile_number || '',
-        password: staffData.login_password || '',
         fatherName: staffData.father_name || '',
         photograph: staffData.photograph_url || '',
         email: staffData.email_id || '',
@@ -464,7 +463,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
 
       const { error: staffError } = await supabase.from('staff').upsert({
         id: staffId, full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
-        login_password: profile.password, father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
+        father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
         employment_class: profile.employmentClass, employment_type: profile.employmentType, gender: profile.gender,
         dob: formatDateForDB(profile.dob), current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
         present_district: profile.presentDistrict, blood_group: profile.bloodGroup, permanent_address: profile.permanentAddress,

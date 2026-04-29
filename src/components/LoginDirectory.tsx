@@ -8,7 +8,6 @@ interface HospitalLogin {
   id: string;
   name: string;
   username: string;
-  password?: string;
   district: string;
 }
 
@@ -17,7 +16,6 @@ interface StaffLogin {
   id: string;
   name: string;
   username: string;
-  password?: string;
   role: string;
   hospitalName: string;
 }
@@ -27,7 +25,6 @@ interface AdminLogin {
   id: string;
   name: string;
   username: string;
-  password?: string;
   email: string; // Assuming admin_userid is email for display
   access_districts?: string[];
   access_systems?: string[];
@@ -53,7 +50,7 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
       const adminTableNames = ['admin_logins']; // Only query the new table
 
       for (const tableName of adminTableNames) {
-        const { data, error } = await supabase.from(tableName).select('id, name, admin_name, admin_userid, admin_password, access_districts, access_systems');
+        const { data, error } = await supabase.from(tableName).select('id, name, admin_name, admin_userid, access_districts, access_systems');
         if (!error && data && data.length > 0) {
           adminData = data;
           break;
@@ -65,7 +62,7 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
       if (adminError && !adminData.length) throw adminError;
 
       let hospitalQuery = supabase.from('hospitals')
-        .select('hospital_id, facility_name, hospital_password, district, system');
+        .select('hospital_id, facility_name, district, system');
 
       if (accessDistricts && accessDistricts.length > 0 && !accessDistricts.includes('All')) {
         hospitalQuery = hospitalQuery.in('district', accessDistricts);
@@ -75,7 +72,7 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
       }
 
       let staffQuery = supabase.from('staff')
-        .select('id, full_name, role, mobile_number, login_password, hospital_id, hospitals(facility_name, district, system)');
+        .select('id, full_name, role, mobile_number, hospital_id, hospitals(facility_name, district, system)');
 
       if (accessDistricts && accessDistricts.length > 0 && !accessDistricts.includes('All')) {
         staffQuery = staffQuery.in('hospitals.district', accessDistricts);
@@ -97,7 +94,6 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
         id: h.hospital_id,
         name: h.facility_name,
         username: h.hospital_id, // Assuming hospital_id is the username
-        password: h.hospital_password,
         district: h.district,
       }));
 
@@ -106,7 +102,6 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
         id: s.id,
         name: s.full_name,
         username: s.mobile_number, // Assuming mobile_number is the username
-        password: s.login_password,
         role: s.role,
         hospitalName: s.hospitals?.[0]?.facility_name || s.hospital_id, // Use joined hospital name
       }));
@@ -116,7 +111,6 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
         id: a.id,
         name: a.name || a.admin_name,
         username: a.admin_userid,
-        password: a.admin_password,
         email: a.admin_userid, // Using admin_userid as email for display consistency
         access_districts: a.access_districts,
         access_systems: a.access_systems,
@@ -208,7 +202,7 @@ export default function LoginDirectory({ accessDistricts, accessSystems }: { acc
                   </div>
                   <div className="flex items-center gap-3">
                     <Key size={16} className="text-slate-400" />
-                    <span className="text-sm font-medium">Password: {login.password || '********'}</span>
+                    <span className="text-sm font-medium">Password: ********</span>
                   </div>
                   {login.type === 'hospital' && (
                     <div className="flex items-center gap-3">

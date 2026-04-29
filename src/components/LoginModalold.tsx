@@ -1,7 +1,7 @@
 import { X, Lock, User, ShieldCheck, Eye, EyeOff, Loader2, UserSearch } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState } from 'react';
-import { supabase, setSupabaseToken } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import SearchEmployeeModal from './SearchEmployeeModal';
 
 export interface UserSession {
@@ -58,29 +58,28 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       }
 
       if (data?.type === 'admin') {
-        if (data.token) setSupabaseToken(data.token);
+        // We received JWT as well, maybe store it if needed
+        if (data.token) localStorage.setItem('token', data.token);
         onLogin(data.session);
         onClose();
         return;
       }
 
       if (data?.type === 'hospital') {
-        if (data.token) setSupabaseToken(data.token);
+        if (data.token) localStorage.setItem('token', data.token);
         onLogin(data.session);
         onClose();
         return;
       }
 
       if (data?.type === 'staff_multiple') {
-        // Store options token for when user selects hospital
-        if (data.token) setSupabaseToken(data.token);
         setStaffOptions(data.options);
         setLoading(false);
         return;
       }
 
       if (data?.type === 'staff_single') {
-        if (data.token) setSupabaseToken(data.token);
+        if (data.token) localStorage.setItem('token', data.token);
         await completeStaffLogin(data.record);
         return;
       }
@@ -104,6 +103,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
   };
 
   const completeStaffLogin = async (staffData: any) => {
+    if (staffData.token) localStorage.setItem('token', staffData.token);
+
     if (!staffData.is_active) {
       setError('Account Deactivated');
       return;

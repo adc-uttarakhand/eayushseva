@@ -36,7 +36,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
         
         const { data, error } = await supabase
           .from('admin_logins')
-          .select('*')
+          .select('id, admin_userid, name, email_id, mobile_number, access_systems')
           .eq(queryColumn, session.id)
           .single();
 
@@ -45,7 +45,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
             name: data.name || '',
             email: data.email_id || data.admin_userid || '',
             mobile: data.mobile_number || '',
-            password: data.admin_password || '',
+            password: '',
             system: data.access_systems?.join(', ') || 'All',
             designation: session.role.replace('_', ' '),
             userId: data.admin_userid || session.id
@@ -54,7 +54,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
       } else if (session.role === 'HOSPITAL') {
         const { data, error } = await supabase
           .from('hospitals')
-          .select('*')
+          .select('hospital_id, facility_name, email, mobile, system')
           .eq('hospital_id', session.id)
           .single();
 
@@ -63,7 +63,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
             name: data.facility_name || '',
             email: data.email || '',
             mobile: data.mobile || '',
-            password: data.hospital_password || '',
+            password: '',
             system: data.system || '',
             designation: 'Hospital Administrator',
             userId: session.id
@@ -72,7 +72,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
       } else if (session.role === 'STAFF') {
         const { data, error } = await supabase
           .from('staff')
-          .select('*')
+          .select('id, full_name, email_id, mobile_number, role')
           .eq('id', session.id)
           .single();
 
@@ -81,7 +81,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
             name: data.full_name || '',
             email: data.email_id || '',
             mobile: data.mobile_number || '',
-            password: data.login_password || '',
+            password: '',
             system: '', // Staff usually tied to hospital system
             designation: data.role || 'Staff',
             userId: session.id
@@ -92,7 +92,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
           name: 'Super Admin',
           email: 'admin@uttarakhand.gov.in',
           mobile: '9999999999',
-          password: 'Shutup@99',
+          password: '',
           system: 'All',
           designation: 'Super Administrator',
           userId: session.id
@@ -113,38 +113,44 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.id);
         const queryColumn = isUuid ? 'id' : 'admin_userid';
 
+        const updatePayload: any = {
+          name: formData.name,
+          email_id: formData.email,
+          mobile_number: formData.mobile
+        };
+        if (formData.password) updatePayload.admin_password = formData.password;
+
         const { error } = await supabase
           .from('admin_logins')
-          .update({
-            name: formData.name,
-            admin_password: formData.password,
-            email_id: formData.email,
-            mobile_number: formData.mobile
-          })
+          .update(updatePayload)
           .eq(queryColumn, session.id);
         
         if (error) throw error;
       } else if (session.role === 'HOSPITAL') {
+        const updatePayload: any = {
+          facility_name: formData.name,
+          email: formData.email,
+          mobile: formData.mobile
+        };
+        if (formData.password) updatePayload.hospital_password = formData.password;
+
         const { error } = await supabase
           .from('hospitals')
-          .update({
-            facility_name: formData.name,
-            hospital_password: formData.password,
-            email: formData.email,
-            mobile: formData.mobile
-          })
+          .update(updatePayload)
           .eq('hospital_id', session.id);
         
         if (error) throw error;
       } else if (session.role === 'STAFF') {
+        const updatePayload: any = {
+          full_name: formData.name,
+          email_id: formData.email,
+          mobile_number: formData.mobile
+        };
+        if (formData.password) updatePayload.login_password = formData.password;
+
         const { error } = await supabase
           .from('staff')
-          .update({
-            full_name: formData.name,
-            login_password: formData.password,
-            email_id: formData.email,
-            mobile_number: formData.mobile
-          })
+          .update(updatePayload)
           .eq('id', session.id);
         
         if (error) throw error;

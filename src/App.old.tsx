@@ -42,7 +42,7 @@ import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
 import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard } from 'lucide-react';
-import { supabase, restoreSupabaseToken, clearSupabaseToken } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import { Toaster, toast } from 'react-hot-toast';
 
 interface Notification {
@@ -409,24 +409,21 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Restore session on page refresh
-    const savedSession = localStorage.getItem('ayush_session');
+    const savedSession = localStorage.getItem('session');
     if (savedSession) {
       setSession(JSON.parse(savedSession));
     }
-    // Restore JWT token so Supabase queries stay authenticated
-    restoreSupabaseToken();
   }, []);
 
   const handleLogin = (sess: UserSession) => {
     setSession(sess);
-    localStorage.setItem('ayush_session', JSON.stringify(sess));
+    localStorage.setItem('session', JSON.stringify(sess));
   };
 
   const handleLogout = () => {
     setSession(null);
-    localStorage.removeItem('ayush_session');
-    clearSupabaseToken();
+    localStorage.removeItem('session');
+    localStorage.removeItem('token');
   };
 
   const isAdmin = session?.role === 'SUPER_ADMIN';

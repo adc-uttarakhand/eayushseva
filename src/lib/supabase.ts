@@ -1,7 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Using provided credentials directly to ensure the preview works immediately
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://czjxoavqlznzvhypqtwe.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6anhvYXZxbHpuenZoeXBxdHdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM2ODgsImV4cCI6MjA5Mjg4OTY4OH0.uKLslvmxI106GY_PAQCrxKZVm5KbZ07wG2HBZdSPTZc';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase environment variables missing!');
+}
+
+// Create base client
+export const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
+
+// Call this after login — injects JWT token into all future Supabase queries
+export function setSupabaseToken(token: string) {
+  supabase.functions.setAuth(token);
+  // Store token for page refresh
+  localStorage.setItem('ayush_token', token);
+}
+
+// Call this on logout — removes token
+export function clearSupabaseToken() {
+  supabase.functions.setAuth('');
+  localStorage.removeItem('ayush_token');
+  localStorage.removeItem('ayush_session');
+}
+
+// Call this on app load — restores token if page was refreshed
+export function restoreSupabaseToken() {
+  const token = localStorage.getItem('ayush_token');
+  if (token) {
+    supabase.functions.setAuth(token);
+    return token;
+  }
+  return null;
+}
