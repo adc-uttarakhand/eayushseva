@@ -236,7 +236,8 @@ const A4Preview = ({
         )}
       </Section>
 
-      {/* Section 2.2: Calculated Service Details */}
+      {/* Section 2.2: Calculated Service Details - Hidden from preview/PDF as requested */}
+      {/* 
       <Section title="2.2 Calculated Service Details (As on 31st May) (Only for reference, will be cross verified with District verified data)">
         <div style={grid3}>
           <Field label="Calculated Sugam days" value={calculatedWeightedSugam} />
@@ -244,6 +245,7 @@ const A4Preview = ({
           <Field label="Calculated Durgam days (Above 7000ft)" value={calculatedWeightedDurgamAbove} />
         </div>
       </Section>
+      */}
 
       {/* Section 3: Application Type & Category */}
       <Section title="3. Application Type &amp; Category">
