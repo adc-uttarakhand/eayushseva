@@ -217,7 +217,7 @@ const A4Preview = ({
           <Field label="Employee Type" value="Permanent" />
           <Field label="Mobile Number" value={mobileNumber} />
           <Field label="Email Address" value={email} />
-          <Field label="Home District" value={homeDistrict} />
+          <Field label="Home District (Must be verified by DAUO)" value={homeDistrict} />
         </div>
       </Section>
 
@@ -378,6 +378,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const [mainPostingNameState, setMainPostingNameState] = useState(profile?.mainPostingName || '');
   const mainPostingName = submittedData?.present_posting_place || mainPostingNameState || '';
 
+  // 5 dedicated states — seedha staff table se
+  const [ppDistrict, setPpDistrict] = useState('');
+  const [ppHospital, setPpHospital] = useState('');
+  const [ppSince, setPpSince] = useState('');
+  const [ppType, setPpType] = useState('');
+  const [ppAbove7000, setPpAbove7000] = useState('');
+
   useEffect(() => {
     const fetchStaffData = async () => {
       // Admin list passes a transfer_applications object as profile
@@ -429,7 +436,8 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       }
 
       if (profile && (profile.empId || profile.fullName)) {
-        if (!staffId && session?.id) setStaffId(session.id);
+        const currentStaffId = profile.id || session?.id || staffId;
+        if (!staffId && currentStaffId) setStaffId(currentStaffId);
         setMobileNumber(profile.mobile_number || profile.mobile || '');
         if (profile.email_id || profile.email) setEmail(profile.email_id || profile.email || email);
         if (profile.role || profile.designation) setRole(profile.role || profile.designation);
@@ -442,6 +450,30 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         if (profile.home_district || profile.homeDistrict) setHomeDistrict(profile.home_district || profile.homeDistrict);
         if (profile.present_district || profile.presentDistrict) setPresentDistrict(profile.present_district || profile.presentDistrict);
         if (profile.mainPostingName) setMainPostingNameState(profile.mainPostingName);
+
+        // Directly fetch present posting details from staff table — most reliable source
+        if (currentStaffId) {
+          try {
+            const { data: staffRow } = await supabase
+              .from('staff')
+              .select('present_district, present_hospital, current_posting_joining_date, present_posting_status, present_posting_above_7000ft')
+              .eq('id', currentStaffId)
+              .maybeSingle();
+
+            if (staffRow) {
+              if (staffRow.present_district) setPresentDistrict(staffRow.present_district);
+              if (staffRow.present_hospital) setMainPostingNameState(staffRow.present_hospital);
+              setProfileData(prev => ({
+                ...prev,
+                currentPostingJoiningDate: staffRow.current_posting_joining_date || prev?.currentPostingJoiningDate || '',
+                currentPostingType: staffRow.present_posting_status || prev?.currentPostingType || 'Sugam',
+                currentPostingAbove7000: staffRow.present_posting_above_7000ft || prev?.currentPostingAbove7000 || 'No',
+              }));
+            }
+          } catch (err) {
+            console.error('Error fetching staff posting details:', err);
+          }
+        }
       }
 
       // NEW: Fetch DOB if not already set
@@ -478,6 +510,16 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             }
             if (staffData.home_district) setHomeDistrict(staffData.home_district);
             if (staffData.present_district) setPresentDistrict(staffData.present_district);
+            // Direct se staff table ke present posting columns fetch karo
+            if (staffData.present_hospital) setMainPostingNameState(staffData.present_hospital);
+            if (staffData.current_posting_joining_date) {
+              setProfile((prev: any) => prev ? { 
+                ...prev, 
+                currentPostingJoiningDate: staffData.current_posting_joining_date,
+                currentPostingType: staffData.present_posting_status || prev.currentPostingType,
+                currentPostingAbove7000: staffData.present_posting_above_7000ft || prev.currentPostingAbove7000,
+              } : prev);
+            }
           }
         } catch (err) {
           console.error('Error fetching staff data:', err);
@@ -583,6 +625,31 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingLocal, setIsFetchingLocal] = useState(false);
   const [profileData, setProfileData] = useState(profile);
+
+  // Dedicated function — sirf staff table ke 5 columns fetch karo
+  const fetchPresentPostingFromStaff = async (sid: string) => {
+    if (!sid) return;
+    try {
+      const { data } = await supabase
+        .from('staff')
+        .select('present_district, present_hospital, current_posting_joining_date, present_posting_status, present_posting_above_7000ft')
+        .eq('id', sid)
+        .maybeSingle();
+
+      if (data) {
+        setPpDistrict(data.present_district || '');
+        setPpHospital(data.present_hospital || '');
+        setPpSince(data.current_posting_joining_date || '');
+        setPpType(data.present_posting_status || '');
+        setPpAbove7000(data.present_posting_above_7000ft || '');
+        // Baki states bhi update karo consistency ke liye
+        if (data.present_district) setPresentDistrict(data.present_district);
+        if (data.present_hospital) setMainPostingNameState(data.present_hospital);
+      }
+    } catch (err) {
+      console.error('Error fetching present posting:', err);
+    }
+  };
   const [isLocked, setIsLocked] = useState(false);
   const isFormLocked = isLocked || !!profile;
   const [useLatestLocalComputedData, setUseLatestLocalComputedData] = useState(false);
@@ -626,7 +693,24 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       if (staffData) {
         setProfileData(staffData);
         setUseLatestLocalComputedData(true);
-        toast.success('Service details updated from server.');
+        if (staffData.home_district) setHomeDistrict(staffData.home_district);
+        if (staffData.present_district) setPresentDistrict(staffData.present_district);
+        if (staffData.mobile_number) setMobileNumber(staffData.mobile_number);
+        if (staffData.email_id) setEmail(staffData.email_id);
+        if (staffData.full_name) setApplicantName(staffData.full_name);
+        if (staffData.father_name) setFatherHusbandName(staffData.father_name);
+        if (staffData.dob) {
+           const dobStr = typeof staffData.dob === 'string' ? staffData.dob : new Date(staffData.dob).toISOString();
+           setDob(dobStr.split('T')[0]);
+        }
+        // Present posting — seedha staff table se dedicated function se
+        setPpDistrict(staffData.present_district || '');
+        setPpHospital(staffData.present_hospital || '');
+        setPpSince(staffData.current_posting_joining_date || '');
+        setPpType(staffData.present_posting_status || '');
+        setPpAbove7000(staffData.present_posting_above_7000ft || '');
+        if (staffData.present_hospital) setMainPostingNameState(staffData.present_hospital);
+        toast.success('Latest data fetched from server.');
       }
     } catch (err) {
       console.error('Error fetching staff data:', err);
@@ -670,6 +754,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       calculated_durgam_above_7000_days: useDraftOrSubmitted && submittedData.calculated_durgam_above_7000_days != null ? Number(submittedData.calculated_durgam_above_7000_days) : null,
     };
   };
+
+  // Jab bhi staffId mile — seedha staff table se present posting fetch karo
+  useEffect(() => {
+    if (staffId) {
+      fetchPresentPostingFromStaff(staffId);
+    }
+  }, [staffId]);
 
   useEffect(() => {
     const loadApplicationStatus = async () => {
@@ -827,9 +918,9 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         applicant_name: applicantName, father_husband_name: fatherHusbandName,
         dob, home_district: homeDistrict, present_posting: presentDistrict,
         present_posting_place: mainPostingName,
-        present_posting_since: profile?.currentPostingJoiningDate || '',
-        present_posting_place_status: profile?.currentPostingType || '',
-        present_posting_place_above_7000: profile?.currentPostingAbove7000 || '',
+        present_posting_since: ppSince || profile?.currentPostingJoiningDate || '',
+        present_posting_place_status: ppType || profile?.currentPostingType || '',
+        present_posting_place_above_7000: ppAbove7000 || profile?.currentPostingAbove7000 || '',
         profile_last_edited_on: getActiveMetrics().profile_last_edited_on,
         application_type: applicationType,
         transfer_category:
@@ -937,9 +1028,9 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         applicant_name: applicantName, father_husband_name: fatherHusbandName,
         dob, home_district: homeDistrict, present_posting: presentDistrict,
         present_posting_place: mainPostingName,
-        present_posting_since: profile?.currentPostingJoiningDate || '',
-        present_posting_place_status: profile?.currentPostingType || '',
-        present_posting_place_above_7000: profile?.currentPostingAbove7000 || '',
+        present_posting_since: ppSince || profile?.currentPostingJoiningDate || '',
+        present_posting_place_status: ppType || profile?.currentPostingType || '',
+        present_posting_place_above_7000: ppAbove7000 || profile?.currentPostingAbove7000 || '',
         profile_last_edited_on: getActiveMetrics().profile_last_edited_on,
         application_type: applicationType,
         transfer_category:
@@ -1114,7 +1205,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
                 <input type="date" value={dob} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Home District</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Home District (Must be verified by DAUO)</label>
                 <input type="text" value={homeDistrict} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Home District" />
               </div>
             </div>
@@ -1122,30 +1213,36 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
 
           {/* SECTION: Present Posting Details */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg"><MapPin size={24} /></div>
-              <h2 className="text-xl font-bold text-slate-800">Present Posting Details</h2>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg"><MapPin size={24} /></div>
+                <h2 className="text-xl font-bold text-slate-800">Present Posting Details</h2>
+              </div>
+              <button type="button" onClick={fetchLatestStaffData} disabled={isFetchingLocal}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all flex items-center gap-2">
+                {isFetchingLocal ? <Loader2 size={16} className="animate-spin" /> : 'Fetch Latest'}
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present District</label>
-                <input type="text" value={presentDistrict} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Present District" />
+                <input type="text" value={submittedData?.present_posting || ppDistrict} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Present District" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Hospital</label>
-                <input type="text" value={submittedData?.present_posting_place || profile?.mainPostingName || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Posting Name" />
+                <input type="text" value={submittedData?.present_posting_place || ppHospital} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Posting Name" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Since</label>
-                <input type="text" value={submittedData?.present_posting_since || profile?.currentPostingJoiningDate || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                <input type="text" value={submittedData?.present_posting_since || ppSince || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Place Type</label>
-                <input type="text" value={submittedData?.present_posting_place_status || profile?.currentPostingType || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Sugam / Durgam" />
+                <input type="text" value={submittedData?.present_posting_place_status || ppType} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Sugam / Durgam" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Place Above 7000 Feet</label>
-                <input type="text" value={submittedData?.present_posting_place_above_7000 || profile?.currentPostingAbove7000 || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Yes / No" />
+                <input type="text" value={submittedData?.present_posting_place_above_7000 || ppAbove7000} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Yes / No" />
               </div>
             </div>
           </div>
