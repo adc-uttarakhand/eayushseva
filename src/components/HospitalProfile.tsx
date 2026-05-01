@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, Save, MapPin, Eye, EyeOff, Star, ShieldCheck, Upload, Camera, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { Building2, Save, MapPin, Star, ShieldCheck, Upload, Camera, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import ChangeInchargeModal from './ChangeInchargeModal';
@@ -37,7 +37,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     taluka: '',
     ipd_services: '',
     mobile: '',
-    hospital_password: '',
     email: '',
     special_services: [] as string[],
     centre_of_excellence: '',
@@ -62,7 +61,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     above_7000_feet: '',
     type: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [incharge, setIncharge] = useState<any>(null);
@@ -90,7 +88,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     if (hospitalDetails && formData) {
       const isCurrentlyDirty = 
         normalize(formData.email) !== normalize(hospitalDetails.email || '') ||
-        normalize(formData.hospital_password) !== normalize(hospitalDetails.hospital_password || '') ||
         JSON.stringify(formData.special_services.sort()) !== JSON.stringify((hospitalDetails.special_services || []).sort()) ||
         normalize(formData.centre_of_excellence) !== normalize(hospitalDetails.centre_of_excellence || '') ||
         formData.supraja_centre !== (hospitalDetails.supraja_centre || false) ||
@@ -126,7 +123,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     if (hospitalDetails && !initialized) {
       setFormData({
         email: hospitalDetails.email || '',
-        hospital_password: hospitalDetails.hospital_password || '',
         special_services: hospitalDetails.special_services || [],
         centre_of_excellence: hospitalDetails.centre_of_excellence || '',
         supraja_centre: hospitalDetails.supraja_centre || false,
@@ -286,7 +282,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
       const isAdmin = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role);
       const updateData: any = {
         email: formData.email,
-        hospital_password: formData.hospital_password,
         special_services: formData.special_services,
         centre_of_excellence: formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' ? (formData.centre_of_excellence === 'True' ? null : formData.centre_of_excellence) : null,
         supraja_centre: formData.supraja_centre,
@@ -716,25 +711,6 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
               <option value="OPD Only">OPD Only</option>
               <option value="IPD">IPD</option>
             </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Hospital Password</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? 'text' : 'password'}
-                value={formData.hospital_password}
-                onChange={e => setFormData({...formData, hospital_password: e.target.value})}
-                className="font-bold text-slate-900 w-full bg-slate-50 rounded-lg p-1 pr-10"
-                disabled={!canEdit}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
           </div>
           <div className="col-span-2 md:col-span-4">
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Email ID</label>

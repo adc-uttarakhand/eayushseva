@@ -513,7 +513,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             // Direct se staff table ke present posting columns fetch karo
             if (staffData.present_hospital) setMainPostingNameState(staffData.present_hospital);
             if (staffData.current_posting_joining_date) {
-              setProfile((prev: any) => prev ? { 
+              setProfileData((prev: any) => prev ? { 
                 ...prev, 
                 currentPostingJoiningDate: staffData.current_posting_joining_date,
                 currentPostingType: staffData.present_posting_status || prev.currentPostingType,

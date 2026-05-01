@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Activity, Plus, Save, UserCircle2, X, CheckCircle, Camera, Loader2, Upload, Eye, EyeOff, Shield, Building2, MapPin, Calendar, GraduationCap, Lock, Unlock } from 'lucide-react';
+import { User, Activity, Plus, Save, UserCircle2, X, CheckCircle, Camera, Loader2, Upload, Shield, Building2, MapPin, Calendar, GraduationCap, Lock, Unlock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import HospitalChangeModal from './HospitalChangeModal';
@@ -107,7 +107,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
   }, [propHospitals]);
   const [initialProfile, setInitialProfile] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
   const [uploading, setUploading] = useState(false);
   const [isActualHospitalChangeModalOpen, setIsActualHospitalChangeModalOpen] = useState(false);
   const [hospitalToDelete, setHospitalToDelete] = useState<any>(null);
@@ -116,7 +116,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState({
-    fullName: '', designation: '', empId: '', mobile: '', password: '', fatherName: '',
+    fullName: '', designation: '', empId: '', mobile: '', fatherName: '',
     photograph: '', email: '', employmentClass: 'Class II', employmentType: 'Permanent' as 'Contractual' | 'Permanent' | 'Outsourced',
     gender: 'Male', dob: '', currentPostingJoiningDate: '', presentDistrict: '', bloodGroup: '',
     permanentAddress: '', currentResidentialAddress: '', system: '', hospitalConnectedName: '',
@@ -318,9 +318,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         designation: staffData.role || staffData.designation || '',
         empId: staffData.employee_id || '',
         mobile: staffData.mobile_number || '',
-        password: staffData.login_password || '',
         fatherName: staffData.father_name || '',
-        photograph: staffData.photograph_url || '',
+        photograph: staffData.photograph_url ? (staffData.photograph_url.startsWith('http') ? staffData.photograph_url : supabase.storage.from('staff-photos').getPublicUrl(staffData.photograph_url).data.publicUrl) : '',
         email: staffData.email_id || '',
         employmentClass: staffData.employment_class || 'Class II',
         employmentType: staffData.employment_type || 'Permanent',
@@ -403,7 +402,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
       const { error: uploadError } = await supabase.storage.from('staff-photos').upload(fileName, compressedFile, { upsert: true });
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('staff-photos').getPublicUrl(fileName);
-      setProfile(prev => ({ ...prev, photograph: publicUrl }));
+      const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
+      setProfile(prev => ({ ...prev, photograph: urlWithTimestamp }));
       alert('Photo uploaded successfully! / फोटो सफलतापूर्वक अपलोड हो गई!');
     } catch (err: any) {
       alert('Upload failed: ' + (err.message || 'Unknown error'));
@@ -464,7 +464,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
 
       const { error: staffError } = await supabase.from('staff').upsert({
         id: staffId, full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
-        login_password: profile.password, father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
+        father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
         employment_class: profile.employmentClass, employment_type: profile.employmentType, gender: profile.gender,
         dob: formatDateForDB(profile.dob), current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
         present_district: profile.presentDistrict, blood_group: profile.bloodGroup, permanent_address: profile.permanentAddress,
@@ -656,15 +656,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
               {!(isIncharge || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && <p className="text-[10px] text-slate-400 ml-4 mt-1 italic">Only Incharge or Admin can modify your role.</p>}
             </div>
             
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Login Password</label>
-              <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={profile.password} onChange={e => setProfile({...profile, password: e.target.value})} className="w-full bg-slate-50 border border-gray-100 rounded-2xl py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
+
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Employee ID</label>
