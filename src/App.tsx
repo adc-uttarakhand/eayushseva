@@ -25,7 +25,6 @@ import MedicineDemandSystem from './components/MedicineDemandSystem';
 import StateSupplyDashboard from './components/StateSupplyDashboard';
 import DistrictSupplyManager from './components/DistrictSupplyManager';
 import ProfilePage from './components/ProfilePage';
-import LoginDirectory from './components/LoginDirectory';
 import InchargeManagement from './components/InchargeManagement';
 import RapidTests from './components/RapidTests';
 import HospitalDetailsModal from './components/HospitalDetailsModal';
@@ -1164,13 +1163,6 @@ export default function App() {
               Transfer Requests
             </button>
           )}
-          <button 
-            onClick={() => setActiveTab('loginDirectory')}
-            className="bg-white/40 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] font-bold text-slate-900 shadow-sm hover:bg-white/60 transition-all"
-          >
-            Login Directory
-          </button>
-          
           {(session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN') && (
             <button 
               onClick={() => setIsDeleteModalOpen(true)}
@@ -1523,14 +1515,6 @@ export default function App() {
             ) : (
               <EmployeeDirectory hospitals={hospitals} session={session} onStaffClick={setSelectedStaffId} />
             )}
-          </motion.div>
-        )}
-        {activeTab === 'loginDirectory' && session?.role === 'SUPER_ADMIN' && (
-          <motion.div key="loginDirectory" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <LoginDirectory 
-              accessDistricts={session.access_districts} 
-              accessSystems={session.access_systems} 
-            />
           </motion.div>
         )}
         {activeTab === 'demands' && session && (
