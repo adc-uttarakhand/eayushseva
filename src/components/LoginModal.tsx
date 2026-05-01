@@ -42,60 +42,173 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
 
     try {
       const trimmedUsername = username.trim();
+      
+      // 1. Admin Login check
+      const { data: adminData } = await supabase
+        .from('admin_logins')
+        .select('*')
+        .eq('admin_userid', trimmedUsername)
+        .single();
 
-      const { data, error: functionError } = await supabase.functions.invoke('login', {
-        body: { username: trimmedUsername, password }
-      });
+      if (adminData) {
+        if (adminData.admin_password === password) {
+          let role: UserSession['role'] = 'DISTRICT_ADMIN';
+          if (adminData.admin_access === 'PHARMACY_MANAGER') {
+            role = 'PHARMACY_MANAGER';
+          } else {
+            const hasAllDistricts = adminData.access_districts?.includes('All');
 
-      if (functionError) {
-        throw functionError;
+            if (hasAllDistricts) {
+              if (adminData.admin_access === 'SUPER_ADMIN') {
+                role = 'SUPER_ADMIN';
+              } else {
+                role = 'STATE_ADMIN';
+              }
+            } else if (adminData.admin_access === 'DISTRICT_MEDICINE_INCHARGE') {
+              role = 'DISTRICT_MEDICINE_INCHARGE';
+            }
+          }
+
+          onLogin({
+            role: role,
+            id: adminData.id?.toString() || adminData.admin_userid,
+            name: adminData.name || adminData.admin_name || adminData.admin_userid,
+            access_districts: adminData.access_districts || [],
+            access_systems: adminData.access_systems || [],
+            district: adminData.district,
+          });
+          onClose();
+          return;
+        } else {
+          setError('Wrong Password');
+          setLoading(false);
+          return;
+        }
       }
 
-      if (data?.error) {
-        setError(data.error);
-        setLoading(false);
-        return;
+      // 2. Staff Login check
+      const { data: staffDataList, error: staffError } = await supabase
+        .from('staff')
+        .select('*')
+        .or(`mobile_number.eq."${trimmedUsername}",employee_id.eq."${trimmedUsername}"`);
+
+      if (staffDataList && staffDataList.length > 0) {
+        // Check password for the first one (assuming same password for all records of same person)
+        const firstStaff = staffDataList[0];
+        if (firstStaff.login_password !== password && firstStaff.password !== password) {
+          setError('Wrong Password');
+          setLoading(false);
+          return;
+        }
+
+        // Find all hospital associations for this person
+        const staffIds = staffDataList.map(s => s.id);
+        
+        // 1. Direct links in staff table
+        const directLinks = staffDataList.map(s => {
+          const links = [{
+            staffId: s.id,
+            hospitalId: s.hospital_id,
+            staffRecord: s
+          }];
+          
+          // Add secondary hospitals
+          if (s.secondary_hospitals && Array.isArray(s.secondary_hospitals)) {
+            s.secondary_hospitals.forEach((h: any) => {
+              links.push({
+                staffId: s.id,
+                hospitalId: h.hospital_id,
+                staffRecord: s
+              });
+            });
+          }
+          return links;
+        }).flat().filter(l => l.hospitalId);
+
+        // 2. Incharge links in hospitals table
+        const { data: inchargeHospitals } = await supabase
+          .from('hospitals')
+          .select('hospital_id, incharge_staff_id')
+          .in('incharge_staff_id', staffIds);
+        
+        const inchargeLinks = inchargeHospitals?.map(h => ({
+          staffId: h.incharge_staff_id,
+          hospitalId: h.hospital_id,
+          staffRecord: staffDataList.find(s => s.id === h.incharge_staff_id)
+        })) || [];
+
+        // Combine all unique hospital associations
+        const allLinksMap = new Map();
+        
+        [...directLinks, ...inchargeLinks].forEach(link => {
+          const key = `${link.staffId}-${link.hospitalId}`;
+          if (!allLinksMap.has(key)) {
+            allLinksMap.set(key, link);
+          }
+        });
+
+        const allLinks = Array.from(allLinksMap.values());
+
+        if (allLinks.length > 1) {
+          // Multiple hospitals found - need selection
+          const hospitalIds = allLinks.map(l => l.hospitalId);
+          const { data: hospitals } = await supabase
+            .from('hospitals')
+            .select('hospital_id, facility_name, district, block')
+            .in('hospital_id', hospitalIds);
+
+          const options = allLinks.map(l => {
+            const hosp = hospitals?.find(h => h.hospital_id === l.hospitalId);
+            return {
+              ...l.staffRecord,
+              hospital_id: l.hospitalId,
+              hospitalName: hosp?.facility_name || 'Unknown Hospital',
+              location: hosp ? `${hosp.block}, ${hosp.district}` : 'Unknown Location'
+            };
+          });
+
+          setStaffOptions(options);
+          setLoading(false);
+          return;
+        } else if (allLinks.length === 1) {
+          // Only one hospital found - Go directly to dashboard
+          const singleLink = allLinks[0];
+          await completeStaffLogin({
+            ...singleLink.staffRecord,
+            hospital_id: singleLink.hospitalId
+          });
+          return;
+        }
       }
 
-      if (data?.type === 'admin') {
-        // We received JWT as well, maybe store it if needed
-        if (data.token) localStorage.setItem('token', data.token);
-        onLogin(data.session);
-        onClose();
-        return;
-      }
+      // 3. Hospital Login check
+      const { data: hospitalLoginData } = await supabase
+        .from('hospitals')
+        .select('hospital_id, facility_name, hospital_password, district')
+        .eq('hospital_id', username)
+        .maybeSingle();
 
-      if (data?.type === 'hospital') {
-        if (data.token) localStorage.setItem('token', data.token);
-        onLogin(data.session);
-        onClose();
-        return;
-      }
-
-      if (data?.type === 'staff_multiple') {
-        setStaffOptions(data.options);
-        setLoading(false);
-        return;
-      }
-
-      if (data?.type === 'staff_single') {
-        await completeStaffLogin(data.record);
-        return;
+      if (hospitalLoginData) {
+        if (password === hospitalLoginData.hospital_password) {
+          onLogin({
+            role: 'HOSPITAL',
+            id: hospitalLoginData.hospital_id,
+            name: hospitalLoginData.facility_name,
+            district: hospitalLoginData.district,
+          });
+          onClose();
+          return;
+        } else {
+          setError('Wrong Password');
+          setLoading(false);
+          return;
+        }
       }
 
       setError('User Not Found');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', err);
-      // Supabase Edge Function error might be mapped to err.message or in a custom shape
-      if (err instanceof Error) {
-        if (err.message.includes('Function not found') || err.message.includes('404')) {
-           setError('Server edge function not configured. Please deploy it.');
-        } else {
-           setError(err.message || 'An error occurred during login.');
-        }
-      } else {
-         setError('An error occurred during login.');
-      }
+      setError('An error occurred during login.');
     } finally {
       setLoading(false);
     }
