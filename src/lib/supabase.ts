@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Using provided credentials directly to ensure the preview works immediately
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://czjxoavqlznzvhypqtwe.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6anhvYXZxbHpuenZoeXBxdHdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM2ODgsImV4cCI6MjA5Mjg4OTY4OH0.uKLslvmxI106GY_PAQCrxKZVm5KbZ07wG2HBZdSPTZc';
+// Credentials must be set in .env file — never hardcode here
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing database configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
