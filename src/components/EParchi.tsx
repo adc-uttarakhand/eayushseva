@@ -1655,7 +1655,7 @@ const handleDownloadPNG = async (patient: Patient) => {
         <div className="h-[5%] flex flex-col items-center justify-center border-b-2 border-slate-900 bg-slate-50 relative px-4">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 h-[80%] flex items-center justify-center">
             <img 
-              src="https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/Uttarakhand%20logo.png" 
+              src="https://czjxoavqlznzvhypqtwe.supabase.co/storage/v1/object/public/logo/Uttarakhand%20logo.png" 
               alt="Uttarakhand Govt" 
               className="h-full object-contain mix-blend-multiply"
               crossOrigin="anonymous"
