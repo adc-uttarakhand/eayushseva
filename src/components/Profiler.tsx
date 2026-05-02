@@ -462,8 +462,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         return dateStr;
       };
 
-      const { error: staffError } = await supabase.from('staff').update({
-        full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
+      const { error: staffError } = await supabase.from('staff').upsert({
+        id: staffId, full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
         father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
         employment_class: profile.employmentClass, employment_type: profile.employmentType, gender: profile.gender,
         dob: formatDateForDB(profile.dob), current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
@@ -480,7 +480,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         total_durgam_below_7000_days: serviceDays.totalDurgam, total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
         last_edited_on: new Date().toISOString(),
         is_verified: profile.is_verified && (profile.last_verified_on && new Date(new Date().toISOString()) <= new Date(profile.last_verified_on))
-      }).eq('id', staffId);
+      }, { onConflict: 'id' });
       if (staffError) throw new Error(`Staff Table Error: ${staffError.message}`);
 
       const { error: docError } = await supabase.from('doctor_profiles').upsert({
@@ -818,9 +818,12 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                       )}
                     </div>
                   )}
-                  {userRole === 'ADMIN' && profile.is_verified && profile.last_verified_on && (!profile.last_edited_on || new Date(profile.last_verified_on) > new Date(profile.last_edited_on)) && (
+                  {/* Lock status icon — always visible to everyone */}
+                  {userRole === 'ADMIN' ? (
+                    // Admin: clickable lock/unlock button
                     <button
                       type="button"
+                      title={profile.is_locked ? 'Click to Unlock Profile' : 'Click to Lock Profile'}
                       onClick={async () => {
                         const newLockedStatus = !profile.is_locked;
                         const { error } = await supabase
@@ -832,10 +835,20 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
                           setProfile(prev => ({ ...prev, is_locked: newLockedStatus }));
                         } else alert('Failed: ' + error.message);
                       }}
-                      className={`${profile.is_locked ? 'bg-red-600' : 'bg-slate-600'} text-white p-2 rounded-xl transition-all`}
+                      className={`${profile.is_locked ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white p-2 rounded-xl transition-all flex flex-col items-center gap-0.5`}
                     >
                       {profile.is_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                      <span className="text-[8px] font-bold uppercase tracking-wider">{profile.is_locked ? 'Locked' : 'Unlocked'}</span>
                     </button>
+                  ) : (
+                    // Employee: non-clickable indicator only
+                    <div
+                      title={profile.is_locked ? 'Your profile is locked by admin' : 'Your profile is active'}
+                      className={`${profile.is_locked ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'} p-2 rounded-xl flex flex-col items-center gap-0.5`}
+                    >
+                      {profile.is_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                      <span className="text-[8px] font-bold uppercase tracking-wider">{profile.is_locked ? 'Locked' : 'Unlocked'}</span>
+                    </div>
                   )}
                   {userRole === 'ADMIN' && (
                     <button
