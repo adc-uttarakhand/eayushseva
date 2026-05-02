@@ -22,6 +22,7 @@ import RegistrationRequests from './components/RegistrationRequests';
 import ServiceRecordTab from './components/ServiceRecordTab';
 import HospitalDirectory from './components/HospitalDirectory';
 import AdminPasswordReset from './components/AdminPasswordReset';
+import AdminCreator from './components/AdminCreator';
 import MedicineDemandSystem from './components/MedicineDemandSystem';
 import StateSupplyDashboard from './components/StateSupplyDashboard';
 import DistrictSupplyManager from './components/DistrictSupplyManager';
@@ -1528,6 +1529,11 @@ export default function App() {
             <AdminPasswordReset session={session} />
           </motion.div>
         )}
+        {activeTab === 'admin_management' && session && (session.role === 'SUPER_ADMIN' || (session.role === 'STATE_ADMIN' && (!session.access_pages?.length || session.access_pages.includes('admin_management')))) && (
+          <motion.div key="admin_management" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <AdminCreator session={session} />
+          </motion.div>
+        )}
         {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
           <motion.div key="supply_upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <StateSupplyDashboard activeSubTab={supplySubTab} />
@@ -1657,6 +1663,7 @@ export default function App() {
           hasPanchakarma={currentHospital?.panchakarma_centre}
           modules={session?.modules || []}
           isIncharge={currentHospital ? currentHospital.incharge_staff_id === session?.id : false}
+          accessPages={session?.access_pages || []}
         />
       )}
       {/* Unsaved Changes Modal */}
