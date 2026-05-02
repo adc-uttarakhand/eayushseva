@@ -1,7 +1,7 @@
 import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management';
 
 interface BottomNavProps {
   active: TabId;
@@ -11,9 +11,10 @@ interface BottomNavProps {
   hasPanchakarma?: boolean;
   modules: string[];
   isIncharge: boolean;
+  accessPages?: string[];
 }
 
-export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma, modules, isIncharge }: BottomNavProps) {
+export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma, modules, isIncharge, accessPages = [] }: BottomNavProps) {
   const publicTabs = [
     { id: 'dashboard' as TabId, label: 'AYUSH Network', icon: Building2 },
     { id: 'stats' as TabId, label: 'Statistics', icon: BarChart3 },
@@ -25,6 +26,7 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
     { id: 'patients' as TabId, label: 'Patients', icon: Users },
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || role === 'DISTRICT_ADMIN') ? [{ id: 'password_reset' as TabId, label: 'Reset Password', icon: Key }] : []),
+    ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'admin_management' as TabId, label: 'Admin Mgmt', icon: ShieldCheck }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'supply_upload' as TabId, label: 'State Supply', icon: Truck }] : []),
     ...(role === 'DISTRICT_ADMIN' ? [{ id: 'district_supply' as TabId, label: 'District Supply', icon: Truck }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || (role === 'DISTRICT_ADMIN' && isTransferEnabled)) ? [{ id: 'requests' as TabId, label: 'Requests', icon: ClipboardList }] : []),
@@ -48,7 +50,15 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
   ];
 
   const isPublic = !role;
-  const tabs = isPublic ? publicTabs : (role === 'DISTRICT_MEDICINE_INCHARGE' ? medicineInchargeTabs : (role === 'PHARMACY_MANAGER' ? pharmacyTabs : adminTabs));
+
+  // If accessPages has entries, filter adminTabs to only show allowed pages + always-on tabs
+  const hasPageRestriction = (role === 'DISTRICT_ADMIN' || role === 'STATE_ADMIN') && accessPages.length > 0;
+  const ALWAYS_SHOW = ['dashboard', 'profile', 'password_reset'];
+  const filteredAdminTabs = hasPageRestriction
+    ? adminTabs.filter(tab => ALWAYS_SHOW.includes(tab.id) || accessPages.includes(tab.id))
+    : adminTabs;
+
+  const tabs = isPublic ? publicTabs : (role === 'DISTRICT_MEDICINE_INCHARGE' ? medicineInchargeTabs : (role === 'PHARMACY_MANAGER' ? pharmacyTabs : filteredAdminTabs));
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-lg">

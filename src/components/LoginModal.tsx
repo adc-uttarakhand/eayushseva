@@ -16,6 +16,7 @@ export interface UserSession {
   isIncharge?: boolean;
   access_districts?: string[];
   access_systems?: string[];
+  access_pages?: string[];
   district?: string;
 }
 
@@ -229,6 +230,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
             name: adminData.name || adminData.admin_name || adminData.admin_userid,
             access_districts: adminData.access_districts || [],
             access_systems: adminData.access_systems || [],
+            access_pages: adminData.access_pages || [],
             district: adminData.district,
           };
           checkAndProceed(session, 'admin', adminData.id?.toString() || adminData.admin_userid, password);
