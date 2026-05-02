@@ -462,8 +462,8 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         return dateStr;
       };
 
-      const { error: staffError } = await supabase.from('staff').upsert({
-        id: staffId, full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
+      const { error: staffError } = await supabase.from('staff').update({
+        full_name: profile.fullName, mobile_number: profile.mobile, employee_id: profile.empId || null,
         father_name: profile.fatherName, photograph_url: profile.photograph, email_id: profile.email,
         employment_class: profile.employmentClass, employment_type: profile.employmentType, gender: profile.gender,
         dob: formatDateForDB(profile.dob), current_posting_joining_date: formatDateForDB(profile.currentPostingJoiningDate),
@@ -480,7 +480,7 @@ export default function Profiler({ staffId, userRole, isIncharge, hospitalName, 
         total_durgam_below_7000_days: serviceDays.totalDurgam, total_durgam_above_7000_days: serviceDays.totalDurgamAbove7000,
         last_edited_on: new Date().toISOString(),
         is_verified: profile.is_verified && (profile.last_verified_on && new Date(new Date().toISOString()) <= new Date(profile.last_verified_on))
-      }, { onConflict: 'id' });
+      }).eq('id', staffId);
       if (staffError) throw new Error(`Staff Table Error: ${staffError.message}`);
 
       const { error: docError } = await supabase.from('doctor_profiles').upsert({
