@@ -21,6 +21,7 @@ import EmployeeDirectory from './components/EmployeeDirectory';
 import RegistrationRequests from './components/RegistrationRequests';
 import ServiceRecordTab from './components/ServiceRecordTab';
 import HospitalDirectory from './components/HospitalDirectory';
+import AdminPasswordReset from './components/AdminPasswordReset';
 import MedicineDemandSystem from './components/MedicineDemandSystem';
 import StateSupplyDashboard from './components/StateSupplyDashboard';
 import DistrictSupplyManager from './components/DistrictSupplyManager';
@@ -1520,6 +1521,11 @@ export default function App() {
         {activeTab === 'demands' && session && (
           <motion.div key="demands" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <MedicineDemandSystem session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'password_reset' && session && (session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN' || session.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="password_reset" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <AdminPasswordReset session={session} />
           </motion.div>
         )}
         {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
