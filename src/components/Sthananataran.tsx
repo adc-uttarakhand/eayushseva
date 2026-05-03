@@ -1234,7 +1234,13 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Since</label>
-                <input type="text" value={submittedData?.present_posting_since || ppSince || 'N/A'} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                <input 
+                  type="text" 
+                  value={ppSince || ''} 
+                  readOnly={isLocked}
+                  onChange={(e) => setPpSince(e.target.value)}
+                  className={`w-full px-4 py-2.5 border border-slate-200 rounded-lg transition-all focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${isLocked ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50'}`} 
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Place Type</label>
