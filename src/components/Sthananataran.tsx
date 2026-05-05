@@ -1230,7 +1230,21 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Hospital</label>
-                <input type="text" value={submittedData?.present_posting_place || ppHospital} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Posting Name" />
+                <HospitalSearchInput 
+                    value={submittedData?.present_posting_place || ppHospital} 
+                    onChange={(val: any) => {
+                      setPpHospital(val);
+                      const selectedHosp = hospitals.find(h => h.facility_name === val);
+                      if (selectedHosp) {
+                        setPpType(selectedHosp.status || 'Sugam');
+                        setPpAbove7000(selectedHosp.above_7000_feet || 'No');
+                        setPpDistrict(selectedHosp.district || '');
+                      }
+                    }} 
+                    hospitals={hospitals}
+                    readOnly={false}
+                    className={'bg-slate-50'}
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Present Posting Since</label>
