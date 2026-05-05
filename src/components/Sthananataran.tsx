@@ -372,6 +372,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
   const [role, setRole] = useState('Medical Officer');
   const [applicantName, setApplicantName] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
+  const [empId, setEmpId] = useState('');
   const [dob, setDob] = useState('');
   const [homeDistrict, setHomeDistrict] = useState('');
   const [presentDistrict, setPresentDistrict] = useState('');
@@ -443,6 +444,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
         if (profile.role || profile.designation) setRole(profile.role || profile.designation);
         if (profile.full_name || profile.fullName) setApplicantName(profile.full_name || profile.fullName);
         if (profile.father_name || profile.fatherName) setFatherHusbandName(profile.father_name || profile.fatherName);
+        if (profile.employee_id || profile.empId) setEmpId(profile.employee_id || profile.empId || '');
         if (profile.dob) {
             const dobStr = typeof profile.dob === 'string' ? profile.dob : new Date(profile.dob).toISOString();
             setDob(dobStr.split('T')[0]);
@@ -1167,7 +1169,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Employee ID</label>
-                <input type="text" value={submittedData?.employee_id || profile?.empId || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" placeholder="Auto-populated Employee ID" />
+                <input type="text" value={empId} onChange={(e) => setEmpId(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all" placeholder="Enter Employee ID" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Employee Type</label>
@@ -1195,9 +1197,8 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Father's / Husband's Name</label>
                 <input type="text" value={fatherHusbandName} 
-                  readOnly={isFormLocked}
                   onChange={(e) => setFatherHusbandName(e.target.value)} 
-                  className={`w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${isFormLocked ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50'}`} 
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
                   placeholder="Father or Husband's Name" />
               </div>
               <div>
@@ -1526,7 +1527,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
             applicantName={applicantName}
             fatherHusbandName={fatherHusbandName}
             dob={dob}
-            empId={profile?.empId}
+            empId={empId}
             role={role}
             mobileNumber={mobileNumber}
             email={email}
