@@ -1187,18 +1187,18 @@ export default function App() {
   };
 
   const renderDiseaseManagement = () => {
-    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    if (!session || (!['SUPER_ADMIN', 'STATE_ADMIN'].includes(session.role))) return null;
     return <DiseaseManagement session={session} />;
   };
 
   const renderRoleManagement = () => {
-    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    if (!session || (!['SUPER_ADMIN', 'STATE_ADMIN'].includes(session.role))) return null;
     return <RoleManagement />;
   };
 
   const renderStaffDistributionSummary = () => {
     console.log('renderStaffDistributionSummary called', { session });
-    if (!session || session.role !== 'SUPER_ADMIN') return null;
+    if (!session || (!['SUPER_ADMIN', 'STATE_ADMIN'].includes(session.role))) return null;
     return <StaffDistributionSummary />;
   };
 
