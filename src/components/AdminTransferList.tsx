@@ -173,6 +173,10 @@ export default function AdminTransferList({ session }: { session: any }) {
                 </div>
             </div>
 
+            <div className="mb-4 text-sm font-medium text-slate-600">
+                Total Applications: {filteredApplications.length}
+            </div>
+
             {/* Table */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
