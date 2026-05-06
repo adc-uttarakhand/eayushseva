@@ -107,7 +107,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       description: 'Configure and manage disease categories and reporting parameters.',
       icon: Activity,
       color: 'purple',
-      show: session.role === 'SUPER_ADMIN'
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN'
     },
     {
       id: 'role_management',
@@ -115,7 +115,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       description: 'Manage system roles and permissions.',
       icon: ShieldAlert,
       color: 'red',
-      show: session.role === 'SUPER_ADMIN'
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN'
     },
     {
       id: 'staff_distribution',
@@ -123,7 +123,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       description: 'View and manage staff distribution across facilities.',
       icon: BarChart3,
       color: 'blue',
-      show: session.role === 'SUPER_ADMIN'
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN'
     },
     {
       id: 'add_medicine',
@@ -131,7 +131,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       description: 'Add new medicine records to the central inventory.',
       icon: Plus,
       color: 'emerald',
-      show: session.role === 'SUPER_ADMIN',
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN'
       action: () => onAddMedicine()
     },
     {
