@@ -472,6 +472,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
               ) : (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-1">
+                    <p className="text-[9px] text-slate-500 mb-1 ml-4 italic px-1">
+                      आपका मोबाइल नंबर आपका यूजर नेम है, यदि आपका रजिस्ट्रेशन पोर्टल पर नहीं हुआ है तो जिला आयुर्वेद यूनानी अधिकारी कार्यालय अथवा डीपीएम से संपर्क करें.
+                    </p>
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Username</label>
                     <input
                       type="text"
