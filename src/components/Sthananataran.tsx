@@ -574,7 +574,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       const { default: jsPDF } = await import('jspdf');
 
       const canvas = await html2canvas(wrapper, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         backgroundColor: '#ffffff',
         width: A4_PX,
@@ -587,7 +587,7 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
 
       document.body.removeChild(wrapper);
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pdfW = pdf.internal.pageSize.getWidth();   // 210mm
       const pdfH = pdf.internal.pageSize.getHeight();  // 297mm
@@ -597,14 +597,14 @@ export default function Sthananataran({ session, profile }: { session?: any; pro
       const imgH = usableW * ratio;
 
       if (imgH <= pdfH) {
-        pdf.addImage(imgData, 'PNG', marginLR, 0, usableW, imgH);
+        pdf.addImage(imgData, 'JPEG', marginLR, 0, usableW, imgH);
       } else {
         const marginTB = 5;
         const usableH = pdfH - marginTB * 2;
         const scale = usableH / imgH;
         const scaledW = usableW * scale;
         const xOffset = (pdfW - scaledW) / 2;
-        pdf.addImage(imgData, 'PNG', xOffset, marginTB, scaledW, usableH);
+        pdf.addImage(imgData, 'JPEG', xOffset, marginTB, scaledW, usableH);
       }
 
       const fileName = `Transfer_Application_${(applicantName || 'Form').replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
