@@ -235,7 +235,6 @@ export default function App() {
   useEffect(() => {
     fetchTransferStatus();
   }, []);
-
   const fetchTransferStatus = async () => {
     setLoading(true);
     const { data: transferData } = await supabase
@@ -775,6 +774,20 @@ export default function App() {
       </motion.div>
     );
   };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const publicPage = urlParams.get('page');
+
+  useEffect(() => {
+    if (publicPage === 'nearby') {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+        });
+      }
+    }
+  }, [publicPage]);
 
   const [realStats, setRealStats] = useState({
     totalPatients: 0,
@@ -1712,4 +1725,128 @@ export default function App() {
       <Toaster position="top-center" reverseOrder={false} />
     </div>
   );
+}
+
+// ── Standalone Nearby Hospitals Page (no login required) ──────────────────
+function NearbyPublicPage() {
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [locationError, setLocationError] = useState('');
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      const { data } = await supabase
+        .from('hospitals')
+        .select('hospital_id, facility_name, district, taluka, system, type, latitude, longitude, mobile')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+      setHospitals(data || []);
+      setLoading(false);
+    };
+    fetchHospitals();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setLocationError('Could not get your location. Please enable GPS.')
+      );
+    } else {
+      setLocationError('GPS not supported on this device.');
+    }
+  }, []);
+
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const nearbyHospitals = userLocation
+    ? hospitals
+        .map(h => ({ ...h, distance: calculateDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude) }))
+        .filter(h => h.distance <= 10)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 10)
+    : [];
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="fixed top-0 w-full bg-white shadow-sm z-50 px-4 py-3 flex items-center justify-between">
+        <img src="https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/eAYUSHSeva%20(1).png" alt="eAYUSH Seva" className="h-10" />
+        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Uttarakhand AYUSH</span>
+      </header>
+
+      <div className="pt-20 px-4 pb-12 max-w-2xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">Nearby AYUSH <span className="text-emerald-600">Hospitals</span></h1>
+          <p className="text-slate-500 mt-1 text-sm">Government AYUSH facilities within 10km of your location</p>
+        </div>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400 text-sm">Loading hospitals...</p>
+          </div>
+        )}
+
+        {!loading && locationError && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-amber-700 text-sm font-medium">
+            📍 {locationError}
+          </div>
+        )}
+
+        {!loading && !userLocation && !locationError && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400 text-sm">Getting your location...</p>
+          </div>
+        )}
+
+        {userLocation && nearbyHospitals.length === 0 && !loading && (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+            <p className="text-4xl mb-4">🏥</p>
+            <h3 className="text-lg font-bold text-slate-900">No facilities found within 10km</h3>
+            <p className="text-slate-500 mt-2 text-sm">Try checking your GPS settings</p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {nearbyHospitals.map(h => (
+            <div key={h.hospital_id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    {h.system}
+                  </span>
+                  <h3 className="text-lg font-bold text-slate-900 mt-2">{h.facility_name}</h3>
+                  <p className="text-slate-500 text-sm mt-0.5">📍 {h.taluka}, {h.district}</p>
+                </div>
+                <div className="text-right ml-4 shrink-0">
+                  <div className="text-2xl font-black text-emerald-600">{h.distance.toFixed(1)}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">km</div>
+                </div>
+              </div>
+              <button
+                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${h.latitude},${h.longitude}`, '_blank')}
+                className="w-full mt-3 bg-emerald-600 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all"
+              >
+                🗺️ Get Directions
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Root wrapper — checks URL before rendering full app ──────────────────
+export function AppWrapper() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const publicPage = urlParams.get('page');
+  if (publicPage === 'nearby') return <NearbyPublicPage />;
+  return <App />;
 }
