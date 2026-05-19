@@ -409,7 +409,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const savedSession = localStorage.getItem('session');
+    const savedSession = localStorage.getItem('ayush_session');
     if (savedSession) {
       setSession(JSON.parse(savedSession));
     }
@@ -417,12 +417,12 @@ export default function App() {
 
   const handleLogin = (sess: UserSession) => {
     setSession(sess);
-    localStorage.setItem('session', JSON.stringify(sess));
+    localStorage.setItem('ayush_session', JSON.stringify(sess));
   };
 
   const handleLogout = () => {
     setSession(null);
-    localStorage.removeItem('session');
+    localStorage.removeItem('ayush_session');
   };
 
   const isAdmin = session?.role === 'SUPER_ADMIN';
@@ -1775,7 +1775,7 @@ function NearbyPublicPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="fixed top-0 w-full bg-white shadow-sm z-50 px-4 py-3 flex items-center justify-between">
-        <img src="https://waxolpvdayhkqhtfnbfk.supabase.co/storage/v1/object/public/logo/eAYUSHSeva%20(1).png" alt="eAYUSH Seva" className="h-10" />
+        <img src="https://czjxoavqlznzvhypqtwe.supabase.co/storage/v1/object/public/logo/eAYUSHSeva%20(1).png" alt="eAYUSH Seva" className="h-10" />
         <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Uttarakhand AYUSH</span>
       </header>
 
