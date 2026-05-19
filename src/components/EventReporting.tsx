@@ -122,8 +122,8 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
 
   const handleSubmit = async () => {
     setError('');
-    if (!form.venue.trim()) { setError('Venue zaroori hai'); return; }
-    if (!form.participants_total || isNaN(Number(form.participants_total))) { setError('Participants count zaroori hai'); return; }
+    if (!form.venue.trim()) { setError('Venue is required'); return; }
+    if (!form.participants_total || isNaN(Number(form.participants_total))) { setError('Participants count is required'); return; }
 
     setSaving(true);
     try {
@@ -161,7 +161,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-white font-bold text-lg">Report Submit Karo</h2>
+              <h2 className="text-white font-bold text-lg">Submit Report</h2>
               <p className="text-emerald-200 text-xs mt-0.5">
                 {event.title}{subEvent ? ` → ${subEvent.title}` : ''}
               </p>
@@ -222,7 +222,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Venue *</label>
             <input type="text" value={form.venue}
               onChange={e => setForm(f => ({ ...f, venue: e.target.value }))}
-              placeholder="Jaise: District Hospital Premises, Dehradun"
+              placeholder="e.g. District Hospital Premises, Dehradun"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
           </div>
 
@@ -245,7 +245,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Description (Optional)</label>
             <textarea value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Event ka brief description..."
+              placeholder="Brief description of the event..."
               rows={3}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 resize-none" />
           </div>
@@ -443,7 +443,7 @@ function SubEventRow({ sub, index, onChange, onRemove }: any) {
       </div>
       <input type="text" value={sub.title}
         onChange={e => onChange(index, { ...sub, title: e.target.value })}
-        placeholder="Sub event ka naam *"
+        placeholder="Sub event name *"
         className="w-full border border-purple-200 bg-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400" />
       <input type="text" value={sub.description}
         onChange={e => onChange(index, { ...sub, description: e.target.value })}
@@ -501,7 +501,7 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
   const [subEventDrafts, setSubEventDrafts] = useState<SubEventDraft[]>(() => {
     if (editing && existingSubEvents?.length > 0) {
       return existingSubEvents.map((s: any) => ({
-        id: s.id, // existing ID save karo update ke liye
+        id: s.id, // keep existing ID for update
         title: s.title || '',
         description: s.description || '',
         start_date: s.start_date || '',
@@ -536,14 +536,14 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
   };
 
   const handleSave = async () => {
-    if (!form.title.trim()) { setError('Title zaroori hai'); return; }
-    if (form.reporting_level.length === 0) { setError('Kam se kam ek reporting level select karo'); return; }
+    if (!form.title.trim()) { setError('Title is required'); return; }
+    if (form.reporting_level.length === 0) { setError('Select at least one reporting level'); return; }
 
     // Validate sub events
     if (form.event_type === 'multi' && !isSubEvent) {
       for (let i = 0; i < subEventDrafts.length; i++) {
-        if (!subEventDrafts[i].title.trim()) { setError(`Sub Event ${i + 1} ka title zaroori hai`); return; }
-        if (subEventDrafts[i].reporting_level.length === 0) { setError(`Sub Event ${i + 1} ka reporting level select karo`); return; }
+        if (!subEventDrafts[i].title.trim()) { setError(`Sub Event ${i + 1} title is required`); return; }
+        if (subEventDrafts[i].reporting_level.length === 0) { setError(`Select reporting level for Sub Event ${i + 1}`); return; }
       }
     }
 
@@ -567,9 +567,9 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-white font-bold text-lg">
-                {editing ? 'Update' : 'Naya'} {isSubEvent ? 'Sub Event' : 'Event'}
+                {editing ? 'Update' : 'New'} {isSubEvent ? 'Sub Event' : 'Event'}
               </h2>
-              {isSubEvent && <p className="text-purple-200 text-xs mt-0.5">{parentEvent.title} ke andar</p>}
+              {isSubEvent && <p className="text-purple-200 text-xs mt-0.5">{parentEvent.title} under</p>}
             </div>
             <button onClick={onCancel} className="text-white/70 hover:text-white p-1"><X size={20} /></button>
           </div>
@@ -579,14 +579,14 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Title *</label>
             <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder={isSubEvent ? "Jaise: Run for Yoga" : "Jaise: International Day of Yoga 2026"}
+              placeholder={isSubEvent ? "e.g. Run for Yoga" : "e.g. International Day of Yoga 2026"}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
           </div>
 
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Description (Optional)</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={2} placeholder="Event ke baare mein..."
+              rows={2} placeholder="About this event..."
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 resize-none" />
           </div>
 
@@ -595,8 +595,8 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Event Type</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { key: 'single', label: 'Single Event', desc: 'Ek hi event', icon: Flag },
-                  { key: 'multi', label: 'Multi Event', desc: 'Sub events ke saath', icon: ListTree },
+                  { key: 'single', label: 'Single Event', desc: 'Single standalone event', icon: Flag },
+                  { key: 'multi', label: 'Multi Event', desc: 'With sub-events', icon: ListTree },
                 ].map(t => (
                   <button key={t.key} onClick={() => setForm(f => ({ ...f, event_type: t.key as any }))}
                     className={`p-3 rounded-xl border-2 text-left transition-all ${form.event_type === t.key ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -652,7 +652,7 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
             <div className={`relative w-11 h-6 rounded-full transition-colors ${form.is_active ? 'bg-emerald-600' : 'bg-slate-300'}`}>
               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.is_active ? 'left-6' : 'left-1'}`} />
             </div>
-            <span className="text-sm font-semibold text-slate-600">{form.is_active ? 'Active — reporting open hai' : 'Inactive'}</span>
+            <span className="text-sm font-semibold text-slate-600">{form.is_active ? 'Active — reporting is open' : 'Inactive'}</span>
           </div>
 
           {/* Sub Events Section — only for multi type main events */}
@@ -661,18 +661,18 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-sm font-bold text-slate-700">Sub Events</p>
-                  <p className="text-xs text-slate-400">Har sub event ki alag reporting level hogi</p>
+                  <p className="text-xs text-slate-400">Each sub event can have its own reporting level</p>
                 </div>
                 <button onClick={addSubDraft}
                   className="flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-2 rounded-xl font-semibold hover:bg-purple-700 transition-colors">
-                  <Plus size={13} />Sub Event Add Karo
+                  <Plus size={13} />Add Sub Event
                 </button>
               </div>
 
               {subEventDrafts.length === 0 ? (
                 <div className="text-center py-6 border-2 border-dashed border-purple-200 rounded-2xl">
                   <ListTree size={24} className="text-purple-300 mx-auto mb-2" />
-                  <p className="text-xs text-slate-400">Koi sub event nahi — upar button se add karo</p>
+                  <p className="text-xs text-slate-400">No sub events — add using the button above</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -693,7 +693,7 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
             </button>
             <button onClick={handleSave} disabled={saving}
               className={`flex-1 py-3 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${isSubEvent ? 'bg-purple-600 hover:bg-purple-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-              {saving ? <><Loader2 size={16} className="animate-spin" />Saving...</> : 'Save Karo'}
+              {saving ? <><Loader2 size={16} className="animate-spin" />Saving...</> : 'Save'}
             </button>
           </div>
         </div>
@@ -720,7 +720,7 @@ export default function EventReporting({ session }: { session: any }) {
   // CSV Download function
   const downloadCSV = () => {
     const filtered = filteredReports;
-    if (filtered.length === 0) { alert('Koi reports nahi hain download ke liye'); return; }
+    if (filtered.length === 0) { alert('No reports to download'); return; }
 
     const headers = [
       'Event', 'Sub Event', 'Report Level', 'Reported By',
@@ -781,7 +781,7 @@ export default function EventReporting({ session }: { session: any }) {
 
   const handleSaveEvent = async (form: any, parentEventId: string | null, subEventDrafts: SubEventDraft[] = []) => {
     if (parentEventId) {
-      // Sub event save karo
+      // Save sub event
       if (editingEvent) {
         await supabase.from('sub_events').update({ ...form }).eq('id', editingEvent.id);
       } else {
@@ -800,7 +800,7 @@ export default function EventReporting({ session }: { session: any }) {
         eventId = data?.id;
       }
 
-      // Sub events save/update karo
+      // Save/update sub events
       if (form.event_type === 'multi' && eventId && subEventDrafts.length > 0) {
         for (const s of subEventDrafts) {
           if (!s.title.trim()) continue;
@@ -817,7 +817,7 @@ export default function EventReporting({ session }: { session: any }) {
             // Existing sub event — update karo
             await supabase.from('sub_events').update(payload).eq('id', (s as any).id);
           } else {
-            // Naya sub event — insert karo
+            // New sub event — insert karo
             await supabase.from('sub_events').insert(payload);
           }
         }
@@ -830,7 +830,7 @@ export default function EventReporting({ session }: { session: any }) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete karna chahte hain? Saari reports bhi delete ho jayengi.')) return;
+    if (!confirm('Delete this event? All associated reports will also be deleted.')) return;
     await supabase.from('events').delete().eq('id', id);
     fetchAll();
   };
@@ -849,7 +849,7 @@ export default function EventReporting({ session }: { session: any }) {
     return true;
   });
 
-  // Sub events for selected filter event
+  // Sub events for selected filter
   const filterSubEvents = filterEventId !== 'all'
     ? subEvents.filter(s => s.event_id === filterEventId)
     : [];
@@ -873,7 +873,7 @@ export default function EventReporting({ session }: { session: any }) {
             <motion.button whileTap={{ scale: 0.97 }}
               onClick={() => { setEditingEvent(null); setAddSubFor(null); setShowEventForm(true); }}
               className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-colors">
-              <Plus size={16} />Naya Event
+              <Plus size={16} />New Event
             </motion.button>
           )}
         </div>
@@ -916,11 +916,11 @@ export default function EventReporting({ session }: { session: any }) {
             {events.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                 <Flag size={36} className="text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-400 font-medium">Koi event nahi hai abhi</p>
+                <p className="text-slate-400 font-medium">No events yet</p>
                 {isSuperOrState(session) && (
                   <button onClick={() => setShowEventForm(true)}
                     className="mt-4 text-emerald-600 text-sm font-semibold hover:underline flex items-center gap-1 mx-auto">
-                    <Plus size={14} />Pehla event banao
+                    <Plus size={14} />Create first event
                   </button>
                 )}
               </div>
@@ -951,7 +951,7 @@ export default function EventReporting({ session }: { session: any }) {
                   <select value={filterEventId}
                     onChange={e => { setFilterEventId(e.target.value); setFilterSubEventId('all'); }}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
-                    <option value="all">Saare Events</option>
+                    <option value="all">All Events</option>
                     {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
                   </select>
                 </div>
@@ -961,7 +961,7 @@ export default function EventReporting({ session }: { session: any }) {
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Sub Event</label>
                     <select value={filterSubEventId} onChange={e => setFilterSubEventId(e.target.value)}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
-                      <option value="all">Saare Sub Events</option>
+                      <option value="all">All Sub Events</option>
                       {filterSubEvents.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                     </select>
                   </div>
@@ -971,7 +971,7 @@ export default function EventReporting({ session }: { session: any }) {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Level</label>
                   <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
-                    <option value="all">Sab Levels</option>
+                    <option value="all">All Levels</option>
                     <option value="field">Field</option>
                     <option value="district">District</option>
                     <option value="state">State</option>
@@ -996,7 +996,7 @@ export default function EventReporting({ session }: { session: any }) {
               <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                 <ClipboardList size={36} className="text-slate-200 mx-auto mb-3" />
                 <p className="text-slate-400 font-medium">
-                  {reports.length === 0 ? 'Koi report submit nahi hui abhi' : 'Is filter mein koi report nahi'}
+                  {reports.length === 0 ? 'No reports submitted yet' : 'No reports match this filter'}
                 </p>
               </div>
             ) : (
