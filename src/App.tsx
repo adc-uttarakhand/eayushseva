@@ -42,9 +42,10 @@ import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio, Flag } from 'lucide-react';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio, Flag, FileText } from 'lucide-react';
 import LiveStream from './components/LiveStream';
 import EventReporting from './components/EventReporting';
+import Form1Monthly from './components/Form1Monthly';
 import { supabase } from './lib/supabase';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -1602,6 +1603,11 @@ export default function App() {
         {activeTab === 'sthanantaran' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="sthanantaran" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <AdminTransferList session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'form1' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="form1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Form1Monthly session={session} />
           </motion.div>
         )}
         {activeTab === 'registrations' && (
