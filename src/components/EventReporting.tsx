@@ -485,7 +485,7 @@ function SubEventRow({ sub, index, onChange, onRemove }: any) {
   );
 }
 
-function EventFormModal({ editing, parentEvent, onSave, onCancel }: any) {
+function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCancel }: any) {
   const isSubEvent = !!parentEvent;
   const [form, setForm] = useState({
     title: editing?.title || '',
@@ -496,7 +496,21 @@ function EventFormModal({ editing, parentEvent, onSave, onCancel }: any) {
     reporting_level: editing?.reporting_level || ['field'],
     is_active: editing?.is_active !== undefined ? editing.is_active : true,
   });
-  const [subEventDrafts, setSubEventDrafts] = useState<SubEventDraft[]>([]);
+
+  // Existing sub events load karo jab editing mode mein ho
+  const [subEventDrafts, setSubEventDrafts] = useState<SubEventDraft[]>(() => {
+    if (editing && existingSubEvents?.length > 0) {
+      return existingSubEvents.map((s: any) => ({
+        id: s.id, // existing ID save karo update ke liye
+        title: s.title || '',
+        description: s.description || '',
+        start_date: s.start_date || '',
+        end_date: s.end_date || '',
+        reporting_level: s.reporting_level || ['field'],
+      }));
+    }
+    return [];
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -736,21 +750,26 @@ export default function EventReporting({ session }: { session: any }) {
         eventId = data?.id;
       }
 
-      // Sub events bhi save karo agar multi type hai
+      // Sub events save/update karo
       if (form.event_type === 'multi' && eventId && subEventDrafts.length > 0) {
-        const subInserts = subEventDrafts
-          .filter(s => s.title.trim())
-          .map(s => ({
+        for (const s of subEventDrafts) {
+          if (!s.title.trim()) continue;
+          const payload = {
             event_id: eventId,
             title: s.title.trim(),
-            description: s.description.trim() || null,
+            description: s.description?.trim() || null,
             start_date: s.start_date || null,
             end_date: s.end_date || null,
             reporting_level: s.reporting_level,
             is_active: true,
-          }));
-        if (subInserts.length > 0) {
-          await supabase.from('sub_events').insert(subInserts);
+          };
+          if ((s as any).id) {
+            // Existing sub event — update karo
+            await supabase.from('sub_events').update(payload).eq('id', (s as any).id);
+          } else {
+            // Naya sub event — insert karo
+            await supabase.from('sub_events').insert(payload);
+          }
         }
       }
     }
@@ -912,6 +931,7 @@ export default function EventReporting({ session }: { session: any }) {
             <EventFormModal
               editing={editingEvent}
               parentEvent={addSubFor}
+              existingSubEvents={editingEvent ? subEvents.filter(s => s.event_id === editingEvent.id) : []}
               onSave={handleSaveEvent}
               onCancel={() => { setShowEventForm(false); setEditingEvent(null); setAddSubFor(null); }}
             />
