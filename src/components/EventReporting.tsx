@@ -4,7 +4,7 @@ import {
   Flag, Plus, ChevronRight, ChevronDown, Users, MapPin,
   Calendar, FileText, CheckCircle, XCircle, Eye, Edit3,
   Trash2, Loader2, Camera, X, BarChart3, Building2,
-  Globe, Map, ListTree, ClipboardList, AlertCircle
+  Globe, Map, ListTree, ClipboardList, AlertCircle, Download
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -713,6 +713,56 @@ export default function EventReporting({ session }: { session: any }) {
   const [addSubFor, setAddSubFor] = useState<Event | null>(null);
   const [reportingFor, setReportingFor] = useState<{ event: Event; subEvent: SubEvent | null } | null>(null);
   const [activeView, setActiveView] = useState<'events' | 'reports'>('events');
+  const [filterEventId, setFilterEventId] = useState('all');
+  const [filterSubEventId, setFilterSubEventId] = useState('all');
+  const [filterLevel, setFilterLevel] = useState('all');
+
+  // CSV Download function
+  const downloadCSV = () => {
+    const filtered = filteredReports;
+    if (filtered.length === 0) { alert('Koi reports nahi hain download ke liye'); return; }
+
+    const headers = [
+      'Event', 'Sub Event', 'Report Level', 'Reported By',
+      'District', 'Hospital ID', 'Event Date', 'Venue',
+      'GPS Location', 'Total Participants', 'Male', 'Female',
+      'Description', 'Status', 'Submitted At'
+    ];
+
+    const rows = filtered.map(r => {
+      const ev = events.find(e => e.id === r.event_id);
+      const sub = subEvents.find(s => s.id === r.sub_event_id);
+      return [
+        ev?.title || '',
+        sub?.title || '',
+        r.report_level,
+        r.reported_by_name,
+        r.district || '',
+        r.hospital_id || '',
+        r.event_date,
+        r.venue,
+        r.gps_location || '',
+        r.participants_total,
+        r.participants_male || '',
+        r.participants_female || '',
+        r.description || '',
+        r.status,
+        new Date(r.created_at).toLocaleString('en-IN'),
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+    });
+
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const evName = filterEventId !== 'all'
+      ? events.find(e => e.id === filterEventId)?.title?.replace(/\s+/g, '_') || 'Event'
+      : 'All_Events';
+    a.download = `Event_Reports_${evName}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -790,6 +840,19 @@ export default function EventReporting({ session }: { session: any }) {
   const totalParticipants = reports.reduce((s, r) => s + (r.participants_total || 0), 0);
   const fieldReports = reports.filter(r => r.report_level === 'field').length;
   const districtReports = reports.filter(r => r.report_level === 'district').length;
+
+  // Filtered reports for Reports view
+  const filteredReports = reports.filter(r => {
+    if (filterEventId !== 'all' && r.event_id !== filterEventId) return false;
+    if (filterSubEventId !== 'all' && r.sub_event_id !== filterSubEventId) return false;
+    if (filterLevel !== 'all' && r.report_level !== filterLevel) return false;
+    return true;
+  });
+
+  // Sub events for selected filter event
+  const filterSubEvents = filterEventId !== 'all'
+    ? subEvents.filter(s => s.event_id === filterEventId)
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 md:p-6">
@@ -880,14 +943,65 @@ export default function EventReporting({ session }: { session: any }) {
         {/* Reports View */}
         {!loading && activeView === 'reports' && (
           <>
-            {reports.length === 0 ? (
+            {/* Filter Bar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-[160px]">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Event</label>
+                  <select value={filterEventId}
+                    onChange={e => { setFilterEventId(e.target.value); setFilterSubEventId('all'); }}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                    <option value="all">Saare Events</option>
+                    {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+                  </select>
+                </div>
+
+                {filterSubEvents.length > 0 && (
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Sub Event</label>
+                    <select value={filterSubEventId} onChange={e => setFilterSubEventId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                      <option value="all">Saare Sub Events</option>
+                      {filterSubEvents.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <div className="min-w-[130px]">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Level</label>
+                  <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                    <option value="all">Sab Levels</option>
+                    <option value="field">Field</option>
+                    <option value="district">District</option>
+                    <option value="state">State</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end gap-2 ml-auto">
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400 mb-1">{filteredReports.length} reports</p>
+                    <p className="text-sm font-bold text-emerald-600">
+                      {filteredReports.reduce((s, r) => s + (r.participants_total || 0), 0).toLocaleString('en-IN')} participants
+                    </p>
+                  </div>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={downloadCSV}
+                    className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-200">
+                    <Download size={15} />CSV
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+            {filteredReports.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                 <ClipboardList size={36} className="text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-400 font-medium">Koi report submit nahi hui abhi</p>
+                <p className="text-slate-400 font-medium">
+                  {reports.length === 0 ? 'Koi report submit nahi hui abhi' : 'Is filter mein koi report nahi'}
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {reports.map(report => {
+                {filteredReports.map(report => {
                   const ev = events.find(e => e.id === report.event_id);
                   const sub = subEvents.find(s => s.id === report.sub_event_id);
                   return (
