@@ -81,7 +81,8 @@ export default function AdminTransferList({ session }: { session: any }) {
 
     const handleDownloadCSV = () => {
         const headers = [
-            'Applicant Name', 'Home District', 'Present District', 'Posting Place', 
+            'Applicant Name', 'Role', "Father's / Husband's Name", 'Mobile Number', 'Date of Birth',
+            'Home District', 'Present District', 'Posting Place', 
             'Posting Since', 'Category', 'Sub-category', 'Sugam Days', 
             'Durgam (<7000ft) Days', 'Durgam (>7000ft) Days', 'Choices', 'Status'
         ];
@@ -90,6 +91,10 @@ export default function AdminTransferList({ session }: { session: any }) {
             headers.join(','),
             ...filteredApplications.map(app => [
                 `"${(app.applicant_name || '').replace(/"/g, '""')}"`,
+                `"${(app.category || '').replace(/"/g, '""')}"`,
+                `"${(app.father_husband_name || '').replace(/"/g, '""')}"`,
+                `"${(app.mobile_number || '').replace(/"/g, '""')}"`,
+                `"${(app.dob || '').replace(/"/g, '""')}"`,
                 `"${(app.home_district || '').replace(/"/g, '""')}"`,
                 `"${(app.present_posting || '').replace(/"/g, '""')}"`,
                 `"${(app.present_posting_hospital || app.present_posting_place || app.main_posting_name || app.present_posting_name || '-').replace(/"/g, '""')}"`,
