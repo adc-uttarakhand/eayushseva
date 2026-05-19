@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+
+// Secure random password generator
+const generateTempPassword = () => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const numbers = '23456789';
+  const special = '@#$!';
+  const all = upper + lower + numbers + special;
+  let pwd = upper[Math.floor(Math.random()*upper.length)]
+    + lower[Math.floor(Math.random()*lower.length)]
+    + numbers[Math.floor(Math.random()*numbers.length)]
+    + special[Math.floor(Math.random()*special.length)];
+  for (let i = 4; i < 10; i++) pwd += all[Math.floor(Math.random()*all.length)];
+  return pwd.split('').sort(() => Math.random()-0.5).join('');
+};
 import { Loader2, Check, X } from 'lucide-react';
 
 export default function RegistrationRequests({ session }: { session: any }) {
@@ -69,13 +84,14 @@ export default function RegistrationRequests({ session }: { session: any }) {
 
   const handleApprove = async (request: any) => {
     setLoading(true);
+    const tempPassword = generateTempPassword();
     // 1. Insert into staff table
     const { error: staffError } = await supabase.from('staff').insert({
       full_name: request.full_name,
       mobile_number: request.mobile_number,
       role: request.role,
-      hospital_id: request.hospital_id, // hospital_id is TEXT
-      login_password: 'ayush@123',
+      hospital_id: request.hospital_id,
+      login_password: tempPassword,
       is_active: true
     });
 
@@ -96,7 +112,7 @@ export default function RegistrationRequests({ session }: { session: any }) {
       return;
     }
 
-    alert('Employee approved and can now login with ayush@123');
+    alert(`✅ Employee approved!\n\nTemporary Password: ${tempPassword}\n\nShare this with the employee. They will be asked to change it on first login.`);
     fetchRequests();
     setLoading(false);
   };

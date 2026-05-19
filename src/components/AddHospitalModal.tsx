@@ -3,6 +3,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Save, Loader2, Building2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+const generateHospitalPassword = (hospitalId: string) => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const numbers = '23456789';
+  const special = '@#$!';
+  const suffix = hospitalId.slice(-4).toUpperCase();
+  let pwd = upper[Math.floor(Math.random()*upper.length)]
+    + numbers[Math.floor(Math.random()*numbers.length)]
+    + special[Math.floor(Math.random()*special.length)]
+    + suffix;
+  for (let i = 0; i < 4; i++) pwd += (upper+numbers)[Math.floor(Math.random()*(upper+numbers).length)];
+  return pwd.split('').sort(() => Math.random()-0.5).join('');
+};
+
 interface AddHospitalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -85,7 +98,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
     above_7000_feet: 'No',
     email: '',
     status: '',
-    hospital_password: 'ABCD_1234'
+    hospital_password: generateHospitalPassword(formData.hospital_id || 'AYUSH')
   });
 
   // Fetch max sr_no when opened
@@ -122,7 +135,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
         above_7000_feet: 'No',
         email: '',
         status: '',
-        hospital_password: 'ABCD_1234'
+        hospital_password: generateHospitalPassword(formData.hospital_id || 'AYUSH')
       });
     }
   }, [isOpen]);

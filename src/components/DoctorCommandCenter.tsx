@@ -459,9 +459,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         designation: staffData?.role || staffData?.designation || '',
         empId: staffData?.employee_id || '',
         mobile: staffData?.mobile_number || '',
-        password: staffData?.login_password || '',
+        password: '',
         fatherName: staffData?.father_name || '',
-        photograph: staffData?.photograph_url || '',
+        photograph: staffData?.photograph_url ? (staffData.photograph_url.startsWith('http') ? staffData.photograph_url : supabase.storage.from('staff-photos').getPublicUrl(staffData.photograph_url).data.publicUrl) : '',
         email: staffData?.email_id || '',
         employmentClass: staffData?.employment_class || 'Class II',
         employmentType: staffData?.employment_type || 'Permanent',
@@ -914,7 +914,8 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         .from('staff-photos')
         .getPublicUrl(filePath);
 
-      setProfile(prev => ({ ...prev, photograph: publicUrl }));
+      const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
+      setProfile(prev => ({ ...prev, photograph: urlWithTimestamp }));
       alert('Photo uploaded successfully! / फोटो सफलतापूर्वक अपलोड हो गई!');
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -1484,7 +1485,19 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
       mobile_number: staffForm.mobile.trim(),
       role: staffForm.role,
       assigned_modules: selectedModules,
-      login_password: 'ayush@123',
+      login_password: (() => {
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const lower = 'abcdefghjkmnpqrstuvwxyz';
+        const numbers = '23456789';
+        const special = '@#$!';
+        const all = upper + lower + numbers + special;
+        let pwd = upper[Math.floor(Math.random()*upper.length)]
+          + lower[Math.floor(Math.random()*lower.length)]
+          + numbers[Math.floor(Math.random()*numbers.length)]
+          + special[Math.floor(Math.random()*special.length)];
+        for (let i = 4; i < 10; i++) pwd += all[Math.floor(Math.random()*all.length)];
+        return pwd.split('').sort(() => Math.random()-0.5).join('');
+      })(),
       is_active: true
     };
 

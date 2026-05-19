@@ -310,15 +310,24 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         }
       }
 
-      // 3. Hospital Login
+      // 3. Hospital Login — Edge Function se verify karo
+      // Note: Direct comparison as fallback — password never stored in state
       const { data: hospitalLoginData } = await supabase
         .from('hospitals')
-        .select('hospital_id, facility_name, hospital_password, district')
+        .select('hospital_id, facility_name, district')
         .eq('hospital_id', username)
         .maybeSingle();
 
       if (hospitalLoginData) {
-        if (password === hospitalLoginData.hospital_password) {
+        // Verify via separate check — password not loaded into client state
+        const { data: pwCheck } = await supabase
+          .from('hospitals')
+          .select('hospital_id')
+          .eq('hospital_id', username)
+          .eq('hospital_password', password)
+          .maybeSingle();
+
+        if (pwCheck) {
           const session: UserSession = {
             role: 'HOSPITAL',
             id: hospitalLoginData.hospital_id,

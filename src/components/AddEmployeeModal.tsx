@@ -3,6 +3,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Search, Loader2, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+// Secure random password generator
+const generateTempPassword = () => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const numbers = '23456789';
+  const special = '@#$!';
+  const all = upper + lower + numbers + special;
+  let pwd = upper[Math.floor(Math.random()*upper.length)]
+    + lower[Math.floor(Math.random()*lower.length)]
+    + numbers[Math.floor(Math.random()*numbers.length)]
+    + special[Math.floor(Math.random()*special.length)];
+  for (let i = 4; i < 10; i++) pwd += all[Math.floor(Math.random()*all.length)];
+  return pwd.split('').sort(() => Math.random()-0.5).join('');
+};
+
 interface Hospital {
   hospital_id: string;
   facility_name: string;
@@ -131,12 +146,17 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
         hospital_id: formData.posting_place_id,
         first_posting_place: postingPlaceName,
         employment_type: formData.employment_type,
-        login_password: 'ayush@123',
+        login_password: generateTempPassword(),
         is_active: true
       }]);
 
       if (insertError) throw insertError;
 
+      // Show generated password to admin
+      const tempPwd = (await supabase.from('staff').select('login_password').eq('mobile_number', formData.mobile_number.trim()).maybeSingle()).data?.login_password;
+      if (tempPwd) {
+        alert(`✅ Employee added successfully!\n\nTemporary Login Password: ${tempPwd}\n\nPlease share this with the employee. They will be asked to change it on first login.`);
+      }
       onAdd();
       onClose();
     } catch (err: any) {

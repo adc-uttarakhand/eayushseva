@@ -45,7 +45,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
             name: data.name || '',
             email: data.email_id || data.admin_userid || '',
             mobile: data.mobile_number || '',
-            password: data.admin_password || '',
+            password: '',
             system: data.access_systems?.join(', ') || 'All',
             designation: session.role.replace('_', ' '),
             userId: data.admin_userid || session.id
@@ -63,7 +63,7 @@ export default function ProfilePage({ session, onUpdate }: ProfilePageProps) {
             name: data.facility_name || '',
             email: data.email || '',
             mobile: data.mobile || '',
-            password: data.hospital_password || '',
+            password: '',
             system: data.system || '',
             designation: 'Hospital Administrator',
             userId: session.id
