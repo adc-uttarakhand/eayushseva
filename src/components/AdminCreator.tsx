@@ -42,7 +42,9 @@ const ALL_PAGES = [
 ];
 
 const ADMIN_ROLES = [
+  { value: 'SUPER_ADMIN',                label: 'Super Admin' },
   { value: 'DISTRICT_ADMIN',             label: 'District Admin' },
+  { value: 'DISTRICT_VIEWER',            label: 'District Viewer' },
   { value: 'STATE_ADMIN',               label: 'State Admin' },
   { value: 'DISTRICT_MEDICINE_INCHARGE', label: 'District Medicine Incharge' },
   { value: 'PHARMACY_MANAGER',           label: 'Pharmacy Manager' },
