@@ -98,7 +98,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSuccess }: AddHosp
     above_7000_feet: 'No',
     email: '',
     status: '',
-    hospital_password: generateHospitalPassword(formData.hospital_id || 'AYUSH')
+    hospital_password: ''
   });
 
   // Fetch max sr_no when opened
