@@ -11,6 +11,7 @@ import HospitalChangeModal from './HospitalChangeModal';
 import AddEmployeeModal from './AddEmployeeModal';
 import LiveStream from './LiveStream';
 import EventReporting from './EventReporting';
+import Form1Monthly from './Form1Monthly';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -168,8 +169,8 @@ const EXPERTISE_KEYWORDS = [
 ];
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -2019,6 +2020,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <button onClick={() => setActiveTab('events')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'events' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Flag size={18} /> {activeTab === 'events' ? 'Event Reports' : 'Events'}
             </button>
+            <button onClick={() => setActiveTab('form1')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'form1' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <FileText size={18} /> {activeTab === 'form1' ? 'Form 1 Report' : 'Form 1'}
+            </button>
           </div>
         </div>
       </div>
@@ -2592,6 +2596,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         )}
         {activeTab === 'events' && (
           <EventReporting session={session} />
+        )}
+        {activeTab === 'form1' && (
+          <Form1Monthly session={session} />
         )}
       </motion.div>
 
