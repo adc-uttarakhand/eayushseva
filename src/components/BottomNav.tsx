@@ -1,7 +1,7 @@
-import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity } from 'lucide-react';
+import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity, Radio } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management' | 'live';
 
 interface BottomNavProps {
   active: TabId;
@@ -12,16 +12,19 @@ interface BottomNavProps {
   modules: string[];
   isIncharge: boolean;
   accessPages?: string[];
+  hasActiveLiveStream?: boolean;
 }
 
-export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma, modules, isIncharge, accessPages = [] }: BottomNavProps) {
+export default function BottomNav({ active, setActive, role, isTransferEnabled, hasPanchakarma, modules, isIncharge, accessPages = [], hasActiveLiveStream }: BottomNavProps) {
   const publicTabs = [
     { id: 'dashboard' as TabId, label: 'AYUSH Network', icon: Building2 },
+    { id: 'live' as TabId, label: 'Live', icon: Radio },
     { id: 'stats' as TabId, label: 'Statistics', icon: BarChart3 },
   ];
 
   const adminTabs = [
     { id: 'dashboard' as TabId, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'live' as TabId, label: 'Live', icon: Radio },
     { id: 'hospitals' as TabId, label: 'Hospitals', icon: Building2 },
     { id: 'patients' as TabId, label: 'Patients', icon: Users },
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
@@ -74,7 +77,12 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
                 isActive ? 'text-emerald-900 bg-emerald-100' : 'text-slate-600 hover:text-emerald-800'
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <div className="relative">
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                {tab.id === 'live' && hasActiveLiveStream && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                )}
+              </div>
               <span className="text-xs font-bold uppercase tracking-widest">
                 {tab.label}
               </span>
