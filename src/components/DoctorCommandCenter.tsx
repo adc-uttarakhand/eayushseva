@@ -2,7 +2,7 @@ import Profiler from './Profiler';
 import React, { useState, useEffect, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun, Stethoscope, Radio } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun, Stethoscope, Radio, Flag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
@@ -10,6 +10,7 @@ import StaffDeleteConfirmationModal from './StaffDeleteConfirmationModal';
 import HospitalChangeModal from './HospitalChangeModal';
 import AddEmployeeModal from './AddEmployeeModal';
 import LiveStream from './LiveStream';
+import EventReporting from './EventReporting';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -167,8 +168,8 @@ const EXPERTISE_KEYWORDS = [
 ];
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -2015,6 +2016,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <button onClick={() => setActiveTab('live')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'live' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Radio size={18} /> {activeTab === 'live' ? 'Live Streams' : 'Live'}
             </button>
+            <button onClick={() => setActiveTab('events')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'events' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <Flag size={18} /> {activeTab === 'events' ? 'Event Reports' : 'Events'}
+            </button>
           </div>
         </div>
       </div>
@@ -2585,6 +2589,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         )}
         {activeTab === 'live' && (
           <LiveStream session={session} />
+        )}
+        {activeTab === 'events' && (
+          <EventReporting session={session} />
         )}
       </motion.div>
 

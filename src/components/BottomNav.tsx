@@ -1,7 +1,7 @@
-import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity, Radio } from 'lucide-react';
+import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity, Radio, Flag } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management' | 'live';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management' | 'live' | 'events';
 
 interface BottomNavProps {
   active: TabId;
@@ -25,6 +25,7 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
   const adminTabs = [
     { id: 'dashboard' as TabId, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'live' as TabId, label: 'Live', icon: Radio },
+    { id: 'events' as TabId, label: 'Events', icon: Flag },
     { id: 'hospitals' as TabId, label: 'Hospitals', icon: Building2 },
     { id: 'patients' as TabId, label: 'Patients', icon: Users },
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
