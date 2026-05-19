@@ -42,8 +42,9 @@ import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio } from 'lucide-react';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio, Flag } from 'lucide-react';
 import LiveStream from './components/LiveStream';
+import EventReporting from './components/EventReporting';
 import { supabase } from './lib/supabase';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -1561,6 +1562,11 @@ export default function App() {
         {activeTab === 'live' && (
           <motion.div key="live" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <LiveStream session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'events' && (
+          <motion.div key="events" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <EventReporting session={session} />
           </motion.div>
         )}
         {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
