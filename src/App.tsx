@@ -42,7 +42,8 @@ import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard } from 'lucide-react';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio } from 'lucide-react';
+import LiveStream from './components/LiveStream';
 import { supabase } from './lib/supabase';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -117,6 +118,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [hasActiveLiveStream, setHasActiveLiveStream] = useState(false);
   const [isNearbyActive, setIsNearbyActive] = useState(false);
   const [doctorSearchQuery, setDoctorSearchQuery] = useState('');
   const [doctorSearchResults, setDoctorSearchResults] = useState<any[]>([]);
@@ -234,6 +236,15 @@ export default function App() {
 
   useEffect(() => {
     fetchTransferStatus();
+    
+    // Check for active live streams
+    const checkActiveStreams = async () => {
+      const { data } = await supabase.from('live_streams').select('id').eq('is_active', true);
+      setHasActiveLiveStream(!!data && data.length > 0);
+    };
+    checkActiveStreams();
+    const interval = setInterval(checkActiveStreams, 30000);
+    return () => clearInterval(interval);
   }, []);
   const fetchTransferStatus = async () => {
     setLoading(true);
@@ -1547,6 +1558,11 @@ export default function App() {
             <AdminCreator session={session} />
           </motion.div>
         )}
+        {activeTab === 'live' && (
+          <motion.div key="live" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <LiveStream session={session} />
+          </motion.div>
+        )}
         {activeTab === 'supply_upload' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN') && (
           <motion.div key="supply_upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <StateSupplyDashboard activeSubTab={supplySubTab} />
@@ -1677,6 +1693,7 @@ export default function App() {
           modules={session?.modules || []}
           isIncharge={currentHospital ? currentHospital.incharge_staff_id === session?.id : false}
           accessPages={session?.access_pages || []}
+          hasActiveLiveStream={hasActiveLiveStream}
         />
       )}
       {/* Unsaved Changes Modal */}
