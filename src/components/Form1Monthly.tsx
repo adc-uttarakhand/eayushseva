@@ -355,6 +355,13 @@ function Form1View({ session, hospital }: any) {
 
   const disabled = isSubmitted;
 
+  // Cannot fill form before 1st of next month
+  // e.g. May 2026 form can only be filled from 1 June 2026 onwards
+  const today = new Date();
+  const fillableFrom = new Date(selectedYear, selectedMonth, 1); // 1st of next month
+  const isTooEarly = today < fillableFrom;
+  const fillableFromStr = fillableFrom.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
   const getCumulative = (monthField: string) => {
     const cumField = monthField.replace('_current_month', '_cumulative');
     // Agar form submitted hai to saved cumulative value use karo — dobara calculate mat karo
@@ -456,7 +463,7 @@ function Form1View({ session, hospital }: any) {
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex-1 min-w-[160px]">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Reporting Month</label>
-            <select value={selectedMonth} disabled={isSubmitted}
+            <select value={selectedMonth}
               onChange={e => setSelectedMonth(Number(e.target.value))}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
               {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
@@ -464,7 +471,7 @@ function Form1View({ session, hospital }: any) {
           </div>
           <div className="min-w-[120px]">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Year</label>
-            <select value={selectedYear} disabled={isSubmitted}
+            <select value={selectedYear}
               onChange={e => setSelectedYear(Number(e.target.value))}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
               {[2023,2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
@@ -494,6 +501,27 @@ function Form1View({ session, hospital }: any) {
             {Object.keys(cumulativeData).length > 0 && ` Previous months data included.`}
           </span>
         </div>
+
+        {isTooEarly && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+            <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+            <span>
+              <strong>Cannot fill this form yet.</strong> {MONTHS[selectedMonth-1]} {selectedYear} report can only be submitted from <strong>{fillableFromStr}</strong> onwards.
+            </span>
+          </div>
+        )}
+
+        {isSubmitted && (
+          <div className="mt-3 p-3 bg-green-50 border-2 border-green-300 rounded-xl flex items-center gap-3">
+            <CheckCircle size={20} className="text-green-600 flex-shrink-0" />
+            <div>
+              <p className="font-bold text-green-700 text-sm">Form Submitted Successfully</p>
+              <p className="text-green-600 text-xs mt-0.5">
+                {MONTHS[selectedMonth-1]} {selectedYear} — Submitted by {formData.submitted_by}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SECTION 1: Local Coordination */}
@@ -850,24 +878,14 @@ function Form1View({ session, hospital }: any) {
       {/* Action Buttons */}
       {!isSubmitted && (
         <div className="flex gap-3 mt-4 pb-8">
-          <button onClick={handleSaveDraft} disabled={saving || submitting}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 border-2 border-emerald-300 text-emerald-700 bg-emerald-50 rounded-2xl font-bold text-sm hover:bg-emerald-100 transition-colors disabled:opacity-50">
+          <button onClick={handleSaveDraft} disabled={saving || submitting || isTooEarly}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 border-2 border-emerald-300 text-emerald-700 bg-emerald-50 rounded-2xl font-bold text-sm hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <><Loader2 size={16} className="animate-spin" />Saving...</> : <><Save size={16} />Save Draft</>}
           </button>
-          <button onClick={() => setShowSubmitConfirm(true)} disabled={saving || submitting}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 disabled:opacity-50">
+          <button onClick={() => setShowSubmitConfirm(true)} disabled={saving || submitting || isTooEarly}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed">
             {submitting ? <><Loader2 size={16} className="animate-spin" />Submitting...</> : <><Send size={16} />Submit Form</>}
           </button>
-        </div>
-      )}
-
-      {isSubmitted && (
-        <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-5 text-center mt-4 mb-8">
-          <CheckCircle size={28} className="text-green-600 mx-auto mb-2" />
-          <p className="font-bold text-green-700">Form Submitted Successfully</p>
-          <p className="text-green-600 text-sm mt-1">
-            {MONTHS[selectedMonth-1]} {selectedYear} — Submitted by {formData.submitted_by}
-          </p>
         </div>
       )}
 
