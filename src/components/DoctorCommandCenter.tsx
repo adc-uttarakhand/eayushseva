@@ -1816,79 +1816,94 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
           <div className="flex gap-1">
             {showDashboard && (
               <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <LayoutDashboard size={16} /> Dash
+                <LayoutDashboard size={16} /> {activeTab === 'dashboard' && 'Dash'}
               </button>
             )}
             {showProfile && (
               <button onClick={() => setActiveTab('profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <User size={16} /> Profile
+                <User size={16} /> {activeTab === 'profile' && 'Profile'}
               </button>
             )}
             {isMedicalOfficer && (
               <button onClick={() => setActiveTab('deep_profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'deep_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <UserCircle2 size={16} /> Deep
+                <UserCircle2 size={16} /> {activeTab === 'deep_profile' && 'Deep'}
               </button>
             )}
             {isMedicalOfficer && (
               <button onClick={() => setActiveTab('doctor_feedback')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'doctor_feedback' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Star size={16} /> Feedback
+                <Star size={16} /> {activeTab === 'doctor_feedback' && 'Feedback'}
               </button>
             )}
             {showHospitalProfile && (
               <button onClick={() => setActiveTab('hospital_profile')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'hospital_profile' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Building2 size={16} /> Hosp
+                <Building2 size={16} /> {activeTab === 'hospital_profile' && 'Hosp'}
               </button>
             )}
             {showStaff && (
               <button onClick={() => setActiveTab('staff')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'staff' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Users size={16} /> Staff
+                <Users size={16} /> {activeTab === 'staff' && 'Staff'}
               </button>
             )}
             {showEParchi && (
               <button onClick={() => setActiveTab('eparchi')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'eparchi' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <FileText size={16} /> OPD
+                <FileText size={16} /> {activeTab === 'eparchi' && 'OPD'}
               </button>
             )}
             {showPatients && (
               <button onClick={() => setActiveTab('patients')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'patients' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Users size={16} /> Pats
+                <Users size={16} /> {activeTab === 'patients' && 'Pats'}
               </button>
             )}
             {showMedicineDemand && (
               <button onClick={() => setActiveTab('medicine_demand')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'medicine_demand' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <ClipboardList size={16} /> Demand
+                <ClipboardList size={16} /> {activeTab === 'medicine_demand' && 'Demand'}
               </button>
             )}
             {showMedicineManagement && (
               <button onClick={() => setActiveTab('inventory')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'inventory' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Package size={16} /> Inv
+                <Package size={16} /> {activeTab === 'inventory' && 'Inv'}
               </button>
             )}
             {showPanchakarma && (
               <button onClick={() => setActiveTab('panchakarma')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'panchakarma' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Hand size={16} /> Pancha
+                <Hand size={16} /> {activeTab === 'panchakarma' && 'Pancha'}
               </button>
             )}
             {showYoga && (
               <button onClick={() => setActiveTab('yoga')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'yoga' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Sun size={16} /> Yoga
+                <Sun size={16} /> {activeTab === 'yoga' && 'Yoga'}
               </button>
             )}
             {showSpecialTherapy && (
               <button onClick={() => setActiveTab('special_therapy')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'special_therapy' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Stethoscope size={16} /> Therap
+                <Stethoscope size={16} /> {activeTab === 'special_therapy' && 'Therap'}
               </button>
             )}
             {sthananataranModuleActive && (
               <button onClick={() => setActiveTab('sthananataran')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'sthananataran' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <Truck size={16} /> Sthan
+                <Truck size={16} /> {activeTab === 'sthananataran' && 'Sthan'}
               </button>
             )}
             {isIncharge && (
               <button onClick={() => setActiveTab('certificate')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'certificate' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
-                <FileText size={16} /> Cert
+                <FileText size={16} /> {activeTab === 'certificate' && 'Cert'}
               </button>
             )}
+            <button onClick={() => setActiveTab('live')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'live' ? 'bg-red-100 text-red-900' : 'text-slate-600'}`}>
+              <Radio size={16} /> {activeTab === 'live' && 'Live'}
+            </button>
+
+            <button onClick={() => setActiveTab('events')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'events' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <Flag size={16} /> {activeTab === 'events' && 'Events'}
+            </button>
+
+            <button onClick={() => setActiveTab('form1')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'form1' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <FileText size={16} /> {activeTab === 'form1' && 'Form 1'}
+            </button>
+
+            <button onClick={() => setActiveTab('prakriti')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'prakriti' ? 'bg-amber-100 text-amber-900' : 'text-slate-600'}`}>
+              <Scale size={16} /> {activeTab === 'prakriti' && 'Prakriti'}
+            </button>
           </div>
         </div>
         
