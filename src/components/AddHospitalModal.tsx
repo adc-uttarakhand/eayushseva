@@ -33,7 +33,8 @@ const HOSPITAL_TYPES = [
   'Government AYUSH Dispensary',
   'Government AYUSH Hospital',
   'MOCH - PHC',
-  'MOCH - CHC'
+  'MOCH - CHC',
+  'Office'
 ];
 
 const FACILITY_TYPE_CODES: Record<string, string> = {
@@ -47,7 +48,8 @@ const FACILITY_TYPE_CODES: Record<string, string> = {
   'MOCH - CHC': 'MOCH',
   'AYUSH Educational Institute': 'EDU',
   'Ayurveda 10 Bed': '10B',
-  'AYUSH 50 Bed': '50B'
+  'AYUSH 50 Bed': '50B',
+  'Office': 'OFF'
 };
 
 const SYSTEMS = ['Ayurveda', 'Homeopathy', 'Unani', 'AYUSH'];

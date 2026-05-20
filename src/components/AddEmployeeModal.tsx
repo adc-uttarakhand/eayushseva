@@ -139,16 +139,20 @@ export default function AddEmployeeModal({ isOpen, onClose, onAdd, hospitals }: 
         const selectedHospital = hospitals.find(h => h.hospital_id === formData.posting_place_id);
         const postingPlaceName = selectedHospital?.facility_name || '';
       
-      const { error: insertError } = await supabase.from('staff').insert([{
-        full_name: formData.full_name,
-        mobile_number: formData.mobile_number.trim(),
-        role: formData.role,
-        hospital_id: formData.posting_place_id,
-        first_posting_place: postingPlaceName,
-        employment_type: formData.employment_type,
-        login_password: generateTempPassword(),
-        is_active: true
-      }]);
+        const { error: insertError } = await supabase.from('staff').insert([{
+          full_name: formData.full_name,
+          mobile_number: formData.mobile_number.trim(),
+          role: formData.role,
+          hospital_id: formData.posting_place_id,
+          first_posting_place: postingPlaceName,
+          present_hospital: postingPlaceName,
+          present_posting_status: selectedHospital?.status || 'Sugam',
+          present_posting_above_7000ft: selectedHospital?.above_7000_feet || 'No',
+          present_district: selectedHospital?.district || '',
+          employment_type: formData.employment_type,
+          login_password: generateTempPassword(),
+          is_active: true
+        }]);
 
       if (insertError) throw insertError;
 
