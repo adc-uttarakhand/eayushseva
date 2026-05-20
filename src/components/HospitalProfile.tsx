@@ -280,14 +280,26 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
     setSaving(true);
     try {
       const isAdmin = ['SUPER_ADMIN', 'STATE_ADMIN', 'DISTRICT_ADMIN'].includes(session?.role);
+      const toNum = (val: any) => {
+        if (val === undefined || val === null || val === '') return null;
+        const n = parseFloat(String(val).replace(/ft|feet/gi, '').trim());
+        return isNaN(n) ? null : n;
+      };
+
+      const toInt = (val: any) => {
+        if (val === undefined || val === null || val === '') return null;
+        const n = parseInt(String(val).replace(/ft|feet/gi, '').trim());
+        return isNaN(n) ? null : n;
+      };
+
       const updateData: any = {
         email: formData.email,
         special_services: formData.special_services,
         centre_of_excellence: formData.centre_of_excellence && formData.centre_of_excellence !== 'False' && formData.centre_of_excellence !== 'false' ? (formData.centre_of_excellence === 'True' ? null : formData.centre_of_excellence) : null,
         supraja_centre: formData.supraja_centre,
         panchakarma_centre: formData.panchakarma_centre,
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+        latitude: toNum(formData.latitude),
+        longitude: toNum(formData.longitude),
         facility_name: formData.facility_name,
         pincode: formData.pincode,
         block: formData.block,
@@ -296,14 +308,14 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
         status: formData.status,
         taluka: formData.taluka,
         ipd_services: formData.ipd_services,
-        mobile: formData.mobile,
+        mobile: toNum(formData.mobile),
         location: formData.location,
         building_status: formData.building_status,
-        no_of_rooms: formData.no_of_rooms ? parseInt(formData.no_of_rooms) : null,
-        total_area_sqft: formData.total_area ? parseFloat(formData.total_area) : null,
-        construction_year: formData.construction_year ? parseInt(formData.construction_year) : null,
-        no_of_beds: formData.no_of_beds ? parseInt(formData.no_of_beds) : null,
-        altitude: formData.altitude ? parseInt(formData.altitude.toString().replace(/ft|feet/gi, '').trim()) : null,
+        no_of_rooms: toInt(formData.no_of_rooms),
+        total_area_sqft: toNum(formData.total_area),
+        construction_year: toInt(formData.construction_year),
+        no_of_beds: toInt(formData.no_of_beds),
+        altitude: toInt(formData.altitude),
         above_7000_feet: formData.above_7000_feet || 'No',
         type: formData.type
       };
@@ -326,73 +338,25 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
         throw new Error('No. of Beds cannot be negative.');
       }
 
-      const tableNames = ['hospitals'];
-      let updateSuccess = false;
+      // Use hospital_id directly — primary key hai
+      const targetHospitalId = hospitalDetails.hospital_id;
 
-      for (const tableName of tableNames) {
-        // Try id first (most reliable)
-        if (hospitalDetails.id) {
-          console.log(`Attempting update on ${tableName} with id: ${hospitalDetails.id}`);
-          const { data: idData, error: idError } = await supabase
-            .from(tableName)
-            .update(updateData)
-            .eq('id', hospitalDetails.id)
-            .select();
-          if (idError) console.error(`Error updating ${tableName} with id ${hospitalDetails.id}:`, idError);
-          if (!idError && idData && idData.length > 0) {
-            updateSuccess = true;
-            break;
-          }
-        }
-
-        let targetId = hospitalDetails.hospital_id;
-        let targetSr = hospitalDetails.sr_no;
-
-        // Try to find correct identifiers first
-        console.log(`Searching for ${tableName} with facility_name: ${hospitalDetails.facility_name}, district: ${hospitalDetails.district}`);
-        const { data: searchData } = await supabase
-          .from(tableName)
-          .select('hospital_id, sr_no')
-          .eq('facility_name', hospitalDetails.facility_name)
-          .eq('district', hospitalDetails.district)
-          .limit(1);
-
-        if (searchData) console.log(`Search result for ${tableName}:`, searchData);
-        else console.log(`No search result for ${tableName}`);
-
-        if (searchData && searchData.length > 0) {
-          targetId = searchData[0].hospital_id;
-          targetSr = searchData[0].sr_no;
-        }
-
-        // Try hospital_id
-        console.log(`Attempting update on ${tableName} with hospital_id: ${targetId}`);
-        let { data, error } = await supabase
-          .from(tableName)
-          .update(updateData)
-          .eq('hospital_id', targetId)
-          .select();
-
-        if (error) console.error(`Error updating ${tableName} with hospital_id ${targetId}:`, error);
-        if (!error && data && data.length > 0) {
-          updateSuccess = true;
-          break;
-        }
-
-        // Try sr_no
-        console.log(`Attempting update on ${tableName} with sr_no: ${targetSr}`);
-        const { data: retryData, error: retryError } = await supabase
-          .from(tableName)
-          .update(updateData)
-          .eq('sr_no', targetSr)
-          .select();
-        
-        if (retryError) console.error(`Error updating ${tableName} with sr_no ${targetSr}:`, retryError);
-        if (!retryError && retryData && retryData.length > 0) {
-          updateSuccess = true;
-          break;
-        }
+      if (!targetHospitalId) {
+        throw new Error('Hospital ID not found. Cannot update.');
       }
+
+      const { data: updateResult, error: updateError } = await supabase
+        .from('hospitals')
+        .update(updateData)
+        .eq('hospital_id', targetHospitalId)
+        .select();
+
+      if (updateError) {
+        console.error('Error updating hospital:', updateError);
+        throw new Error(`Update failed: ${updateError.message}`);
+      }
+
+      const updateSuccess = updateResult && updateResult.length > 0;
 
       if (!updateSuccess) {
         throw new Error('Hospital record not found for update in any table.');
@@ -609,7 +573,8 @@ export default function HospitalProfile({ hospitalDetails, onUpdate, session, on
                 'Government AYUSH Dispensary',
                 'Government AYUSH Hospital',
                 'MOCH - PHC',
-                'MOCH - CHC'
+                'MOCH - CHC',
+                'Office'
               ].map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
