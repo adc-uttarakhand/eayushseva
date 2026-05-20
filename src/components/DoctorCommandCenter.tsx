@@ -13,6 +13,7 @@ import LiveStream from './LiveStream';
 import EventReporting from './EventReporting';
 import Form1Monthly from './Form1Monthly';
 import PrakritiPareekshan from './PrakritiPareekshan';
+import EmployeeIDCard from './EmployeeIDCard';
 
 import PatientList from './PatientList';
 import EParchi from './EParchi';
@@ -170,8 +171,8 @@ const EXPERTISE_KEYWORDS = [
 ];
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -1904,6 +1905,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             <button onClick={() => setActiveTab('prakriti')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'prakriti' ? 'bg-amber-100 text-amber-900' : 'text-slate-600'}`}>
               <Scale size={16} /> {activeTab === 'prakriti' && 'Prakriti'}
             </button>
+            <button onClick={() => setActiveTab('id_card')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'id_card' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <Shield size={16} /> {activeTab === 'id_card' && 'ID Card'}
+            </button>
           </div>
         </div>
         
@@ -2043,6 +2047,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
             )}
             <button onClick={() => setActiveTab('prakriti')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'prakriti' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Scale size={18} /> {activeTab === 'prakriti' && 'Prakriti'}
+            </button>
+            <button onClick={() => setActiveTab('id_card')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'id_card' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <Shield size={18} /> {activeTab === 'id_card' && 'ID Card'}
             </button>
           </div>
         </div>
@@ -2623,6 +2630,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         )}
         {activeTab === 'prakriti' && (
           <PrakritiPareekshan session={session} />
+        )}
+        {activeTab === 'id_card' && (
+          <EmployeeIDCard session={session} />
         )}
       </motion.div>
 

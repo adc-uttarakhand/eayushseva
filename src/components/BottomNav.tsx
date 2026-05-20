@@ -1,7 +1,7 @@
-import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity, Radio, Flag, FileText } from 'lucide-react';
+import { Building2, BarChart3, LayoutDashboard, Users, Wrench, User, Key, ClipboardList, Truck, ShieldCheck, ArrowUpDown, Activity, Radio, Flag, FileText, Shield } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management' | 'live' | 'events' | 'form1';
+export type TabId = 'dashboard' | 'hospitals' | 'doctors' | 'tools' | 'profile' | 'eparchi' | 'stats' | 'demands' | 'supply_upload' | 'district_supply' | 'disease_management' | 'role_management' | 'staff_distribution' | 'pharmacy_dashboard' | 'requests' | 'transfer_module' | 'registrations' | 'nearby' | 'rate' | 'transfer_requests' | 'loginDirectory' | 'panchakarma' | 'rapid_tests' | 'patients' | 'sthanantaran' | 'password_reset' | 'admin_management' | 'live' | 'events' | 'form1' | 'id_card';
 
 interface BottomNavProps {
   active: TabId;
@@ -30,6 +30,7 @@ export default function BottomNav({ active, setActive, role, isTransferEnabled, 
     { id: 'patients' as TabId, label: 'Patients', icon: Users },
     { id: 'demands' as TabId, label: 'Demands', icon: ClipboardList },
     ...(role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || role === 'DISTRICT_ADMIN' ? [{ id: 'form1' as TabId, label: 'Form 1', icon: FileText }] : []),
+    ...(role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || role === 'DISTRICT_ADMIN' ? [{ id: 'id_card' as TabId, label: 'ID Card', icon: Shield }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN' || role === 'DISTRICT_ADMIN') ? [{ id: 'password_reset' as TabId, label: 'Reset Password', icon: Key }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'admin_management' as TabId, label: 'Admin Mgmt', icon: ShieldCheck }] : []),
     ...((role === 'SUPER_ADMIN' || role === 'STATE_ADMIN') ? [{ id: 'supply_upload' as TabId, label: 'State Supply', icon: Truck }] : []),
