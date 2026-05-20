@@ -852,8 +852,8 @@ function Form1View({ session, hospital }: any) {
           </motion.div>
         )}
       </AnimatePresence>
-      </div> {/* close fill form div */}
-      )} {/* close subTab === fill */}
+      </div>
+      )}
     </div>
   );
 }
