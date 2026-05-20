@@ -42,7 +42,8 @@ import StaffDistributionSummary from './components/StaffDistributionSummary';
 import PanchakarmaModule from './components/PanchakarmaModule';
 import PanchakarmaAdminDashboard from './components/PanchakarmaAdminDashboard';
 import SearchDeleteEmployeeModal from './components/SearchDeleteEmployeeModal';
-import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio, Flag, FileText } from 'lucide-react';
+import EmployeeIDCard from './components/EmployeeIDCard';
+import { LogIn, User as UserIcon, LogOut, Loader2, Search, Filter, Building2, MapPin, Phone, Mail, ShieldCheck, X, Star, ArrowRight, Save, Bell, Key, Activity, Stethoscope, Users, LayoutDashboard, Radio, Flag, FileText, Shield } from 'lucide-react';
 import LiveStream from './components/LiveStream';
 import EventReporting from './components/EventReporting';
 import Form1Monthly from './components/Form1Monthly';
@@ -1608,6 +1609,11 @@ export default function App() {
         {activeTab === 'form1' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="form1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Form1Monthly session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'id_card' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="id_card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <EmployeeIDCard session={session} />
           </motion.div>
         )}
         {activeTab === 'registrations' && (
