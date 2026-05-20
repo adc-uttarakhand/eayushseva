@@ -52,6 +52,9 @@ interface Form1Data {
 
   // Section 4: OPD
   opd_started?: string;
+  opd_footfall_male_current_month?: number | string;
+  opd_footfall_female_current_month?: number | string;
+  opd_footfall_other_current_month?: number | string;
   opd_footfall_current_month?: number | string;
   opd_footfall_cumulative?: number | string;
   medicines_distributed_cumulative?: number | string;
@@ -214,6 +217,7 @@ function Form1View({ session, hospital }: any) {
 
   // Cumulative fields list
   const cumulativeFields = [
+    'opd_footfall_male_cumulative', 'opd_footfall_female_cumulative', 'opd_footfall_other_cumulative',
     'opd_footfall_cumulative', 'medicines_distributed_cumulative',
     'cbac_survey_cumulative', 'screened_dm_cumulative',
     'screened_ht_cumulative', 'screened_oral_cancer_cumulative',
@@ -551,7 +555,61 @@ function Form1View({ session, hospital }: any) {
           <YesNoField label="OPD Started" fieldKey="opd_started" value={formData.opd_started} onChange={handleChange} disabled={disabled} />
           {formData.opd_started === 'Yes' && (
             <>
-              <NumberField label="No. of Footfall — Current Month" fieldKey="opd_footfall_current_month" value={formData.opd_footfall_current_month} onChange={handleChange} disabled={disabled} />
+              {/* Male / Female / Other fields */}
+              <NumberField label="No. of Male Footfall — Current Month" fieldKey="opd_footfall_male_current_month" value={(formData as any).opd_footfall_male_current_month} onChange={(key: string, val: string) => {
+                handleChange(key, val);
+                // Auto-calculate total
+                const m = Number(val) || 0;
+                const f = Number((formData as any).opd_footfall_female_current_month) || 0;
+                const o = Number((formData as any).opd_footfall_other_current_month) || 0;
+                handleChange('opd_footfall_current_month', m + f + o);
+              }} disabled={disabled} />
+
+              <NumberField label="No. of Female Footfall — Current Month" fieldKey="opd_footfall_female_current_month" value={(formData as any).opd_footfall_female_current_month} onChange={(key: string, val: string) => {
+                handleChange(key, val);
+                const m = Number((formData as any).opd_footfall_male_current_month) || 0;
+                const f = Number(val) || 0;
+                const o = Number((formData as any).opd_footfall_other_current_month) || 0;
+                handleChange('opd_footfall_current_month', m + f + o);
+              }} disabled={disabled} />
+
+              <NumberField label="No. of Other Footfall — Current Month" fieldKey="opd_footfall_other_current_month" value={(formData as any).opd_footfall_other_current_month} onChange={(key: string, val: string) => {
+                handleChange(key, val);
+                const m = Number((formData as any).opd_footfall_male_current_month) || 0;
+                const f = Number((formData as any).opd_footfall_female_current_month) || 0;
+                const o = Number(val) || 0;
+                handleChange('opd_footfall_current_month', m + f + o);
+              }} disabled={disabled} />
+
+              {/* Total Footfall — auto-calculated */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-700">No. of Footfall — Current Month (Auto Total)</span>
+                <span className="text-lg font-bold text-emerald-700">
+                  {(Number((formData as any).opd_footfall_male_current_month) || 0) +
+                   (Number((formData as any).opd_footfall_female_current_month) || 0) +
+                   (Number((formData as any).opd_footfall_other_current_month) || 0)}
+                </span>
+              </div>
+
+              {/* Male Cumulative */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-700">Male Footfall — Cumulative (FY {financialYear})</span>
+                <span className="text-lg font-bold text-blue-700">{getCumulative('opd_footfall_male_current_month').toLocaleString('en-IN')}</span>
+              </div>
+
+              {/* Female Cumulative */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-700">Female Footfall — Cumulative (FY {financialYear})</span>
+                <span className="text-lg font-bold text-blue-700">{getCumulative('opd_footfall_female_current_month').toLocaleString('en-IN')}</span>
+              </div>
+
+              {/* Other Cumulative */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-700">Other Footfall — Cumulative (FY {financialYear})</span>
+                <span className="text-lg font-bold text-blue-700">{getCumulative('opd_footfall_other_current_month').toLocaleString('en-IN')}</span>
+              </div>
+
+              {/* Total Cumulative */}
               <div className="md:col-span-2">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-blue-700">No. of Footfall — Cumulative (FY {financialYear})</span>
@@ -912,7 +970,10 @@ function AdminView({ session }: any) {
       'Training of Yoga Instructors Completed', 'No. of Yoga Instructors Trained',
       'Training of ASHAs/ANMs Completed', 'No. of ASHAs Trained', 'No. of ANMs Trained',
       // Section 4: OPD
-      'OPD Started', 'OPD Footfall - Current Month', 'OPD Footfall - Cumulative',
+      'OPD Started',
+      'OPD Male Footfall - Current Month', 'OPD Female Footfall - Current Month', 'OPD Other Footfall - Current Month',
+      'OPD Total Footfall - Current Month', 'OPD Footfall - Cumulative',
+      'OPD Male Footfall - Cumulative', 'OPD Female Footfall - Cumulative', 'OPD Other Footfall - Cumulative',
       'Medicines Distributed - Current Month', 'Medicines Distributed - Cumulative',
       // Section 5: Stage-I
       'Lab Services Available', 'Laptop/Desktop Purchased',
@@ -962,7 +1023,9 @@ function AdminView({ session }: any) {
       f.asha_anm_training_completed, f.ashas_trained || '', f.anms_trained || '',
       // Section 4
       f.opd_started,
+      f.opd_footfall_male_current_month || '', f.opd_footfall_female_current_month || '', f.opd_footfall_other_current_month || '',
       f.opd_footfall_current_month || '', f.opd_footfall_cumulative || '',
+      f.opd_footfall_male_cumulative || '', f.opd_footfall_female_cumulative || '', f.opd_footfall_other_cumulative || '',
       f.medicines_distributed_current_month || '', f.medicines_distributed_cumulative || '',
       // Section 5
       f.lab_services_available, f.laptop_desktop_purchased,
