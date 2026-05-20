@@ -131,7 +131,7 @@ export default function AdminTools({ session, setActiveTab, onAddMedicine }: Adm
       description: 'Add new medicine records to the central inventory.',
       icon: Plus,
       color: 'emerald',
-      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN'
+      show: session.role === 'SUPER_ADMIN' || session.role === 'STATE_ADMIN',
       action: () => onAddMedicine()
     },
     {
