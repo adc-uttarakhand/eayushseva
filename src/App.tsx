@@ -34,6 +34,7 @@ import TransferRequests from './components/TransferRequests';
 import TransferModule from './components/TransferModule';
 import AdminTransferList from './components/AdminTransferList';
 import Sthananataran from './components/Sthananataran';
+import IncentiveCalculator from './components/IncentiveCalculator';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
@@ -1614,6 +1615,11 @@ export default function App() {
         {activeTab === 'id_card' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
           <motion.div key="id_card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <EmployeeIDCard session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'incentive' && (session?.role === 'SUPER_ADMIN' || session?.role === 'STATE_ADMIN' || session?.role === 'DISTRICT_ADMIN') && (
+          <motion.div key="incentive" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <IncentiveCalculator session={session} />
           </motion.div>
         )}
         {activeTab === 'registrations' && (
