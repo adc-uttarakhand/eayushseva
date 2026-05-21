@@ -2,7 +2,7 @@ import Profiler from './Profiler';
 import React, { useState, useEffect, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun, Stethoscope, Radio, Flag, Scale } from 'lucide-react';
+import { LayoutDashboard, User, Users, Activity, FileText, Package, Plus, Save, UserCircle2, X, Check, Edit2, Shield, Building2, MapPin, Star, Eye, EyeOff, Upload, Calendar, Hash, Mail, Map, Droplets, Camera, Loader2, Search, ClipboardList, Truck, CheckCircle, Trash2, Hand, Sun, Stethoscope, Radio, Flag, Scale, Calculator } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import imageCompression from 'browser-image-compression';
 import PostingDeleteConfirmationModal from './PostingDeleteConfirmationModal';
@@ -28,6 +28,7 @@ import RapidTests from './RapidTests';
 import SpecialTherapyModule from './SpecialTherapyModule';
 import CertificateModule from './CertificateModule';
 import Sthananataran from './Sthananataran';
+import IncentiveCalculator from './IncentiveCalculator';
 
 interface DoctorCommandCenterProps {
   session: any;
@@ -171,8 +172,8 @@ const EXPERTISE_KEYWORDS = [
 ];
 
 export default function DoctorCommandCenter({ session, hospitalName, hospitals = [], onOpenEParchi, onEditHospital, onUpdateHospital, hospitalDetails, onHospitalProfileDirtyChange }: DoctorCommandCenterProps) {
-  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card'>('dashboard');
-  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card') => {
+  const [activeTab, _setActiveTab] = useState<'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'incentive' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card'>('dashboard');
+  const setActiveTab = (newTab: 'dashboard' | 'profile' | 'deep_profile' | 'hospital_profile' | 'staff' | 'patients' | 'eparchi' | 'inventory' | 'medicine_demand' | 'district_supply' | 'role_management' | 'doctor_feedback' | 'panchakarma' | 'yoga' | 'rapid_tests' | 'special_therapy' | 'certificate' | 'sthananataran' | 'incentive' | 'live' | 'events' | 'form1' | 'prakriti' | 'id_card') => {
     if (isDirty && activeTab === 'profile' && newTab !== 'profile') {
       setPendingTab(newTab);
       setIsUnsavedChangesModalOpen(true);
@@ -1890,6 +1891,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <FileText size={16} /> {activeTab === 'certificate' && 'Cert'}
               </button>
             )}
+            <button onClick={() => setActiveTab('incentive')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'incentive' ? 'bg-emerald-100 text-emerald-900' : 'text-slate-600'}`}>
+              <Calculator size={16} /> Incentive
+            </button>
             <button onClick={() => setActiveTab('live')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-bold text-[10px] transition-all whitespace-nowrap ${activeTab === 'live' ? 'bg-red-100 text-red-900' : 'text-slate-600'}`}>
               <Radio size={16} /> {activeTab === 'live' && 'Live'}
             </button>
@@ -2034,6 +2038,9 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
                 <FileText size={18} /> {activeTab === 'certificate' && 'Certificate Module'}
               </button>
             )}
+            <button onClick={() => setActiveTab('incentive')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'incentive' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <Calculator size={18} /> {activeTab === 'incentive' && 'Incentive Calculator'}
+            </button>
             <button onClick={() => setActiveTab('live')} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'live' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Radio size={18} /> {activeTab === 'live' && 'Live Streams'}
             </button>
@@ -2617,6 +2624,11 @@ export default function DoctorCommandCenter({ session, hospitalName, hospitals =
         {activeTab === 'certificate' && (
           <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
             <CertificateModule session={session} hospitalName={hospitalName} />
+          </div>
+        )}
+        {activeTab === 'incentive' && (
+          <div className="bg-white rounded-3xl p-2 sm:p-4 md:p-8 shadow-sm border border-gray-100">
+            <IncentiveCalculator session={session} />
           </div>
         )}
         {activeTab === 'live' && (
