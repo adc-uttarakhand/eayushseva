@@ -210,6 +210,19 @@
   }
 
   /* Video */
+  .streams-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* 2 streams side by side on wider screens */
+  @media (min-width: 800px) {
+    .streams-grid.multi {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
   .video-container {
     position: relative;
     padding-bottom: 56.25%;
@@ -437,6 +450,8 @@ function renderStreams(streams) {
   } else {
     // Live streams
     if (live.length > 0) {
+      const isMulti = live.length > 1;
+      html += `<div class="streams-grid ${isMulti ? 'multi' : ''}">`;
       live.forEach(stream => {
         const ytId = extractYtId(stream.youtube_url);
         const embedUrl = ytId ? `https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0` : null;
@@ -464,6 +479,7 @@ function renderStreams(streams) {
             </div>
           </div>`;
       });
+      html += `</div>`;
     }
 
     // Upcoming streams
@@ -498,6 +514,7 @@ function renderStreams(streams) {
   document.getElementById('content').innerHTML = html;
 }
 
+let lastStreamIds = '';
 let lastRefresh = Date.now();
 
 async function fetchStreams() {
@@ -507,7 +524,17 @@ async function fetchStreams() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    renderStreams(data || []);
+    const streams = data || [];
+
+    // Build a signature of current streams — id + is_active + scheduled_at
+    const newIds = streams.map(s => `${s.id}:${s.is_active}:${s.scheduled_at}`).join('|');
+
+    // Only re-render if something actually changed
+    if (newIds !== lastStreamIds) {
+      lastStreamIds = newIds;
+      renderStreams(streams);
+    }
+
     lastRefresh = Date.now();
   } catch (err) {
     console.error('Error fetching streams:', err);
