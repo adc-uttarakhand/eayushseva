@@ -406,6 +406,23 @@ function extractYtId(url) {
   return m ? m[1] : null;
 }
 
+function getUrlType(url) {
+  if (!url) return 'other';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) return 'teams';
+  if (url.includes('meet.google.com')) return 'meet';
+  if (url.includes('zoom.us')) return 'zoom';
+  return 'other';
+}
+
+function getMeetingBtn(url) {
+  const type = getUrlType(url);
+  if (type === 'teams') return { label: 'Join on Microsoft Teams', color: '#5059C9', icon: '🟦' };
+  if (type === 'meet') return { label: 'Join on Google Meet', color: '#1E8E3E', icon: '🟢' };
+  if (type === 'zoom') return { label: 'Join on Zoom', color: '#2D8CFF', icon: '🔵' };
+  return { label: 'Join Meeting', color: '#64748b', icon: '🔗' };
+}
+
 function formatDateTime(dt) {
   return new Date(dt).toLocaleString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short',
@@ -442,8 +459,12 @@ function renderStreams(streams) {
       <div class="no-stream">
         <div class="no-stream-icon">📡</div>
         <h2>No live stream at the moment</h2>
-        <p>When a live session starts, it will appear here automatically.</p>
-        <div class="refresh-badge">
+        <p>Visit our YouTube channel to watch live sessions</p>
+        <a href="https://www.youtube.com/@ukdirayurved" target="_blank"
+          style="display:inline-flex;align-items:center;gap:8px;background:#ef4444;color:white;font-weight:700;font-size:13px;padding:12px 24px;border-radius:12px;text-decoration:none;margin-top:16px;">
+          ▶ Watch on YouTube @ukdirayurved
+        </a>
+        <div class="refresh-badge" style="margin-top:12px;">
           <span>🔄</span> Auto-refreshes every 30 seconds
         </div>
       </div>`;
@@ -454,7 +475,42 @@ function renderStreams(streams) {
       html += `<div class="streams-grid ${isMulti ? 'multi' : ''}">`;
       live.forEach(stream => {
         const ytId = extractYtId(stream.youtube_url);
+        const urlType = getUrlType(stream.youtube_url);
+        const isDeptChannel = stream.youtube_url === 'https://www.youtube.com/@ukdirayurved';
         const embedUrl = ytId ? `https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0` : null;
+        const meetBtn = getMeetingBtn(stream.youtube_url);
+
+        let streamContent = '';
+        if (isDeptChannel) {
+          streamContent = `
+            <div style="padding:48px 20px;text-align:center;background:#f0fdf4;border-bottom:1px solid #bbf7d0;">
+              <p style="font-size:48px;margin-bottom:12px;">📺</p>
+              <p style="color:#166534;font-size:15px;font-weight:700;margin-bottom:6px;">${stream.title}</p>
+              ${stream.description ? `<p style="color:#4b7c5a;font-size:13px;margin-bottom:20px;">${stream.description}</p>` : ''}
+              <a href="https://www.youtube.com/@ukdirayurved" target="_blank"
+                style="display:inline-flex;align-items:center;gap:8px;background:#ef4444;color:white;font-weight:700;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;">
+                ▶ Watch Live on YouTube
+              </a>
+              <p style="color:#86a893;font-size:11px;margin-top:12px;">youtube.com/@ukdirayurved</p>
+            </div>`;
+        } else if (urlType === 'youtube' && embedUrl) {
+          streamContent = `
+            <div class="video-container">
+              <iframe src="${embedUrl}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+            </div>`;
+        } else {
+          streamContent = `
+            <div style="padding:48px 20px;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+              <p style="font-size:48px;margin-bottom:12px;">${meetBtn.icon}</p>
+              <p style="color:#475569;font-size:14px;font-weight:600;margin-bottom:20px;">${stream.title}</p>
+              <a href="${stream.youtube_url}" target="_blank"
+                style="display:inline-block;background:${meetBtn.color};color:white;font-weight:700;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;">
+                ${meetBtn.label}
+              </a>
+            </div>`;
+        }
 
         html += `
           <div class="stream-card live">
@@ -462,19 +518,12 @@ function renderStreams(streams) {
               <div class="live-badge"><span></span><p>Live Now</p></div>
               <span class="stream-title">${stream.title}</span>
             </div>
-            ${embedUrl ? `
-            <div class="video-container">
-              <iframe src="${embedUrl}"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen></iframe>
-            </div>` : `
-            <div style="padding:40px;text-align:center;background:#fee2e2;color:#ef4444;">
-              Invalid YouTube URL
-            </div>`}
+            ${streamContent}
             <div class="stream-footer">
-              ${stream.description ? `<p class="stream-description">${stream.description}</p>` : '<span></span>'}
-              <a href="${stream.youtube_url}" target="_blank" class="yt-link">
-                ▶ Open on YouTube
+              ${stream.description && !isDeptChannel ? `<p class="stream-description">${stream.description}</p>` : '<span></span>'}
+              <a href="${stream.youtube_url}" target="_blank" class="yt-link"
+                style="background:${isDeptChannel || urlType === 'youtube' ? '#ef4444' : meetBtn.color}">
+                ↗ Open in browser
               </a>
             </div>
           </div>`;
