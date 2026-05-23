@@ -36,6 +36,27 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+function getUrlType(url: string): 'youtube' | 'teams' | 'meet' | 'zoom' | 'other' {
+  if (!url) return 'other';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) return 'teams';
+  if (url.includes('meet.google.com')) return 'meet';
+  if (url.includes('zoom.us') || url.includes('zoom.com')) return 'zoom';
+  return 'other';
+}
+
+function isExternalMeeting(url: string): boolean {
+  return ['teams', 'meet', 'zoom', 'other'].includes(getUrlType(url));
+}
+
+function getMeetingLabel(url: string): { label: string; color: string; bg: string; icon: string } {
+  const type = getUrlType(url);
+  if (type === 'teams') return { label: 'Join on Teams', color: '#5059C9', bg: '#EEF0FB', icon: '🟦' };
+  if (type === 'meet') return { label: 'Join on Meet', color: '#1E8E3E', bg: '#E6F4EA', icon: '🟢' };
+  if (type === 'zoom') return { label: 'Join on Zoom', color: '#2D8CFF', bg: '#E8F3FF', icon: '🔵' };
+  return { label: 'Join Meeting', color: '#64748b', bg: '#f1f5f9', icon: '🔗' };
+}
+
 function getEmbedUrl(url: string): string | null {
   const id = extractYouTubeId(url);
   return id ? `https://www.youtube.com/embed/${id}?rel=0` : null;
@@ -190,7 +211,7 @@ export default function LiveStream({ session }: LiveStreamProps) {
     if (live.length > 0 && activeTab !== 'live') setActiveTab('live');
   }, [streams]);
 
-  const resetForm = () => { setForm({ title: '', youtube_url: '', description: '', scheduled_at: '', is_active: false }); setEditingStream(null); setError(''); };
+  const resetForm = () => { setForm({ title: '', youtube_url: '', description: '', scheduled_at: '', is_active: false, stream_source: '' }); setEditingStream(null); setError(''); };
 
   const handleEdit = (stream: LiveStream) => {
     setEditingStream(stream);
@@ -201,8 +222,8 @@ export default function LiveStream({ session }: LiveStreamProps) {
   const handleSave = async () => {
     setError('');
     if (!form.title.trim()) { setError('Title zaroori hai'); return; }
-    if (!form.youtube_url.trim()) { setError('YouTube URL zaroori hai'); return; }
-    if (!extractYouTubeId(form.youtube_url)) { setError('Valid YouTube URL dalo'); return; }
+    if (!form.youtube_url.trim()) { setError('Meeting URL zaroori hai'); return; }
+    if (!extractYouTubeId(form.youtube_url) && !form.youtube_url.startsWith('http')) { setError('Valid URL dalo'); return; }
     setSaving(true);
     try {
       const payload = { title: form.title.trim(), youtube_url: form.youtube_url.trim(), description: form.description.trim() || null, scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null, is_active: form.is_active, created_by: session?.name || session?.id };
@@ -296,8 +317,12 @@ export default function LiveStream({ session }: LiveStreamProps) {
                 <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Radio size={28} className="text-red-200" />
                 </div>
-                <h3 className="font-semibold text-slate-500">Abhi koi live stream nahi hai</h3>
-                <p className="text-slate-400 text-sm mt-1">Jab admin live shuru karega, yahan aayega</p>
+                <h3 className="font-semibold text-slate-500">No live stream at the moment</h3>
+                <p className="text-slate-400 text-sm mt-1">Check our YouTube channel for live sessions</p>
+                <a href="https://www.youtube.com/@ukdirayurved" target="_blank" rel="noopener noreferrer"
+                  className="mt-4 flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-red-700 transition-colors shadow-md shadow-red-200 mx-auto w-fit">
+                  <Youtube size={18} />Watch on YouTube
+                </a>
                 {upcoming.length > 0 && (
                   <button onClick={() => setActiveTab('upcoming')}
                     className="mt-4 text-orange-600 text-sm font-semibold flex items-center gap-1 mx-auto hover:underline">
@@ -327,14 +352,32 @@ export default function LiveStream({ session }: LiveStreamProps) {
                         <h3 className="font-bold text-slate-800 text-xl mb-2">{stream.title}</h3>
                         {stream.description && <p className="text-slate-500 text-sm mb-4">{stream.description}</p>}
                         <div className="flex items-center gap-3 flex-wrap">
-                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                            onClick={() => setWatchingStream(stream)}
-                            className="flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-colors shadow-md shadow-red-200">
-                            <Play size={16} />Abhi Dekho
-                          </motion.button>
+                          {stream.youtube_url === 'https://www.youtube.com/@ukdirayurved' ? (
+                            <a href="https://www.youtube.com/@ukdirayurved" target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-colors shadow-md shadow-red-200">
+                              <Play size={16} />Watch on YouTube
+                            </a>
+                          ) : isExternalMeeting(stream.youtube_url) ? (
+                            (() => {
+                              const m = getMeetingLabel(stream.youtube_url);
+                              return (
+                                <a href={stream.youtube_url} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all hover:opacity-90"
+                                  style={{ backgroundColor: m.color, color: 'white' }}>
+                                  <span>{m.icon}</span>{m.label}
+                                </a>
+                              );
+                            })()
+                          ) : (
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                              onClick={() => setWatchingStream(stream)}
+                              className="flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-colors shadow-md shadow-red-200">
+                              <Play size={16} />Abhi Dekho
+                            </motion.button>
+                          )}
                           <a href={stream.youtube_url} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 text-slate-500 text-sm hover:text-slate-700 transition-colors">
-                            <Youtube size={16} />YouTube pe <ExternalLink size={12} />
+                            <ExternalLink size={14} />Open in browser
                           </a>
                           {isAdminUser(session) && (
                             <>
@@ -458,15 +501,86 @@ export default function LiveStream({ session }: LiveStreamProps) {
                       className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400" />
                   </div>
                   <div>
+                {/* Stream Source Selection */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Stream Source *</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { key: 'dept', label: '🏛️ Department Channel', desc: 'Live on @ukdirayurved — staff ko seedha dikhega', color: 'emerald' },
+                      { key: 'personal', label: '📺 Apna YouTube Link', desc: 'Kisi bhi YouTube live ka link paste karo', color: 'red' },
+                      { key: 'meeting', label: '💻 Meeting Link', desc: 'Teams / Google Meet / Zoom / Jio Meet', color: 'blue' },
+                    ].map(opt => (
+                      <button key={opt.key} type="button"
+                        onClick={() => {
+                          setForm(f => ({
+                            ...f,
+                            stream_source: opt.key,
+                            youtube_url: opt.key === 'dept' ? 'https://www.youtube.com/@ukdirayurved' : ''
+                          }));
+                        }}
+                        className={`text-left p-3 rounded-xl border-2 transition-all ${
+                          form.stream_source === opt.key
+                            ? opt.color === 'emerald' ? 'border-emerald-500 bg-emerald-50'
+                              : opt.color === 'red' ? 'border-red-400 bg-red-50'
+                              : 'border-blue-400 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+                        }`}>
+                        <p className={`text-sm font-bold ${
+                          form.stream_source === opt.key
+                            ? opt.color === 'emerald' ? 'text-emerald-700'
+                              : opt.color === 'red' ? 'text-red-700'
+                              : 'text-blue-700'
+                            : 'text-slate-600'
+                        }`}>{opt.label}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* URL Field — based on source */}
+                {form.stream_source === 'dept' && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                    <CheckCircle size={18} className="text-emerald-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-emerald-700 font-bold text-sm">Department Channel Selected</p>
+                      <p className="text-emerald-600 text-xs">youtube.com/@ukdirayurved — Staff ko channel pe redirect hoga</p>
+                    </div>
+                  </div>
+                )}
+
+                {form.stream_source === 'personal' && (
+                  <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">YouTube Live URL *</label>
-                    <input type="url" value={form.youtube_url} onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
+                    <input type="url" value={form.youtube_url}
+                      onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
                       placeholder="https://youtube.com/live/xxxx ya https://youtu.be/xxxx"
                       className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 font-mono" />
                     {form.youtube_url && (
                       <p className={`text-xs mt-1 ${extractYouTubeId(form.youtube_url) ? 'text-green-600' : 'text-red-500'}`}>
-                        {extractYouTubeId(form.youtube_url) ? '✅ Valid YouTube URL' : '❌ Valid nahi — youtube.com/live/... ya youtu.be/... dalo'}
+                        {extractYouTubeId(form.youtube_url) ? '✅ Valid YouTube URL — app mein embedded player dikhega' : '❌ Valid YouTube URL nahi'}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {form.stream_source === 'meeting' && (
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Meeting Link *</label>
+                    <input type="url" value={form.youtube_url}
+                      onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
+                      placeholder="Teams / Google Meet / Zoom / Jio Meet link"
+                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono" />
+                    {form.youtube_url && (
+                      <div className="mt-1 text-xs">
+                        {getUrlType(form.youtube_url) === 'teams' && <p className="text-blue-600">🟦 Microsoft Teams — "Join on Teams" button dikhega</p>}
+                        {getUrlType(form.youtube_url) === 'meet' && <p className="text-green-600">🟢 Google Meet — "Join on Meet" button dikhega</p>}
+                        {getUrlType(form.youtube_url) === 'zoom' && <p className="text-blue-600">🔵 Zoom — "Join on Zoom" button dikhega</p>}
+                        {getUrlType(form.youtube_url) === 'other' && form.youtube_url.startsWith('http') && <p className="text-slate-500">🔗 Meeting link — "Join Meeting" button dikhega</p>}
+                      </div>
+                    )}
+                  </div>
+                )}
                   </div>
                   <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Description (Optional)</label>
