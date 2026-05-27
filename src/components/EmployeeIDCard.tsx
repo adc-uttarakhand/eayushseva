@@ -7,6 +7,7 @@ import {
   Droplets, Hash, Search, Filter, RefreshCw, QrCode, ScanLine, X
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 import { supabase } from '../lib/supabase';
 
@@ -83,7 +84,7 @@ async function downloadIDCardAsPDF(staff: StaffData, request: IDCardRequest, sig
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [54, 86] });
 
   const validFrom = request?.approved_at?.split('T')[0] || request?.valid_from || new Date().toISOString().split('T')[0];
-  const cardId = request?.card_number || (request?.id ? `UK-AYUSH-${new Date().getFullYear()}-${request.id.slice(0, 5).toUpperCase()}` : 'PENDING');
+  const cardId = request?.card_number || `UK-AYUSH-${new Date().getFullYear()}-XXXXX`;
 
   const validTillDate = () => {
     const d = new Date(validFrom);
@@ -261,38 +262,37 @@ async function downloadIDCardAsPDF(staff: StaffData, request: IDCardRequest, sig
   pdf.text(displayCardId, 51, validY + 5.8, { align: 'right' });
 
   // ── SIGNATURE + QR ────────────────────────────────────────────────────────
-  const sigY = validY + 11;
+  const sigY = validY + 8.5;
 
   // Employee sign
   pdf.setDrawColor(...slateBorder);
   pdf.setLineWidth(0.3);
-  pdf.line(2, sigY + 5, 14, sigY + 5);
+  pdf.line(2, sigY + 4, 13, sigY + 4);
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(3.5); pdf.setTextColor(...textLight);
-  pdf.text('Employee Sign', 8, sigY + 6.5, { align: 'center' });
+  pdf.text('Employee Sign', 7.5, sigY + 5.5, { align: 'center' });
 
-  // QR code — 10x10mm
+  // QR code — 9x9mm
   const qrCanvas = document.createElement('canvas');
   qrCanvas.width = 120; qrCanvas.height = 120;
-  const QRCode = await import('qrcode');
   const qrDataStr = JSON.stringify({ id: displayCardId, name: staff.full_name, emp: staff.employee_id || '', role: staff.role });
   await QRCode.toCanvas(qrCanvas, qrDataStr, { width: 120, margin: 1, color: { dark: '#064e3b', light: '#ffffff' } });
   const qrB64 = qrCanvas.toDataURL('image/png');
-  pdf.addImage(qrB64, 'PNG', 22, sigY - 1, 10, 10);
+  pdf.addImage(qrB64, 'PNG', 21, sigY - 0.5, 9, 9);
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(3.5); pdf.setTextColor(...textLight);
-  pdf.text('Scan to verify', 27, sigY + 10.5, { align: 'center' });
+  pdf.text('Scan to verify', 25.5, sigY + 9.5, { align: 'center' });
 
   // Auth signatory
   if (signatureUrl) {
     const sigB64 = await toBase64(signatureUrl);
     if (sigB64) pdf.addImage(sigB64, 'PNG', 37, sigY - 1, 14, 6);
   } else {
-    pdf.line(37, sigY + 5, 51, sigY + 5);
+    pdf.line(37, sigY + 4, 51, sigY + 4);
   }
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(3.5); pdf.setTextColor(...textLight);
-  pdf.text('Auth. Signatory', 44, sigY + 7.5, { align: 'center' });
+  pdf.text('Auth. Signatory', 44, sigY + 7, { align: 'center' });
   if (request.approved_by) {
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(4); pdf.setTextColor(...darkGreen);
-    pdf.text(request.approved_by, 44, sigY + 9.5, { align: 'center' });
+    pdf.text(request.approved_by, 44, sigY + 9, { align: 'center' });
   }
 
   // ── FOOTER ────────────────────────────────────────────────────────────────
