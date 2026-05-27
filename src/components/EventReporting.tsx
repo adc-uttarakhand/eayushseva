@@ -127,8 +127,9 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
 
     setSaving(true);
     try {
-      // Get district — from session directly, or from present_district if field staff
-      const staffDistrict = session?.district ||
+      // Get district — try multiple sources
+      const reportDistrict =
+        session?.district ||
         session?.present_district ||
         session?.hospitalDistrict ||
         null;
@@ -140,7 +141,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
         reported_by_name: session?.name || session?.id,
         reported_by_id: session?.id,
         hospital_id: session?.hospitalId || session?.activeHospitalId || null,
-        district: staffDistrict,
+        district: reportDistrict,
         event_date: form.event_date,
         venue: form.venue.trim(),
         gps_location: form.gps_location.trim() || null,
