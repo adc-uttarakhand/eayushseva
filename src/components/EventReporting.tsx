@@ -127,6 +127,12 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
 
     setSaving(true);
     try {
+      // Get district — from session directly, or from present_district if field staff
+      const staffDistrict = session?.district ||
+        session?.present_district ||
+        session?.hospitalDistrict ||
+        null;
+
       await supabase.from('event_reports').insert({
         event_id: event.id,
         sub_event_id: subEvent?.id || null,
@@ -134,7 +140,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
         reported_by_name: session?.name || session?.id,
         reported_by_id: session?.id,
         hospital_id: session?.hospitalId || session?.activeHospitalId || null,
-        district: session?.district || null,
+        district: staffDistrict,
         event_date: form.event_date,
         venue: form.venue.trim(),
         gps_location: form.gps_location.trim() || null,
@@ -322,13 +328,32 @@ function EventCard({ event, subEvents, session, onReport, onEdit, onDelete, onAd
             )}
 
             {/* Actions */}
-            <div className="flex items-center gap-1">
-              {canReportMain && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {/* Single event — direct report button */}
+              {canReportMain && event.event_type === 'single' && (
                 <button onClick={() => onReport(event, null)}
                   className="flex items-center gap-1 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors">
                   <Plus size={12} />Report
                 </button>
               )}
+              {/* Multi event — show sub-event buttons directly */}
+              {event.event_type === 'multi' && event.is_active && myEventSubEvents
+                .filter((s: SubEvent) => s.reporting_level?.includes(userLevel))
+                .map((sub: SubEvent) => (
+                  <button key={sub.id} onClick={() => onReport(event, sub)}
+                    className="flex items-center gap-1 text-xs bg-purple-600 text-white px-2.5 py-1.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+                    <Plus size={11} />{sub.title.slice(0, 14)}{sub.title.length > 14 ? '…' : ''}
+                  </button>
+                ))}
+              {/* Fallback — single event but no main access, try sub events */}
+              {!canReportMain && event.event_type === 'single' && myEventSubEvents
+                .filter((s: SubEvent) => event.is_active && s.reporting_level?.includes(userLevel))
+                .map((sub: SubEvent) => (
+                  <button key={sub.id} onClick={() => onReport(event, sub)}
+                    className="flex items-center gap-1 text-xs bg-purple-600 text-white px-2.5 py-1.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+                    <Plus size={11} />{sub.title.slice(0, 14)}{sub.title.length > 14 ? '…' : ''}
+                  </button>
+                ))}
               {canManage && (
                 <>
                   <button onClick={() => onAddSub(event)}
@@ -703,6 +728,326 @@ function EventFormModal({ editing, parentEvent, existingSubEvents, onSave, onCan
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+// ── Event Dashboard Component ─────────────────────────────────────────────────
+function EventDashboard({ events, subEvents, reports, session }: {
+  events: Event[]; subEvents: SubEvent[]; reports: EventReport[]; session: any;
+}) {
+  const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  const [selectedSubEvent, setSelectedSubEvent] = useState<string>('all');
+
+  const DISTRICTS = [
+    'Dehradun','Haridwar','Pauri','Tehri','Uttarkashi','Chamoli','Rudraprayag',
+    'Almora','Nainital','Bageshwar','Pithoragarh','Champawat','US Nagar'
+  ];
+
+  // Sub-events for selected event
+  const availableSubEvents = selectedEvent === 'all'
+    ? subEvents
+    : subEvents.filter(s => s.event_id === selectedEvent);
+
+  // Reset sub-event filter when event changes
+  const handleEventChange = (val: string) => {
+    setSelectedEvent(val);
+    setSelectedSubEvent('all');
+  };
+
+  // Filter reports by event + sub-event
+  const filteredReports = reports.filter(r => {
+    if (selectedEvent !== 'all' && r.event_id !== selectedEvent) return false;
+    if (selectedSubEvent !== 'all') {
+      if (selectedSubEvent === 'main_only') return !r.sub_event_id;
+      return r.sub_event_id === selectedSubEvent;
+    }
+    return true;
+  });
+
+  // Total participants
+  const totalParticipants = filteredReports.reduce((s, r) => s + (r.participants_total || 0), 0);
+  const totalReports = filteredReports.length;
+
+  // Normalize district name for matching
+  const normalizeDistrict = (d?: string) => (d || '').toLowerCase().trim()
+    .replace('us nagar', 'us nagar')
+    .replace('u.s. nagar', 'us nagar')
+    .replace('udham singh nagar', 'us nagar');
+
+  const districtsReported = new Set(
+    filteredReports.map(r => normalizeDistrict(r.district)).filter(Boolean)
+  ).size;
+
+  // District-wise participation — case insensitive
+  const districtData = DISTRICTS.map(district => {
+    const normDistrict = normalizeDistrict(district);
+    const distReports = filteredReports.filter(r => normalizeDistrict(r.district) === normDistrict);
+    const total = distReports.reduce((s, r) => s + (r.participants_total || 0), 0);
+    return { district, total, count: distReports.length };
+  }).filter(d => d.total > 0).sort((a, b) => b.total - a.total);
+
+  // No district reports
+  const noDistrictReports = filteredReports.filter(r => !r.district?.trim());
+  const noDistrictTotal = noDistrictReports.reduce((s, r) => s + (r.participants_total || 0), 0);
+
+  const maxDistrict = districtData[0]?.total || 1;
+
+  // Event-wise participation
+  const eventData = events.map(ev => {
+    const evReports = filteredReports.filter(r => r.event_id === ev.id);
+    const total = evReports.reduce((s, r) => s + (r.participants_total || 0), 0);
+    const evSubEvents = subEvents.filter(s => s.event_id === ev.id);
+    return { event: ev, total, count: evReports.length, subCount: evSubEvents.length };
+  }).filter(e => e.total > 0 || selectedEvent === 'all').sort((a, b) => b.total - a.total);
+
+  // Sub-event breakdown for selected event
+  const subEventData = selectedEvent !== 'all'
+    ? subEvents.filter(s => s.event_id === selectedEvent).map(sub => {
+        const subReps = reports.filter(r => r.sub_event_id === sub.id);
+        const total = subReps.reduce((s, r) => s + (r.participants_total || 0), 0);
+        return { sub, total, count: subReps.length };
+      }).sort((a, b) => b.total - a.total)
+    : [];
+
+  // District × Event matrix
+  const matrixEvents = selectedEvent === 'all' ? events.slice(0, 5) : events.filter(e => e.id === selectedEvent);
+
+  return (
+    <div className="space-y-5">
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">Event:</label>
+            <select value={selectedEvent} onChange={e => handleEventChange(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1">
+              <option value="all">All Events</option>
+              {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+            </select>
+          </div>
+          {availableSubEvents.length > 0 && (
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <label className="text-xs font-bold uppercase tracking-wider text-purple-400 whitespace-nowrap">Sub-Event:</label>
+              <select value={selectedSubEvent} onChange={e => setSelectedSubEvent(e.target.value)}
+                className="border border-purple-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1 bg-purple-50">
+                <option value="all">All Sub-Events</option>
+                <option value="main_only">Main Event Only</option>
+                {availableSubEvents.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Total Participants', value: totalParticipants.toLocaleString('en-IN'), color: 'emerald', icon: '👥' },
+          { label: 'Reports Submitted', value: totalReports, color: 'blue', icon: '📋' },
+          { label: 'Districts Reported', value: `${districtsReported}/13`, color: 'purple', icon: '📍' },
+        ].map(card => (
+          <div key={card.label} className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-sm text-center`}>
+            <p className="text-2xl mb-1">{card.icon}</p>
+            <p className={`text-xl font-black text-${card.color}-600`}>{card.value}</p>
+            <p className="text-xs text-slate-400 mt-0.5 leading-tight">{card.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* District-wise Participation Bar Chart */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+          <BarChart3 size={16} className="text-emerald-600" />
+          <h3 className="font-bold text-slate-800 text-sm">District-wise Participation</h3>
+        </div>
+        <div className="p-5">
+          {districtData.length === 0 && noDistrictTotal === 0 ? (
+            <p className="text-slate-400 text-sm text-center py-4">No data yet</p>
+          ) : (
+            <div className="space-y-2.5">
+              {districtData.map((d, i) => (
+                <div key={d.district}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-slate-600 w-28 flex-shrink-0">
+                      {i === 0 && <span className="text-yellow-500 mr-1">🏆</span>}
+                      {d.district}
+                    </span>
+                    <div className="flex-1 mx-3 h-5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500 flex items-center justify-end pr-2"
+                        style={{ width: `${Math.max((d.total / maxDistrict) * 100, 4)}%` }}>
+                        {d.total > maxDistrict * 0.2 && (
+                          <span className="text-white text-[9px] font-bold">{d.total.toLocaleString('en-IN')}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 w-16 text-right">
+                      {d.total.toLocaleString('en-IN')}
+                      <span className="text-slate-400 font-normal"> ({d.count})</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {noDistrictTotal > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-amber-600 w-28 flex-shrink-0">⚠️ District N/A</span>
+                    <div className="flex-1 mx-3 h-5 bg-amber-50 rounded-full overflow-hidden border border-amber-200">
+                      <div className="h-full rounded-full bg-amber-300"
+                        style={{ width: `${Math.max((noDistrictTotal / maxDistrict) * 100, 4)}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-amber-700 w-16 text-right">
+                      {noDistrictTotal.toLocaleString('en-IN')}
+                      <span className="text-amber-500 font-normal"> ({noDistrictReports.length})</span>
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-amber-500 ml-28">These reports have no district set — ask staff to re-submit</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Event-wise Participation */}
+      {selectedEvent === 'all' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <Flag size={16} className="text-blue-600" />
+            <h3 className="font-bold text-slate-800 text-sm">Event-wise Participation</h3>
+          </div>
+          <div className="p-5 space-y-3">
+            {eventData.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center py-4">No data yet</p>
+            ) : eventData.map(({ event, total, count }) => {
+              const maxEv = eventData[0]?.total || 1;
+              return (
+                <div key={event.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-slate-600 flex-1 mr-2 truncate">{event.title}</span>
+                    <span className="text-xs font-bold text-blue-700">{total.toLocaleString('en-IN')} <span className="text-slate-400 font-normal">({count} reports)</span></span>
+                  </div>
+                  <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400"
+                      style={{ width: `${Math.max((total / maxEv) * 100, 2)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-event breakdown */}
+      {selectedEvent !== 'all' && subEventData.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <Flag size={16} className="text-purple-600" />
+            <h3 className="font-bold text-slate-800 text-sm">Sub-event Breakdown</h3>
+          </div>
+          <div className="p-5 space-y-3">
+            {subEventData.map(({ sub, total, count }) => {
+              const maxSub = subEventData[0]?.total || 1;
+              return (
+                <div key={sub.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-slate-600 flex-1 mr-2 truncate">{sub.title}</span>
+                    <span className="text-xs font-bold text-purple-700">{total.toLocaleString('en-IN')} <span className="text-slate-400 font-normal">({count})</span></span>
+                  </div>
+                  <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-purple-400"
+                      style={{ width: `${Math.max((total / maxSub) * 100, 2)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* District Summary Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+          <Building2 size={16} className="text-orange-500" />
+          <h3 className="font-bold text-slate-800 text-sm">District-wise Summary</h3>
+          <span className="text-xs text-slate-400">
+            {selectedSubEvent !== 'all'
+              ? `— ${availableSubEvents.find(s => s.id === selectedSubEvent)?.title || 'Sub-Event'}`
+              : selectedEvent !== 'all'
+              ? `— ${events.find(e => e.id === selectedEvent)?.title || 'Event'}`
+              : '— All Events'}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="text-left px-4 py-3 font-bold text-slate-500">#</th>
+                <th className="text-left px-4 py-3 font-bold text-slate-500">District</th>
+                <th className="px-4 py-3 font-bold text-blue-500 text-center">Events/Sub-Events Reported</th>
+                <th className="px-4 py-3 font-bold text-purple-500 text-center">Reports</th>
+                <th className="px-4 py-3 font-bold text-emerald-600 text-center">Participants</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const normDist = (d?: string) => (d || '').toLowerCase().trim();
+                const rows = DISTRICTS.map(district => {
+                  const distReports = filteredReports.filter(r =>
+                    normDist(r.district) === normDist(district)
+                  );
+                  const participants = distReports.reduce((s, r) => s + (r.participants_total || 0), 0);
+                  const reportCount = distReports.length;
+                  // Unique events + sub-events reported
+                  const uniqueEvents = new Set([
+                    ...distReports.filter(r => !r.sub_event_id).map(r => r.event_id),
+                    ...distReports.filter(r => r.sub_event_id).map(r => r.sub_event_id),
+                  ]).size;
+                  return { district, participants, reportCount, uniqueEvents };
+                }).filter(r => r.participants > 0)
+                  .sort((a, b) => b.participants - a.participants);
+
+                if (rows.length === 0) return (
+                  <tr><td colSpan={5} className="text-center py-6 text-slate-400">No data yet</td></tr>
+                );
+
+                const maxP = rows[0]?.participants || 1;
+
+                return rows.map((row, i) => (
+                  <tr key={row.district} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                    <td className="px-4 py-3 text-slate-400 font-semibold">
+                      {i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.district}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full">
+                        {row.uniqueEvents}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="bg-purple-100 text-purple-700 font-bold px-3 py-1 rounded-full">
+                        {row.reportCount}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 justify-end">
+                        <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden max-w-[80px]">
+                          <div className="h-full rounded-full bg-emerald-400"
+                            style={{ width: `${Math.max((row.participants / maxP) * 100, 4)}%` }} />
+                        </div>
+                        <span className="font-black text-emerald-700 w-14 text-right">
+                          {row.participants.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EventReporting({ session }: { session: any }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
@@ -899,6 +1244,7 @@ export default function EventReporting({ session }: { session: any }) {
         <div className="flex gap-1.5 mb-6 bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm">
           {[
             { key: 'events', label: 'Events', icon: Flag },
+            { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { key: 'reports', label: 'All Reports', icon: ClipboardList },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveView(tab.key as any)}
@@ -938,6 +1284,11 @@ export default function EventReporting({ session }: { session: any }) {
               </div>
             )}
           </>
+        )}
+
+        {/* Dashboard View */}
+        {!loading && activeView === 'dashboard' && (
+          <EventDashboard events={events} subEvents={subEvents} reports={reports} session={session} />
         )}
 
         {/* Reports View */}
