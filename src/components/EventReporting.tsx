@@ -127,9 +127,8 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
 
     setSaving(true);
     try {
-      // Get district — try multiple sources
-      const reportDistrict =
-        session?.district ||
+      // Get district — from session directly, or from present_district if field staff
+      const staffDistrict = session?.district ||
         session?.present_district ||
         session?.hospitalDistrict ||
         null;
@@ -141,7 +140,7 @@ function ReportForm({ event, subEvent, session, onDone, onCancel }: any) {
         reported_by_name: session?.name || session?.id,
         reported_by_id: session?.id,
         hospital_id: session?.hospitalId || session?.activeHospitalId || null,
-        district: reportDistrict,
+        district: staffDistrict,
         event_date: form.event_date,
         venue: form.venue.trim(),
         gps_location: form.gps_location.trim() || null,
@@ -328,8 +327,8 @@ function EventCard({ event, subEvents, session, onReport, onEdit, onDelete, onAd
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex items-center gap-1 flex-wrap">
+            {/* Actions — admin icons only in header */}
+            <div className="flex items-center gap-1 flex-shrink-0">
               {/* Single event — direct report button */}
               {canReportMain && event.event_type === 'single' && (
                 <button onClick={() => onReport(event, null)}
@@ -337,24 +336,6 @@ function EventCard({ event, subEvents, session, onReport, onEdit, onDelete, onAd
                   <Plus size={12} />Report
                 </button>
               )}
-              {/* Multi event — show sub-event buttons directly */}
-              {event.event_type === 'multi' && event.is_active && myEventSubEvents
-                .filter((s: SubEvent) => s.reporting_level?.includes(userLevel))
-                .map((sub: SubEvent) => (
-                  <button key={sub.id} onClick={() => onReport(event, sub)}
-                    className="flex items-center gap-1 text-xs bg-purple-600 text-white px-2.5 py-1.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
-                    <Plus size={11} />{sub.title.slice(0, 14)}{sub.title.length > 14 ? '…' : ''}
-                  </button>
-                ))}
-              {/* Fallback — single event but no main access, try sub events */}
-              {!canReportMain && event.event_type === 'single' && myEventSubEvents
-                .filter((s: SubEvent) => event.is_active && s.reporting_level?.includes(userLevel))
-                .map((sub: SubEvent) => (
-                  <button key={sub.id} onClick={() => onReport(event, sub)}
-                    className="flex items-center gap-1 text-xs bg-purple-600 text-white px-2.5 py-1.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
-                    <Plus size={11} />{sub.title.slice(0, 14)}{sub.title.length > 14 ? '…' : ''}
-                  </button>
-                ))}
               {canManage && (
                 <>
                   <button onClick={() => onAddSub(event)}
@@ -378,6 +359,26 @@ function EventCard({ event, subEvents, session, onReport, onEdit, onDelete, onAd
             </div>
           </div>
         </div>
+
+        {/* Sub-event Report Buttons — grid layout */}
+        {event.is_active && myEventSubEvents.filter((s: SubEvent) =>
+          s.reporting_level?.includes(userLevel)
+        ).length > 0 && (
+          <div className="px-5 pb-4 border-t border-slate-100 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Report for Sub-Event:</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {myEventSubEvents
+                .filter((s: SubEvent) => s.reporting_level?.includes(userLevel))
+                .map((sub: SubEvent) => (
+                  <button key={sub.id} onClick={() => onReport(event, sub)}
+                    className="flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-2 rounded-xl font-semibold hover:bg-purple-700 transition-colors justify-center text-center leading-tight">
+                    <Plus size={11} className="flex-shrink-0" />
+                    <span className="truncate">{sub.title}</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Expanded: Sub Events + Reports */}
