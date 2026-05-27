@@ -952,8 +952,37 @@ function AdminView({ session }: any) {
       .eq('status', 'submitted')
       .order('submitted_at', { ascending: false });
 
-    if (isDistrictAdmin(session) && session?.district) {
-      query = query.eq('district', session.district);
+    if (isDistrictAdmin(session)) {
+      console.log("DEBUG: Admin ID:", session.id, "Session Object:", session);
+      // District multiple sources se try karo
+      let adminDistrict = session?.district ||
+        session?.present_district ||
+        session?.activeDistrict ||
+        session?.hospitalDistrict ||
+        (session?.access_districts && session.access_districts.length > 0 ? session.access_districts[0] : null);
+
+      // Agar session mein nahi mila to staff table se fetch karo
+      if (!adminDistrict && session?.id) {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('present_district, district, home_district')
+          .eq('id', session.id)
+          .maybeSingle();
+        console.log("DEBUG: Admin ID:", session.id, "Staff Table Data:", staffData);
+        adminDistrict = staffData?.present_district || staffData?.district || staffData?.home_district;
+      }
+
+      if (adminDistrict) {
+        const trimmedDistrict = adminDistrict.toString().trim();
+        console.log("DEBUG: Admin ID:", session.id, "Filtering by district (raw):", adminDistrict, "Trimmed:", trimmedDistrict);
+        query = query.ilike('district', `%${trimmedDistrict}%`);
+      } else {
+        console.log("DEBUG: Admin ID:", session.id, "No admin district found in session or staff table.");
+        // District nahi mila — koi bhi record mat dikhao
+        setForms([]);
+        setLoading(false);
+        return;
+      }
     }
     if (filterDistrict !== 'all') query = query.eq('district', filterDistrict);
     if (filterMonth !== 'all') query = query.eq('reporting_month', Number(filterMonth));
