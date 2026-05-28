@@ -28,8 +28,8 @@ interface IncentiveRecord {
   empanelment_actual?: number;
   ht_screening_actual?: number;
   dm_screening_actual?: number;
-  ht_followup_actual?: number;
-  dm_followup_actual?: number;
+  ht_followup_actual?: number;   // repurposed: HTN patients on AYUSH treatment (numerator)
+  dm_followup_actual?: number;   // repurposed: DM patients on AYUSH treatment (numerator)
   lifestyle_session_actual?: number;
   medicinal_plants_actual?: number;
   intersectoral_meetings_actual?: number;
@@ -49,42 +49,103 @@ interface IncentiveRecord {
   created_at: string;
 }
 
+interface IndicatorDef {
+  id: number;
+  key: string;
+  label: string;
+  targetFormula: (d: any) => number;
+  hint: string;
+  isProportional?: boolean;   // IND 6 & 7: ratio-based, not target-based
+  denominatorField?: string;  // base-param field used as denominator
+  denominatorLabel?: string;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June',
   'July','August','September','October','November','December'];
 
-const INDICATORS = [
-  { id: 1, key: 'opd', label: 'OPD (New + Old Patients)', targetField: 'opd_target',
-    targetFormula: (d: any) => Math.round((d.catchment_population || 0) * 0.10),
-    hint: '10% of catchment population per month' },
-  { id: 2, key: 'prakriti', label: 'Prakriti Pareekshan', targetField: 'prakriti_target',
-    targetFormula: (d: any) => Math.round((d.catchment_population || 0) * 0.025),
-    hint: '2.5% of catchment population per month' },
-  { id: 3, key: 'empanelment', label: 'Family Empanelment via ASHA', targetField: 'empanelment_target',
-    targetFormula: (d: any) => Math.round((d.total_families || 0) * 0.80),
-    hint: '80% of total families in catchment' },
-  { id: 4, key: 'ht_screening', label: 'HT Screening — New Patients (30+ yrs)', targetField: 'ht_screening_target',
-    targetFormula: (d: any) => Math.round((d.population_above_30 || 0) * 0.02),
-    hint: '2% of population above 30 years per month' },
-  { id: 5, key: 'dm_screening', label: 'DM Screening — New Patients (30+ yrs)', targetField: 'dm_screening_target',
-    targetFormula: (d: any) => Math.round((d.population_above_30 || 0) * 0.02),
-    hint: '2% of population above 30 years per month' },
-  { id: 6, key: 'ht_followup', label: 'HT Follow-up (Screened patients visiting for treatment/yoga)', targetField: 'ht_followup_target',
-    targetFormula: (d: any) => d.total_ht_patients || 0,
-    hint: 'All previously screened HT patients' },
-  { id: 7, key: 'dm_followup', label: 'DM Follow-up (Screened patients visiting for treatment/yoga)', targetField: 'dm_followup_target',
-    targetFormula: (d: any) => d.total_dm_patients || 0,
-    hint: 'All previously screened DM patients' },
-  { id: 8, key: 'lifestyle_session', label: '7-Day Lifestyle Modification Session (last 2 months, min 20 participants)', targetField: 'lifestyle_session_target',
-    targetFormula: (_: any) => 1,
-    hint: 'Minimum 1 session in last 2 months' },
-  { id: 9, key: 'medicinal_plants', label: 'Families Received Medicinal Plants this month', targetField: 'medicinal_plants_target',
-    targetFormula: (d: any) => Math.round((d.total_families || 0) * 0.02),
-    hint: '2% of total families per month' },
-  { id: 10, key: 'intersectoral_meetings', label: 'Intersectoral Meetings (public participated)', targetField: 'intersectoral_meetings_target',
-    targetFormula: (_: any) => 1,
-    hint: 'Minimum 1 meeting per month' },
+// ── UPDATED INDICATORS (all 10) ───────────────────────────────────────────────
+const INDICATORS: IndicatorDef[] = [
+  {
+    id: 1, key: 'opd',
+    label: 'OPD (New + Old Patients)',
+    targetFormula: (_: any) => 400,           // FIXED target: 400/month
+    hint: 'Fixed target: 400 OPD per month',
+  },
+  {
+    id: 2, key: 'prakriti',
+    label: 'Prakriti Pareekshan',
+    targetFormula: (_: any) => 100,           // FIXED target: 100/month
+    hint: 'Fixed target: 100 per month',
+  },
+  {
+    id: 3, key: 'empanelment',
+    label: 'Individual Empanelment',
+    targetFormula: (d: any) => Math.round((d.catchment_population || 0) * 0.08),  // 8% of catchment pop
+    hint: '8% of total catchment population',
+  },
+  {
+    id: 4, key: 'ht_screening',
+    label: 'HTN Screening — New Patients (30+ yrs)',
+    targetFormula: (d: any) => Math.round((d.population_above_30 || 0) * 0.08),   // 8% of pop 30+
+    hint: '8% of population above 30 years',
+  },
+  {
+    id: 5, key: 'dm_screening',
+    label: 'DM Screening — New Patients (30+ yrs)',
+    targetFormula: (d: any) => Math.round((d.population_above_30 || 0) * 0.08),   // 8% of pop 30+
+    hint: '8% of population above 30 years',
+  },
+  {
+    id: 6, key: 'ht_followup',
+    label: 'Proportion of HTN Patients on AYUSH Follow-up',
+    targetFormula: (_: any) => 0,             // not used — proportion-based
+    isProportional: true,
+    denominatorField: 'total_ht_patients',
+    denominatorLabel: 'Total HTN Screened Till Date',
+    hint: 'HTN patients on AYUSH Tx ÷ Total HTN screened till date × 100',
+  },
+  {
+    id: 7, key: 'dm_followup',
+    label: 'Proportion of DM Patients on AYUSH Follow-up',
+    targetFormula: (_: any) => 0,
+    isProportional: true,
+    denominatorField: 'total_dm_patients',
+    denominatorLabel: 'Total DM Screened Till Date',
+    hint: 'DM patients on AYUSH Tx ÷ Total DM screened till date × 100',
+  },
+  {
+    id: 8, key: 'lifestyle_session',
+    label: '7-Day Lifestyle Modification Session (min 20 participants)',
+    targetFormula: (_: any) => 1,             // 1 session/month (6/year)
+    hint: 'Target: 1 session per month (6 in a year)',
+  },
+  {
+    id: 9, key: 'medicinal_plants',
+    label: 'Distribution of Medicinal Plants to Families',
+    targetFormula: (d: any) => Math.round((d.total_families || 0) * 0.08),        // 8% of families
+    hint: '8% of total families in catchment area',
+  },
+  {
+    id: 10, key: 'intersectoral_meetings',
+    label: 'Intersectoral Meetings Organised',
+    targetFormula: (_: any) => 1,             // 1/month
+    hint: 'Target: 1 meeting per month',
+  },
 ];
+
+// ── Slab configuration ────────────────────────────────────────────────────────
+// Global rule: no incentive below 30%; proportional above 30%
+const SLABS = [
+  { label: '<30%',    min: 0,  max: 29,  hexColor: '#dc2626', chipClass: 'bg-red-100 text-red-700',      note: 'No Incentive' },
+  { label: '30–50%',  min: 30, max: 50,  hexColor: '#ea580c', chipClass: 'bg-orange-100 text-orange-700', note: 'Slab I'        },
+  { label: '51–70%',  min: 51, max: 70,  hexColor: '#d97706', chipClass: 'bg-amber-100 text-amber-700',   note: 'Slab II'       },
+  { label: '71–100%', min: 71, max: 100, hexColor: '#16a34a', chipClass: 'bg-green-100 text-green-700',   note: 'Slab III'      },
+];
+
+function getSlabInfo(rawPct: number) {
+  return SLABS.find(s => rawPct >= s.min && rawPct <= s.max) ?? SLABS[0];
+}
 
 function getFinancialYear(month: number, year: number): string {
   return month >= 4 ? `${year}-${(year+1).toString().slice(2)}` : `${year-1}-${year.toString().slice(2)}`;
@@ -98,9 +159,16 @@ function getPrevMonth() {
   return { month: m, year: y };
 }
 
-function calcPct(actual: number, target: number): number {
+// Raw % achievement — no floor applied, capped at 100
+function calcRawPct(actual: number, target: number): number {
   if (!target || target === 0) return 0;
   return Math.min(100, Math.round((actual / target) * 100));
+}
+
+// Effective % — returns 0 if below 30% floor; otherwise rawPct
+// This drives ALL incentive math
+function toEffectivePct(raw: number): number {
+  return raw < 30 ? 0 : raw;
 }
 
 function isSuperOrState(s: any) { return ['SUPER_ADMIN', 'STATE_ADMIN'].includes(s?.role); }
@@ -156,37 +224,88 @@ function TextInput({ label, fieldKey, value, onChange, disabled, placeholder }: 
 }
 
 // ── Indicator Row ─────────────────────────────────────────────────────────────
-function IndicatorRow({ ind, target, actual, pct, onChange, disabled }: any) {
-  const barColor = pct >= 100 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#ef4444';
+function IndicatorRow({ ind, target, actual, rawPct, onChange, disabled, denominator }: any) {
+  const slab = getSlabInfo(rawPct);
+  const noIncentive = rawPct > 0 && rawPct < 30; // achieved something but below threshold
+
   return (
-    <div className="bg-slate-50 rounded-xl p-4 mb-3">
-      <div className="flex items-start gap-3 mb-2">
-        <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ind.id}</div>
+    <div className="bg-slate-50 rounded-xl p-4 mb-3 border border-slate-100">
+      {/* Header row */}
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">{ind.id}</div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-700 leading-tight">{ind.label}</p>
           <p className="text-[10px] text-slate-400 mt-0.5">{ind.hint}</p>
         </div>
+        {/* Slab badge — always visible */}
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${rawPct > 0 ? slab.chipClass : 'bg-slate-100 text-slate-400'}`}>
+          {rawPct > 0 ? slab.note : '—'}
+        </span>
       </div>
-      <div className="grid grid-cols-3 gap-3 mt-3">
+
+      {/* Input grid */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Col 1: Target or Denominator */}
         <div>
-          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Target</p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm font-bold text-blue-700">{target ?? '—'}</div>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">
+            {ind.isProportional ? 'Total Screened' : 'Target'}
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm font-bold text-blue-700">
+            {ind.isProportional
+              ? (denominator != null && denominator !== '' ? denominator : '—')
+              : (target ?? '—')}
+          </div>
         </div>
+
+        {/* Col 2: Actual input */}
         <div>
-          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Actual</p>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">
+            {ind.isProportional ? 'On AYUSH Tx' : 'Actual'}
+          </p>
           <input type="number" min={0} disabled={disabled}
             value={actual ?? ''}
             onChange={e => onChange(`${ind.key}_actual`, e.target.value === '' ? '' : Number(e.target.value))}
             className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 ${disabled ? 'bg-slate-50 opacity-70 cursor-not-allowed' : 'bg-white'}`} />
         </div>
+
+        {/* Col 3: Achievement % */}
         <div>
-          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Performance</p>
-          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold" style={{ color: barColor }}>{pct}%</div>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Achievement</p>
+          <div className="rounded-lg px-3 py-1.5 border text-sm font-bold"
+            style={{
+              color: slab.hexColor,
+              borderColor: slab.hexColor + '50',
+              backgroundColor: slab.hexColor + '12',
+            }}>
+            <span>{rawPct}%</span>
+            {noIncentive && (
+              <span className="block text-[9px] font-semibold mt-0.5" style={{ color: '#dc2626' }}>
+                ₹0 — below 30%
+              </span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-        <motion.div className="h-full rounded-full" style={{ backgroundColor: barColor }}
-          animate={{ width: `${Math.min(pct, 100)}%` }} transition={{ duration: 0.4 }} />
+
+      {/* Progress bar */}
+      <div className="mt-2.5 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+        <motion.div className="h-full rounded-full" style={{ backgroundColor: slab.hexColor }}
+          animate={{ width: `${Math.min(rawPct, 100)}%` }} transition={{ duration: 0.4 }} />
+      </div>
+
+      {/* Slab indicator chips */}
+      <div className="mt-2 flex gap-1">
+        {SLABS.map(s => {
+          const isActive = rawPct >= s.min && rawPct <= s.max && rawPct >= 0;
+          // treat rawPct === 0 as <30% slab active
+          const trueActive = s.min === 0 ? (rawPct < 30) : isActive;
+          return (
+            <span key={s.label}
+              className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-all ${trueActive && rawPct > 0 ? s.chipClass : (s.min === 0 && rawPct === 0 ? 'bg-slate-100 text-slate-300' : 'bg-slate-100 text-slate-300')}`}>
+              {s.label}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -208,22 +327,41 @@ function CalculatorView({ session, hospital }: any) {
 
   const financialYear = getFinancialYear(selectedMonth, selectedYear);
 
-  // Calculate targets from base params
+  // ── Targets from base params ───────────────────────────────────────────────
   const targets = INDICATORS.reduce((acc, ind) => {
     acc[ind.key] = ind.targetFormula(form);
     return acc;
   }, {} as Record<string, number>);
 
-  // Calculate performance %
-  const pcts = INDICATORS.reduce((acc, ind) => {
-    acc[ind.key] = calcPct(Number(form[`${ind.key}_actual`]) || 0, targets[ind.key]);
+  // ── Raw achievement % (uncapped at floor, for display) ─────────────────────
+  const rawPcts = INDICATORS.reduce((acc, ind) => {
+    if (ind.isProportional) {
+      // IND 6 & 7: proportion = numerator / denominator × 100
+      const num = Number(form[`${ind.key}_actual`]) || 0;
+      const den = Number(form[ind.denominatorField!]) || 0;
+      acc[ind.key] = den > 0 ? Math.min(100, Math.round((num / den) * 100)) : 0;
+    } else {
+      acc[ind.key] = calcRawPct(Number(form[`${ind.key}_actual`]) || 0, targets[ind.key]);
+    }
     return acc;
   }, {} as Record<string, number>);
 
-  // Calculate incentives
+  // ── Effective % — zeroed below 30% floor (drives ALL incentive math) ───────
+  const pcts = INDICATORS.reduce((acc, ind) => {
+    acc[ind.key] = toEffectivePct(rawPcts[ind.key]);
+    return acc;
+  }, {} as Record<string, number>);
+
+  // ── Incentive amounts ──────────────────────────────────────────────────────
   const ashaCount = [1,2,3,4,5].filter(i => form[`asha${i}_name`]?.trim()).length;
-  const choIncentive = INDICATORS.reduce((sum, ind) => sum + (pcts[ind.key] >= 100 ? 500 : Math.round((pcts[ind.key] / 100) * 500)), 0);
-  const ashaIncentive = INDICATORS.reduce((sum, ind) => sum + (pcts[ind.key] >= 100 ? 100 : Math.round((pcts[ind.key] / 100) * 100)), 0);
+  // CHO: ₹500 per indicator at 100%; proportional above 30%; ₹0 below 30%
+  const choIncentive = INDICATORS.reduce(
+    (sum, ind) => sum + Math.round((pcts[ind.key] / 100) * 500), 0
+  );
+  // ASHA: ₹100 per indicator at 100%; same slab rules
+  const ashaIncentive = INDICATORS.reduce(
+    (sum, ind) => sum + Math.round((pcts[ind.key] / 100) * 100), 0
+  );
 
   const fetchForm = useCallback(async () => {
     setLoading(true);
@@ -235,13 +373,8 @@ function CalculatorView({ session, hospital }: any) {
       .eq('reporting_year', selectedYear)
       .maybeSingle();
 
-    if (data) {
-      setForm(data);
-      setExistingId(data.id);
-    } else {
-      setForm({});
-      setExistingId(null);
-    }
+    if (data) { setForm(data); setExistingId(data.id); }
+    else { setForm({}); setExistingId(null); }
     setLoading(false);
   }, [hospital.hospital_id, selectedMonth, selectedYear]);
 
@@ -274,36 +407,39 @@ function CalculatorView({ session, hospital }: any) {
 
     // Base params
     catchment_population: Number(form.catchment_population) || null,
-    population_above_30: Number(form.population_above_30) || null,
-    total_families: Number(form.total_families) || null,
-    total_ht_patients: Number(form.total_ht_patients) || null,
-    total_dm_patients: Number(form.total_dm_patients) || null,
+    population_above_30:  Number(form.population_above_30)  || null,
+    total_families:       Number(form.total_families)       || null,
+    total_ht_patients:    Number(form.total_ht_patients)    || null,
+    total_dm_patients:    Number(form.total_dm_patients)    || null,
 
     // Actuals
-    opd_actual: Number(form.opd_actual) || null,
-    prakriti_actual: Number(form.prakriti_actual) || null,
-    empanelment_actual: Number(form.empanelment_actual) || null,
-    ht_screening_actual: Number(form.ht_screening_actual) || null,
-    dm_screening_actual: Number(form.dm_screening_actual) || null,
-    ht_followup_actual: Number(form.ht_followup_actual) || null,
-    dm_followup_actual: Number(form.dm_followup_actual) || null,
-    lifestyle_session_actual: Number(form.lifestyle_session_actual) || null,
-    medicinal_plants_actual: Number(form.medicinal_plants_actual) || null,
+    // Note: ht_followup_actual / dm_followup_actual now store the
+    // NUMERATOR (patients on AYUSH treatment) for IND 6 & 7
+    opd_actual:                    Number(form.opd_actual) || null,
+    prakriti_actual:               Number(form.prakriti_actual) || null,
+    empanelment_actual:            Number(form.empanelment_actual) || null,
+    ht_screening_actual:           Number(form.ht_screening_actual) || null,
+    dm_screening_actual:           Number(form.dm_screening_actual) || null,
+    ht_followup_actual:            Number(form.ht_followup_actual) || null,
+    dm_followup_actual:            Number(form.dm_followup_actual) || null,
+    lifestyle_session_actual:      Number(form.lifestyle_session_actual) || null,
+    medicinal_plants_actual:       Number(form.medicinal_plants_actual) || null,
     intersectoral_meetings_actual: Number(form.intersectoral_meetings_actual) || null,
 
-    // Performance %
-    ind1_pct: pcts.opd, ind2_pct: pcts.prakriti, ind3_pct: pcts.empanelment,
-    ind4_pct: pcts.ht_screening, ind5_pct: pcts.dm_screening,
-    ind6_pct: pcts.ht_followup, ind7_pct: pcts.dm_followup,
-    ind8_pct: pcts.lifestyle_session, ind9_pct: pcts.medicinal_plants,
-    ind10_pct: pcts.intersectoral_meetings,
+    // Save RAW achievement % (not effective) — so admin view shows actual performance
+    // Incentive amounts already incorporate the 30% floor via effectivePct
+    ind1_pct:  rawPcts.opd,               ind2_pct:  rawPcts.prakriti,
+    ind3_pct:  rawPcts.empanelment,       ind4_pct:  rawPcts.ht_screening,
+    ind5_pct:  rawPcts.dm_screening,      ind6_pct:  rawPcts.ht_followup,
+    ind7_pct:  rawPcts.dm_followup,       ind8_pct:  rawPcts.lifestyle_session,
+    ind9_pct:  rawPcts.medicinal_plants,  ind10_pct: rawPcts.intersectoral_meetings,
 
     // CHO
     cho_name: form.cho_name || null,
     cho_employee_id: form.cho_employee_id || null,
     cho_incentive_total: choIncentive,
 
-    // ASHAs
+    // ASHAs — all get the same per-ASHA amount
     asha1_name: form.asha1_name || null, asha1_incentive: form.asha1_name ? ashaIncentive : null,
     asha2_name: form.asha2_name || null, asha2_incentive: form.asha2_name ? ashaIncentive : null,
     asha3_name: form.asha3_name || null, asha3_incentive: form.asha3_name ? ashaIncentive : null,
@@ -330,15 +466,18 @@ function CalculatorView({ session, hospital }: any) {
     } catch (err: any) {
       setToast('❌ Error: ' + err.message);
       setTimeout(() => setToast(''), 4000);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="text-emerald-500 animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 size={24} className="text-emerald-500 animate-spin" />
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto">
+
       {/* Sub tabs */}
       <div className="flex gap-1.5 mb-5 bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm">
         <button onClick={() => setView('calculator')}
@@ -348,54 +487,71 @@ function CalculatorView({ session, hospital }: any) {
         <button onClick={() => setView('history')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${view === 'history' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
           <Clock size={15} />History
-          {history.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${view === 'history' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'}`}>{history.length}</span>}
+          {history.length > 0 && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${view === 'history' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'}`}>
+              {history.length}
+            </span>
+          )}
         </button>
       </div>
 
+      {/* ── History view ── */}
       {view === 'history' && (
         <div>
-          {loadingHistory ? <div className="flex justify-center py-10"><Loader2 size={22} className="animate-spin text-emerald-500" /></div>
-          : history.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-              <Calculator size={32} className="text-slate-200 mx-auto mb-3" />
-              <p className="text-slate-400">No calculations yet</p>
-              <button onClick={() => setView('calculator')} className="mt-3 text-emerald-600 text-sm font-semibold hover:underline">Calculate first incentive →</button>
-            </div>
-          ) : (
-            <div>
-              {[...new Set(history.map(r => r.financial_year))].map(fy => (
-                <div key={fy} className="mb-6">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">FY {fy}</p>
-                  <div className="space-y-2">
-                    {history.filter(r => r.financial_year === fy).map(rec => (
-                      <div key={rec.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <IndianRupee size={18} className="text-emerald-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-800">{MONTHS[rec.reporting_month - 1]} {rec.reporting_year}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            CHO: <span className="font-semibold text-emerald-700">₹{rec.cho_incentive_total?.toLocaleString('en-IN')}</span>
-                            {rec.asha1_name && <> • ASHA: <span className="font-semibold text-blue-600">₹{rec.asha1_incentive?.toLocaleString('en-IN')}/each</span></>}
-                          </p>
-                        </div>
-                        <button onClick={() => { setSelectedMonth(rec.reporting_month); setSelectedYear(rec.reporting_year); setView('calculator'); }}
-                          className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium">
-                          <Eye size={13} />View
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+          {loadingHistory
+            ? <div className="flex justify-center py-10"><Loader2 size={22} className="animate-spin text-emerald-500" /></div>
+            : history.length === 0
+              ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+                  <Calculator size={32} className="text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400">No calculations yet</p>
+                  <button onClick={() => setView('calculator')}
+                    className="mt-3 text-emerald-600 text-sm font-semibold hover:underline">
+                    Calculate first incentive →
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div>
+                  {[...new Set(history.map(r => r.financial_year))].map(fy => (
+                    <div key={fy} className="mb-6">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">FY {fy}</p>
+                      <div className="space-y-2">
+                        {history.filter(r => r.financial_year === fy).map(rec => (
+                          <div key={rec.id}
+                            className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <IndianRupee size={18} className="text-emerald-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-slate-800">{MONTHS[rec.reporting_month - 1]} {rec.reporting_year}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                CHO: <span className="font-semibold text-emerald-700">₹{rec.cho_incentive_total?.toLocaleString('en-IN')}</span>
+                                {rec.asha1_name && (
+                                  <> • ASHA: <span className="font-semibold text-blue-600">₹{rec.asha1_incentive?.toLocaleString('en-IN')}/each</span></>
+                                )}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => { setSelectedMonth(rec.reporting_month); setSelectedYear(rec.reporting_year); setView('calculator'); }}
+                              className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium">
+                              <Eye size={13} />View
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+          }
         </div>
       )}
 
+      {/* ── Calculator view ── */}
       {view === 'calculator' && (
         <div>
-          {/* Month selector */}
+
+          {/* Month / Year selector */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-4 shadow-sm">
             <div className="flex gap-3 flex-wrap">
               <div className="flex-1 min-w-[150px]">
@@ -413,7 +569,9 @@ function CalculatorView({ session, hospital }: any) {
                 </select>
               </div>
               <div className="flex items-end">
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-500">FY {financialYear}</div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-500">
+                  FY {financialYear}
+                </div>
               </div>
             </div>
             {existingId && (
@@ -424,14 +582,60 @@ function CalculatorView({ session, hospital }: any) {
             )}
           </div>
 
+          {/* Slab rules legend */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+              Incentive Slab Rules — Applicable to All 10 Indicators
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {SLABS.map(s => (
+                <div key={s.label} className={`rounded-xl p-3 ${s.chipClass}`}>
+                  <p className="font-bold text-sm">{s.label}</p>
+                  <p className="text-[10px] font-semibold opacity-80">{s.note}</p>
+                  <p className="text-[10px] mt-1 opacity-70">
+                    {s.min === 0
+                      ? 'CHO ₹0 • ASHA ₹0'
+                      : `CHO ₹${Math.round(s.min/100*500)}–${Math.round(s.max/100*500)} • ASHA ₹${Math.round(s.min/100*100)}–${Math.round(s.max/100*100)}`
+                    }
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Section 1: Base Parameters */}
           <SectionCard title="Catchment Area Parameters" icon={Building2} color="blue">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <NumInput label="Entire Population of Catchment Area" fieldKey="catchment_population" value={form.catchment_population} onChange={handleChange} hint="Total population served by this HWC" />
-              <NumInput label="Population Above 30 Years" fieldKey="population_above_30" value={form.population_above_30} onChange={handleChange} hint="Used for HT/DM screening targets" />
-              <NumInput label="Total Families in Catchment Area" fieldKey="total_families" value={form.total_families} onChange={handleChange} hint="Used for empanelment & medicinal plant targets" />
-              <NumInput label="Total Hypertensive Patients Screened Till Date" fieldKey="total_ht_patients" value={form.total_ht_patients} onChange={handleChange} hint="Cumulative HT patients screened" />
-              <NumInput label="Total Diabetes Patients Screened Till Date" fieldKey="total_dm_patients" value={form.total_dm_patients} onChange={handleChange} hint="Cumulative DM patients screened" />
+              <NumInput
+                label="Catchment Population (Total)"
+                fieldKey="catchment_population"
+                value={form.catchment_population}
+                onChange={handleChange}
+                hint="Used for: IND 3 Individual Empanelment target (8%)" />
+              <NumInput
+                label="Population Above 30 Years"
+                fieldKey="population_above_30"
+                value={form.population_above_30}
+                onChange={handleChange}
+                hint="Used for: IND 4 HTN Screening & IND 5 DM Screening targets (8%)" />
+              <NumInput
+                label="Total Families in Catchment Area"
+                fieldKey="total_families"
+                value={form.total_families}
+                onChange={handleChange}
+                hint="Used for: IND 9 Medicinal Plants target (8%)" />
+              <NumInput
+                label="Total HTN Patients Screened Till Date"
+                fieldKey="total_ht_patients"
+                value={form.total_ht_patients}
+                onChange={handleChange}
+                hint="Denominator for IND 6 (HTN AYUSH follow-up proportion)" />
+              <NumInput
+                label="Total DM Patients Screened Till Date"
+                fieldKey="total_dm_patients"
+                value={form.total_dm_patients}
+                onChange={handleChange}
+                hint="Denominator for IND 7 (DM AYUSH follow-up proportion)" />
             </div>
           </SectionCard>
 
@@ -439,7 +643,12 @@ function CalculatorView({ session, hospital }: any) {
           <SectionCard title="Performance Indicators (10 Indicators)" icon={Activity} color="emerald">
             <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 flex items-start gap-2">
               <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
-              <span>Enter actual values for each indicator. Targets are auto-calculated from catchment parameters above.</span>
+              <span>
+                Enter actual values for each indicator. Targets are auto-calculated from catchment parameters above.
+                <strong> Incentive = ₹0 if achievement is below 30%</strong> of target.
+                For IND 6 &amp; 7, enter the <em>number of patients</em> who actually received AYUSH treatment
+                — proportion is auto-calculated using screened totals from base params.
+              </span>
             </div>
             {INDICATORS.map(ind => (
               <IndicatorRow
@@ -447,9 +656,10 @@ function CalculatorView({ session, hospital }: any) {
                 ind={ind}
                 target={targets[ind.key]}
                 actual={form[`${ind.key}_actual`]}
-                pct={pcts[ind.key]}
+                rawPct={rawPcts[ind.key]}
                 onChange={handleChange}
                 disabled={false}
+                denominator={ind.isProportional ? form[ind.denominatorField!] : undefined}
               />
             ))}
           </SectionCard>
@@ -464,12 +674,18 @@ function CalculatorView({ session, hospital }: any) {
               <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-3">CHO Incentive Breakdown</p>
               <div className="grid grid-cols-5 gap-2 mb-3">
                 {INDICATORS.map(ind => {
-                  const amount = Math.round((pcts[ind.key] / 100) * 500);
+                  const raw = rawPcts[ind.key];
+                  const eff = pcts[ind.key];
+                  const amount = Math.round((eff / 100) * 500);
+                  const slab = getSlabInfo(raw);
                   return (
                     <div key={ind.id} className="text-center bg-white rounded-xl p-2 border border-purple-100">
                       <p className="text-[9px] text-slate-400 font-bold">IND {ind.id}</p>
                       <p className="text-xs font-bold text-purple-700">₹{amount}</p>
-                      <p className="text-[9px] text-purple-500">{pcts[ind.key]}%</p>
+                      <p className="text-[9px] font-semibold" style={{ color: slab.hexColor }}>{raw}%</p>
+                      {raw > 0 && raw < 30 && (
+                        <p className="text-[8px] text-red-500 font-bold leading-tight">No Inc.</p>
+                      )}
                     </div>
                   );
                 })}
@@ -478,7 +694,9 @@ function CalculatorView({ session, hospital }: any) {
                 <p className="text-purple-200 text-sm font-semibold">Total CHO Incentive</p>
                 <p className="text-white text-2xl font-bold">₹{choIncentive.toLocaleString('en-IN')}</p>
               </div>
-              <p className="text-[10px] text-purple-500 mt-2 text-center">₹500 per indicator at 100% performance • Proportional for partial performance</p>
+              <p className="text-[10px] text-purple-500 mt-2 text-center">
+                ₹500/indicator at 100% • Proportional ≥30% • ₹0 below 30% • Max ₹5,000
+              </p>
             </div>
           </SectionCard>
 
@@ -500,12 +718,18 @@ function CalculatorView({ session, hospital }: any) {
                 <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-3">ASHA Incentive Breakdown (per ASHA)</p>
                 <div className="grid grid-cols-5 gap-2 mb-3">
                   {INDICATORS.map(ind => {
-                    const amount = Math.round((pcts[ind.key] / 100) * 100);
+                    const raw = rawPcts[ind.key];
+                    const eff = pcts[ind.key];
+                    const amount = Math.round((eff / 100) * 100);
+                    const slab = getSlabInfo(raw);
                     return (
                       <div key={ind.id} className="text-center bg-white rounded-xl p-2 border border-orange-100">
                         <p className="text-[9px] text-slate-400 font-bold">IND {ind.id}</p>
                         <p className="text-xs font-bold text-orange-700">₹{amount}</p>
-                        <p className="text-[9px] text-orange-500">{pcts[ind.key]}%</p>
+                        <p className="text-[9px] font-semibold" style={{ color: slab.hexColor }}>{raw}%</p>
+                        {raw > 0 && raw < 30 && (
+                          <p className="text-[8px] text-red-500 font-bold leading-tight">No Inc.</p>
+                        )}
                       </div>
                     );
                   })}
@@ -518,14 +742,18 @@ function CalculatorView({ session, hospital }: any) {
                   <p className="text-orange-200 text-sm font-semibold">Total for {ashaCount} ASHAs</p>
                   <p className="text-white text-xl font-bold">₹{(ashaIncentive * ashaCount).toLocaleString('en-IN')}</p>
                 </div>
-                <p className="text-[10px] text-orange-500 mt-2 text-center">₹100 per indicator at 100% performance • Proportional for partial performance</p>
+                <p className="text-[10px] text-orange-500 mt-2 text-center">
+                  ₹100/indicator at 100% • Proportional ≥30% • ₹0 below 30% • Max ₹1,000 per ASHA
+                </p>
               </div>
             )}
           </SectionCard>
 
           {/* Grand Total Summary */}
           <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl p-5 mb-5 shadow-lg shadow-emerald-200">
-            <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-4">Total Incentive Summary — {MONTHS[selectedMonth-1]} {selectedYear}</p>
+            <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-4">
+              Total Incentive Summary — {MONTHS[selectedMonth-1]} {selectedYear}
+            </p>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-white/15 rounded-xl p-3 text-center">
                 <p className="text-emerald-200 text-xs mb-1">CHO Incentive</p>
@@ -542,7 +770,9 @@ function CalculatorView({ session, hospital }: any) {
             </div>
             <div className="bg-white/20 rounded-xl px-5 py-3 flex items-center justify-between">
               <p className="text-white font-bold">Grand Total (CHO + All ASHAs)</p>
-              <p className="text-white text-2xl font-black">₹{(choIncentive + ashaIncentive * ashaCount).toLocaleString('en-IN')}</p>
+              <p className="text-white text-2xl font-black">
+                ₹{(choIncentive + ashaIncentive * ashaCount).toLocaleString('en-IN')}
+              </p>
             </div>
           </div>
 
@@ -550,7 +780,10 @@ function CalculatorView({ session, hospital }: any) {
           <div className="pb-8">
             <button onClick={handleSave} disabled={saving}
               className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 disabled:opacity-50">
-              {saving ? <><Loader2 size={18} className="animate-spin" />Saving...</> : <><Save size={18} />Save Incentive Calculation</>}
+              {saving
+                ? <><Loader2 size={18} className="animate-spin" />Saving...</>
+                : <><Save size={18} />Save Incentive Calculation</>
+              }
             </button>
           </div>
         </div>
@@ -594,24 +827,29 @@ function AdminView({ session }: any) {
     if (records.length === 0) { alert('No records to download'); return; }
     const headers = [
       'Hospital', 'District', 'Month', 'Year', 'Financial Year', 'Calculated By',
-      'Catchment Population', 'Pop 30+', 'Total Families', 'HT Patients', 'DM Patients',
-      'OPD Actual', 'Prakriti Actual', 'Empanelment Actual',
-      'HT Screening Actual', 'DM Screening Actual', 'HT Followup Actual', 'DM Followup Actual',
+      'Catchment Population', 'Pop 30+', 'Total Families', 'HTN Patients', 'DM Patients',
+      'OPD Actual', 'Prakriti Actual', 'Individual Empanelment Actual',
+      'HTN Screening Actual', 'DM Screening Actual',
+      'HTN on AYUSH Tx (IND6 Numerator)', 'DM on AYUSH Tx (IND7 Numerator)',
       'Lifestyle Sessions Actual', 'Medicinal Plants Actual', 'Intersectoral Meetings Actual',
-      'Ind1%', 'Ind2%', 'Ind3%', 'Ind4%', 'Ind5%', 'Ind6%', 'Ind7%', 'Ind8%', 'Ind9%', 'Ind10%',
+      'Ind1% (OPD)', 'Ind2% (Prakriti)', 'Ind3% (Empanelment)', 'Ind4% (HTN Screen)',
+      'Ind5% (DM Screen)', 'Ind6% (HTN Followup)', 'Ind7% (DM Followup)',
+      'Ind8% (Lifestyle)', 'Ind9% (Med Plants)', 'Ind10% (Intersectoral)',
       'CHO Name', 'CHO Employee ID', 'CHO Incentive (₹)',
       'ASHA1 Name', 'ASHA1 Incentive', 'ASHA2 Name', 'ASHA2 Incentive',
       'ASHA3 Name', 'ASHA3 Incentive', 'ASHA4 Name', 'ASHA4 Incentive',
-      'ASHA5 Name', 'ASHA5 Incentive'
+      'ASHA5 Name', 'ASHA5 Incentive',
     ];
     const rows = records.map(r => [
-      r.hospital_name, r.district, MONTHS[r.reporting_month-1], r.reporting_year, r.financial_year, r.calculated_by,
+      r.hospital_name, r.district, MONTHS[r.reporting_month-1], r.reporting_year,
+      r.financial_year, r.calculated_by,
       r.catchment_population || '', r.population_above_30 || '', r.total_families || '',
       r.total_ht_patients || '', r.total_dm_patients || '',
       r.opd_actual || '', r.prakriti_actual || '', r.empanelment_actual || '',
-      r.ht_screening_actual || '', r.dm_screening_actual || '', r.ht_followup_actual || '',
-      r.dm_followup_actual || '', r.lifestyle_session_actual || '',
-      r.medicinal_plants_actual || '', r.intersectoral_meetings_actual || '',
+      r.ht_screening_actual || '', r.dm_screening_actual || '',
+      r.ht_followup_actual || '', r.dm_followup_actual || '',
+      r.lifestyle_session_actual || '', r.medicinal_plants_actual || '',
+      r.intersectoral_meetings_actual || '',
       r.ind1_pct || 0, r.ind2_pct || 0, r.ind3_pct || 0, r.ind4_pct || 0, r.ind5_pct || 0,
       r.ind6_pct || 0, r.ind7_pct || 0, r.ind8_pct || 0, r.ind9_pct || 0, r.ind10_pct || 0,
       r.cho_name || '', r.cho_employee_id || '', r.cho_incentive_total || 0,
@@ -674,7 +912,9 @@ function AdminView({ session }: any) {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-emerald-500" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-emerald-500" />
+        </div>
       ) : records.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
           <IndianRupee size={32} className="text-slate-200 mx-auto mb-3" />
@@ -683,12 +923,17 @@ function AdminView({ session }: any) {
       ) : (
         <div className="space-y-3">
           {records.map(rec => {
-            const avgPct = Math.round(([rec.ind1_pct, rec.ind2_pct, rec.ind3_pct, rec.ind4_pct, rec.ind5_pct,
-              rec.ind6_pct, rec.ind7_pct, rec.ind8_pct, rec.ind9_pct, rec.ind10_pct]
-              .filter(Boolean) as number[]).reduce((a, b) => a + b, 0) / 10);
-            const barColor = avgPct >= 80 ? '#16a34a' : avgPct >= 50 ? '#f59e0b' : '#ef4444';
+            const indPcts = [
+              rec.ind1_pct, rec.ind2_pct, rec.ind3_pct, rec.ind4_pct, rec.ind5_pct,
+              rec.ind6_pct, rec.ind7_pct, rec.ind8_pct, rec.ind9_pct, rec.ind10_pct,
+            ].filter(v => v != null) as number[];
+            const avgPct = indPcts.length > 0
+              ? Math.round(indPcts.reduce((a, b) => a + b, 0) / 10)
+              : 0;
+            const barColor = avgPct >= 71 ? '#16a34a' : avgPct >= 51 ? '#d97706' : avgPct >= 30 ? '#ea580c' : '#dc2626';
             return (
-              <div key={rec.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
+              <div key={rec.id}
+                className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <IndianRupee size={18} className="text-emerald-600" />
@@ -699,13 +944,16 @@ function AdminView({ session }: any) {
                       {rec.district} • {MONTHS[rec.reporting_month-1]} {rec.reporting_year}
                     </p>
                     <div className="mt-1.5 h-1 w-32 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${avgPct}%`, backgroundColor: barColor }} />
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${avgPct}%`, backgroundColor: barColor }} />
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-xs text-slate-400">CHO</p>
                     <p className="font-bold text-emerald-700">₹{rec.cho_incentive_total?.toLocaleString('en-IN')}</p>
-                    {rec.asha1_name && <p className="text-xs text-blue-600">ASHA: ₹{rec.asha1_incentive?.toLocaleString('en-IN')}</p>}
+                    {rec.asha1_name && (
+                      <p className="text-xs text-blue-600">ASHA: ₹{rec.asha1_incentive?.toLocaleString('en-IN')}</p>
+                    )}
                   </div>
                   <button onClick={() => setViewingRecord(rec)}
                     className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium flex-shrink-0">
@@ -728,49 +976,64 @@ function AdminView({ session }: any) {
               <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 px-6 py-5 flex items-center justify-between">
                 <div>
                   <h2 className="text-white font-bold">{viewingRecord.hospital_name}</h2>
-                  <p className="text-emerald-200 text-xs">{MONTHS[viewingRecord.reporting_month-1]} {viewingRecord.reporting_year} • FY {viewingRecord.financial_year}</p>
+                  <p className="text-emerald-200 text-xs">
+                    {MONTHS[viewingRecord.reporting_month-1]} {viewingRecord.reporting_year} • FY {viewingRecord.financial_year}
+                  </p>
                 </div>
                 <button onClick={() => setViewingRecord(null)} className="text-emerald-200 hover:text-white p-1">✕</button>
               </div>
               <div className="p-6 space-y-4">
-                {/* Indicators */}
+
+                {/* Indicator Performance */}
                 <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Indicator Performance</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Indicator Performance (Raw %)</p>
                   <div className="grid grid-cols-5 gap-2">
                     {INDICATORS.map((ind, i) => {
-                      const pct = [viewingRecord.ind1_pct, viewingRecord.ind2_pct, viewingRecord.ind3_pct,
+                      const rawPct = [
+                        viewingRecord.ind1_pct, viewingRecord.ind2_pct, viewingRecord.ind3_pct,
                         viewingRecord.ind4_pct, viewingRecord.ind5_pct, viewingRecord.ind6_pct,
                         viewingRecord.ind7_pct, viewingRecord.ind8_pct, viewingRecord.ind9_pct,
-                        viewingRecord.ind10_pct][i] || 0;
-                      const c = pct >= 100 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                        viewingRecord.ind10_pct,
+                      ][i] || 0;
+                      const slab = getSlabInfo(rawPct);
                       return (
                         <div key={ind.id} className="text-center bg-slate-50 rounded-xl p-2 border border-slate-200">
                           <p className="text-[9px] text-slate-400 font-bold">IND {ind.id}</p>
-                          <p className="text-sm font-bold" style={{ color: c }}>{pct}%</p>
+                          <p className="text-sm font-bold" style={{ color: slab.hexColor }}>{rawPct}%</p>
+                          <p className="text-[8px] font-semibold" style={{ color: slab.hexColor }}>{slab.note}</p>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
                 {/* CHO */}
                 <div className="bg-purple-50 rounded-xl p-4">
                   <p className="text-xs font-bold text-purple-600 mb-2">CHO Incentive</p>
                   <div className="flex justify-between">
                     <div>
                       <p className="font-bold text-slate-800">{viewingRecord.cho_name || '—'}</p>
-                      {viewingRecord.cho_employee_id && <p className="text-xs text-slate-500">EMP: {viewingRecord.cho_employee_id}</p>}
+                      {viewingRecord.cho_employee_id && (
+                        <p className="text-xs text-slate-500">EMP: {viewingRecord.cho_employee_id}</p>
+                      )}
                     </div>
-                    <p className="text-2xl font-black text-purple-700">₹{viewingRecord.cho_incentive_total?.toLocaleString('en-IN')}</p>
+                    <p className="text-2xl font-black text-purple-700">
+                      ₹{viewingRecord.cho_incentive_total?.toLocaleString('en-IN')}
+                    </p>
                   </div>
                 </div>
+
                 {/* ASHAs */}
                 {[1,2,3,4,5].filter(i => (viewingRecord as any)[`asha${i}_name`]).length > 0 && (
                   <div className="bg-orange-50 rounded-xl p-4">
                     <p className="text-xs font-bold text-orange-600 mb-2">ASHA Incentives</p>
                     {[1,2,3,4,5].filter(i => (viewingRecord as any)[`asha${i}_name`]).map(i => (
-                      <div key={i} className="flex justify-between py-1.5 border-b border-orange-100 last:border-0">
+                      <div key={i}
+                        className="flex justify-between py-1.5 border-b border-orange-100 last:border-0">
                         <p className="text-sm text-slate-700">{(viewingRecord as any)[`asha${i}_name`]}</p>
-                        <p className="font-bold text-orange-700">₹{(viewingRecord as any)[`asha${i}_incentive`]?.toLocaleString('en-IN')}</p>
+                        <p className="font-bold text-orange-700">
+                          ₹{(viewingRecord as any)[`asha${i}_incentive`]?.toLocaleString('en-IN')}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -808,7 +1071,11 @@ export default function IncentiveCalculator({ session }: { session: any }) {
     load();
   }, [session]);
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={28} className="text-emerald-500 animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 size={28} className="text-emerald-500 animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50/20 p-4 md:p-6">
@@ -840,8 +1107,12 @@ export default function IncentiveCalculator({ session }: { session: any }) {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
             <AlertCircle size={36} className="text-amber-400 mx-auto mb-3" />
             <h3 className="font-bold text-slate-600 text-lg">Not Applicable</h3>
-            <p className="text-slate-400 text-sm mt-2">This calculator is only for <strong>Ayushman Arogya Mandir (AYUSH)</strong> facilities.</p>
-            <p className="text-slate-400 text-sm mt-1">Your facility type: <strong>{hospital?.type || hospital?.facility_type || 'Unknown'}</strong></p>
+            <p className="text-slate-400 text-sm mt-2">
+              This calculator is only for <strong>Ayushman Arogya Mandir (AYUSH)</strong> facilities.
+            </p>
+            <p className="text-slate-400 text-sm mt-1">
+              Your facility type: <strong>{hospital?.type || hospital?.facility_type || 'Unknown'}</strong>
+            </p>
           </div>
         </div>
       ) : (
