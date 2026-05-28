@@ -56,6 +56,21 @@ interface EventReport {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const GLOBAL_DISTRICTS = [
+  'Dehradun','Haridwar','Pauri Garhwal','Tehri Garhwal','Uttarkashi','Chamoli','Rudraprayag',
+  'Almora','Nainital','Bageshwar','Pithoragarh','Champawat','US Nagar'
+];
+
+const globalNormalizeDistrict = (d?: string) => {
+  let s = (d || '').toLowerCase().trim()
+    .replace('us nagar', 'us nagar')
+    .replace('u.s. nagar', 'us nagar')
+    .replace('udham singh nagar', 'us nagar');
+  if (s.includes('pauri')) return 'pauri garhwal';
+  if (s.includes('tehri')) return 'tehri garhwal';
+  return s;
+};
+
 const isSuperOrState = (s: any) => ['SUPER_ADMIN', 'STATE_ADMIN'].includes(s?.role);
 const isDistrictAdmin = (s: any) => ['DISTRICT_ADMIN'].includes(s?.role);
 const isField = (s: any) => ['HOSPITAL', 'STAFF', 'DOCTOR'].includes(s?.role);
@@ -738,10 +753,7 @@ function EventDashboard({ events, subEvents, reports, session }: {
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [selectedSubEvent, setSelectedSubEvent] = useState<string>('all');
 
-  const DISTRICTS = [
-    'Dehradun','Haridwar','Pauri Garhwal','Tehri Garhwal','Uttarkashi','Chamoli','Rudraprayag',
-    'Almora','Nainital','Bageshwar','Pithoragarh','Champawat','US Nagar'
-  ];
+  const DISTRICTS = GLOBAL_DISTRICTS;
 
   // Sub-events for selected event
   const availableSubEvents = selectedEvent === 'all'
@@ -769,15 +781,7 @@ function EventDashboard({ events, subEvents, reports, session }: {
   const totalReports = filteredReports.length;
 
   // Normalize district name for matching
-  const normalizeDistrict = (d?: string) => {
-    let s = (d || '').toLowerCase().trim()
-      .replace('us nagar', 'us nagar')
-      .replace('u.s. nagar', 'us nagar')
-      .replace('udham singh nagar', 'us nagar');
-    if (s.includes('pauri')) return 'pauri garhwal';
-    if (s.includes('tehri')) return 'tehri garhwal';
-    return s;
-  };
+  const normalizeDistrict = globalNormalizeDistrict;
 
   const districtsReported = new Set(
     filteredReports.map(r => normalizeDistrict(r.district)).filter(Boolean)
@@ -1069,6 +1073,7 @@ export default function EventReporting({ session }: { session: any }) {
   const [filterEventId, setFilterEventId] = useState('all');
   const [filterSubEventId, setFilterSubEventId] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
+  const [filterDistrict, setFilterDistrict] = useState('all');
 
   // CSV Download function
   const downloadCSV = () => {
@@ -1199,6 +1204,11 @@ export default function EventReporting({ session }: { session: any }) {
     if (filterEventId !== 'all' && r.event_id !== filterEventId) return false;
     if (filterSubEventId !== 'all' && r.sub_event_id !== filterSubEventId) return false;
     if (filterLevel !== 'all' && r.report_level !== filterLevel) return false;
+    if (filterDistrict !== 'all') {
+      const rDist = globalNormalizeDistrict(r.district);
+      const fDist = globalNormalizeDistrict(filterDistrict);
+      if (rDist !== fDist) return false;
+    }
     return true;
   });
 
@@ -1340,6 +1350,15 @@ export default function EventReporting({ session }: { session: any }) {
                     <option value="field">Field</option>
                     <option value="district">District</option>
                     <option value="state">State</option>
+                  </select>
+                </div>
+
+                <div className="min-w-[150px]">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">District</label>
+                  <select value={filterDistrict} onChange={e => setFilterDistrict(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                    <option value="all">All Districts</option>
+                    {GLOBAL_DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
 
