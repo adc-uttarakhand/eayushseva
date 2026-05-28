@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import EventCertificate from './EventCertificate';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Flag, Plus, ChevronRight, ChevronDown, Users, MapPin,
   Calendar, FileText, CheckCircle, XCircle, Eye, Edit3,
   Trash2, Loader2, Camera, X, BarChart3, Building2,
-  Globe, Map, ListTree, ClipboardList, AlertCircle, Download
+  Globe, Map, ListTree, ClipboardList, AlertCircle, Download, Award
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -1248,6 +1249,7 @@ export default function EventReporting({ session }: { session: any }) {
             { key: 'events', label: 'Events', icon: Flag },
             { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { key: 'reports', label: 'All Reports', icon: ClipboardList },
+            { key: 'certificates', label: 'प्रमाण पत्र', icon: Award },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveView(tab.key as any)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeView === tab.key ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -1286,6 +1288,11 @@ export default function EventReporting({ session }: { session: any }) {
               </div>
             )}
           </>
+        )}
+
+        {/* Certificate View */}
+        {!loading && activeView === 'certificates' && (
+          <EventCertificate session={session} events={events} subEvents={subEvents} />
         )}
 
         {/* Dashboard View */}

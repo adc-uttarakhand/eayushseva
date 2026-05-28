@@ -78,6 +78,49 @@ function statusIcon(status: string) {
   return <Clock size={12} />;
 }
 
+// Remove white/light background from signature image
+async function removeWhiteBackground(file: File): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        // Calculate luminance (standard grayscaling)
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        
+        if (luma > 150) {
+          // Smooth fade out of any paper background
+          const alpha = luma >= 220 ? 0 : Math.round(((220 - luma) / 70) * 255);
+          data[i + 3] = Math.min(alpha, a);
+          
+          // Color-normalize semi-transparent pixels towards dark to prevent a white halo outline
+          const inkFactor = Math.min(1, Math.max(0, (luma - 150) / 70));
+          data[i] = Math.round(r * (1 - inkFactor));
+          data[i + 1] = Math.round(g * (1 - inkFactor));
+          data[i + 2] = Math.round(b * (1 - inkFactor));
+        } else {
+          // Solidify and boost contrast of the ink line
+          data[i] = Math.round(r * 0.7);
+          data[i + 1] = Math.round(g * 0.7);
+          data[i + 2] = Math.round(b * 0.7);
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob!), 'image/png');
+    };
+    img.src = url;
+  });
+}
+
 // ── ID Card Visual Component ──────────────────────────────────────────────────
 // ── Pure jsPDF drawing — no HTML capture ─────────────────────────────────────
 async function downloadIDCardAsPDF(staff: StaffData, request: IDCardRequest, signatureUrl?: string, filename?: string) {
@@ -733,8 +776,10 @@ function AdminView({ session }: { session: any }) {
     if (!file) return;
     setUploadingSign(true);
     try {
+      // Remove white background from signature
+      const processedBlob = await removeWhiteBackground(file);
       const path = `signatures/${session?.id}_${Date.now()}.png`;
-      const { error } = await supabase.storage.from('staff-photos').upload(path, file, { upsert: true });
+      const { error } = await supabase.storage.from('staff-photos').upload(path, processedBlob, { upsert: true, contentType: 'image/png' });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from('staff-photos').getPublicUrl(path);
       const url = urlData.publicUrl;
@@ -817,6 +862,7 @@ function AdminView({ session }: { session: any }) {
           <div>
             <h3 className="font-bold text-slate-800">Your Authorized Signature</h3>
             <p className="text-slate-400 text-xs mt-0.5">This will appear on all approved ID cards</p>
+            <p className="text-rose-600 font-bold text-xs mt-1.5">Please upload signature with transparent background in PNG format</p>
           </div>
           <div className="flex items-center gap-3">
             {mySignature && (
