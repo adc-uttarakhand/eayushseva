@@ -135,10 +135,13 @@ function SectionCard({ title, icon: Icon, color = 'emerald', children, defaultOp
   );
 }
 
-function YesNoField({ label, fieldKey, value, onChange, disabled }: any) {
+function YesNoField({ label, fieldKey, value, onChange, disabled, required }: any) {
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-500 block mb-1.5">{label}</label>
+      <label className="text-xs font-semibold text-slate-500 block mb-1.5">
+        {label}
+        {required && <span className="text-rose-500 ml-1 font-bold inline-block">*</span>}
+      </label>
       <div className="flex gap-2">
         {['Yes', 'No'].map(opt => (
           <button key={opt} type="button" disabled={disabled}
@@ -156,11 +159,12 @@ function YesNoField({ label, fieldKey, value, onChange, disabled }: any) {
   );
 }
 
-function NumberField({ label, fieldKey, value, onChange, disabled, highlight }: any) {
+function NumberField({ label, fieldKey, value, onChange, disabled, highlight, required }: any) {
   return (
     <div>
       <label className="text-xs font-semibold text-slate-500 block mb-1.5">
         {label}
+        {required && <span className="text-rose-500 ml-1 font-bold inline-block">*</span>}
         {highlight && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">Cumulative</span>}
       </label>
       <input type="number" min={0} disabled={disabled}
@@ -173,10 +177,13 @@ function NumberField({ label, fieldKey, value, onChange, disabled, highlight }: 
   );
 }
 
-function TextField({ label, fieldKey, value, onChange, disabled, placeholder }: any) {
+function TextField({ label, fieldKey, value, onChange, disabled, placeholder, required }: any) {
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-500 block mb-1.5">{label}</label>
+      <label className="text-xs font-semibold text-slate-500 block mb-1.5 font-bold">
+        {label}
+        {required && <span className="text-rose-500 ml-1 font-bold inline-block">*</span>}
+      </label>
       <input type="text" disabled={disabled} placeholder={placeholder}
         value={value ?? ''}
         onChange={e => onChange(fieldKey, e.target.value)}
@@ -328,10 +335,180 @@ function Form1View({ session, hospital }: any) {
     }
   };
 
+  const validateForm = (): boolean => {
+    const data = formData;
+
+    const isEmpty = (val: any) => {
+      if (val === 0 || val === '0') return false;
+      return val === undefined || val === null || String(val).trim() === '';
+    };
+
+    // 1. Progressive Functional HWC Section (Criteria 1-6) - ALL MANDATORY
+    if (isEmpty(data.branding_done)) { setToast('❌ Please select 1. Branding Done'); return false; }
+    if (isEmpty(data.infrastructure_completed)) { setToast('❌ Please select 2. Infrastructure Completed'); return false; }
+    if (isEmpty(data.herbal_garden_available)) { setToast('❌ Please select 3. Herbal Garden Available'); return false; }
+    if (data.herbal_garden_available === 'Yes' && isEmpty(data.herbal_garden_plants)) {
+      setToast('❌ Please specify No. of Plants in Herbal Garden'); return false;
+    }
+    if (isEmpty(data.medicine_available)) { setToast('❌ Please select 4. Medicine Available'); return false; }
+    if (isEmpty(data.it_network_available)) { setToast('❌ Please select 5. IT Network / Internet Available'); return false; }
+    if (isEmpty(data.cho_posted)) { setToast('❌ Please select 6. CHO Posted'); return false; }
+    if (isEmpty(data.yoga_instructor_appointed)) { setToast('❌ Please select Yoga Instructor Appointed'); return false; }
+
+    // 2. Training Status
+    if (isEmpty(data.cho_training_completed)) { setToast('❌ Please select Training of CHOs Completed'); return false; }
+    if (isEmpty(data.yoga_instructor_training_completed)) { setToast('❌ Please select Training of Yoga Instructors Completed'); return false; }
+    if (data.yoga_instructor_training_completed === 'Yes' && isEmpty(data.yoga_instructors_trained)) {
+      setToast('❌ Please specify No. of Yoga Instructors Trained'); return false;
+    }
+    if (isEmpty(data.asha_anm_training_completed)) { setToast('❌ Please select Training of ASHAs/ANMs Completed'); return false; }
+    if (data.asha_anm_training_completed === 'Yes') {
+      if (isEmpty(data.ashas_trained)) {
+        setToast('❌ Please specify No. of ASHAs Trained in AYUSH'); return false;
+      }
+      // No. of ANMs Trained (anms_trained) is optional!
+    }
+
+    // 3. OPD Services
+    if (isEmpty(data.opd_started)) { setToast('❌ Please select OPD Started'); return false; }
+    if (data.opd_started === 'Yes') {
+      if (isEmpty((data as any).opd_footfall_male_current_month)) {
+        setToast('❌ Please specify No. of Male Footfall — Current Month'); return false;
+      }
+      if (isEmpty((data as any).opd_footfall_female_current_month)) {
+        setToast('❌ Please specify No. of Female Footfall — Current Month'); return false;
+      }
+      // No. of Other Footfall (opd_footfall_other_current_month) is optional!
+      if (isEmpty((data as any).medicines_distributed_current_month)) {
+        setToast('❌ Please specify Medicines Distributed — Current Month'); return false;
+      }
+    }
+
+    // 4. Functional HWC Stage 1 - ALL MANDATORY
+    if (isEmpty(data.lab_services_available)) { setToast('❌ Please select 7. Lab Services Available'); return false; }
+    if (isEmpty(data.laptop_desktop_purchased)) { setToast('❌ Please select 8. Laptop/Desktop Purchased'); return false; }
+
+    // 5. Family Empanelment & CBAC Survey
+    if (isEmpty(data.family_empanelment_started)) { setToast('❌ Please select Family Empanelment Started'); return false; }
+    if (data.family_empanelment_started === 'Yes' && isEmpty(data.people_empanelled)) {
+      setToast('❌ Please specify No. of People Empanelled'); return false;
+    }
+    if (isEmpty(data.cbac_survey_started)) { setToast('❌ Please select CBAC Survey Started (30+ age)'); return false; }
+    if (data.cbac_survey_started === 'Yes' && isEmpty(data.cbac_survey_current_month)) {
+      setToast('❌ Please specify No. Underwent CBAC — Current Month'); return false;
+    }
+
+    // 7. Screening - Diabetes Mellitus
+    if (isEmpty(data.screening_dm)) { setToast('❌ Please select Screening for DM Started'); return false; }
+    if (data.screening_dm === 'Yes') {
+      if (isEmpty(data.screened_dm_current_month)) {
+        setToast('❌ Please specify No. Screened for DM — Current Month'); return false;
+      }
+      if (isEmpty(data.dm_on_treatment)) {
+        setToast('❌ Please specify No. of DM Cases on Treatment/Follow-up'); return false;
+      }
+    }
+
+    // 8. Screening - Hypertension
+    if (isEmpty(data.screening_ht)) { setToast('❌ Please select Screening for HT Started'); return false; }
+    if (data.screening_ht === 'Yes') {
+      if (isEmpty(data.screened_ht_current_month)) {
+        setToast('❌ Please specify No. Screened for HT — Current Month'); return false;
+      }
+      if (isEmpty(data.ht_on_treatment)) {
+        setToast('❌ Please specify No. of HT Cases on Treatment/Follow-up'); return false;
+      }
+    }
+
+    // 9. Cancer Screening
+    if (isEmpty(data.screening_oral_cancer)) { setToast('❌ Please select Screening for Oral Cancer'); return false; }
+    if (data.screening_oral_cancer === 'Yes') {
+      if (isEmpty((data as any).screened_oral_cancer_current_month)) {
+        setToast('❌ Please specify No. Screened for Oral Cancer — Current Month'); return false;
+      }
+      if (isEmpty(data.referred_oral_cancer)) {
+        setToast('❌ Please specify No. of Oral Cancer Cases Referred'); return false;
+      }
+      if (isEmpty((data as any).screened_breast_cancer_current_month)) {
+        setToast('❌ Please specify No. Screened for Breast Cancer — Current Month'); return false;
+      }
+      if (isEmpty(data.referred_breast_cancer)) {
+        setToast('❌ Please specify No. of Breast Cancer Cases Referred'); return false;
+      }
+    }
+
+    // 10. Additional Indicators
+    if (isEmpty((data as any).screened_cervix_cancer_current_month)) {
+      setToast('❌ Please specify No. of Cases Screened for Cervix Cancer — Current Month'); return false;
+    }
+    if (isEmpty((data as any).referred_cervix_cancer)) {
+      setToast('❌ Please specify No. of Referrals for Cervix Cancer'); return false;
+    }
+
+    // Prakriti Parikshan
+    if (isEmpty((data as any).prakriti_parikshan_started)) {
+      setToast('❌ Please select Prakriti Parikshan Started (18+ age population)'); return false;
+    }
+    if ((data as any).prakriti_parikshan_started === 'Yes') {
+      if (isEmpty((data as any).prakriti_parikshan_current_month)) {
+        setToast('❌ Please specify No. of People Underwent Prakriti Parikshan — Current Month'); return false;
+      }
+      if (isEmpty((data as any).counselled_after_prakriti_current_month)) {
+        setToast('❌ Please specify No. of People Counselled for Lifestyle after Prakriti Parikshan — Current Month'); return false;
+      }
+    }
+
+    // IEC Activity
+    if (isEmpty((data as any).iec_activity_done)) {
+      setToast('❌ Please select IEC Activity Done at Community Level'); return false;
+    }
+    if ((data as any).iec_activity_done === 'Yes' && isEmpty((data as any).iec_activities_description)) {
+      setToast('❌ Please specify What kind of IEC activities undertaken (mention any 3 activities)'); return false;
+    }
+
+    // Yoga Sessions
+    if (isEmpty((data as any).yoga_sessions_started)) {
+      setToast('❌ Please select Yoga Sessions Started'); return false;
+    }
+    if ((data as any).yoga_sessions_started === 'Yes') {
+      if (isEmpty((data as any).yoga_sessions_current_month)) {
+        setToast('❌ Please specify No. of Yoga Sessions Conducted — Current Month'); return false;
+      }
+      if (isEmpty((data as any).yoga_sessions_at_community)) {
+        setToast('❌ Please select if Yoga Sessions conducted at HWC and Community Level'); return false;
+      }
+    }
+
+    // Medicinal Plants
+    if (isEmpty((data as any).medicinal_plant_brochure)) {
+      setToast('❌ Please select Distribution of Brochure/Medicinal Plants'); return false;
+    }
+    if ((data as any).medicinal_plant_brochure === 'Yes' && isEmpty((data as any).families_medicinal_plant_distributed)) {
+      setToast('❌ Please specify No. of Families Distributed Medicinal Plants OR Brochure'); return false;
+    }
+
+    // Performance Based Incentives (mandatory)
+    if (isEmpty((data as any).incentive_cho)) {
+      setToast('❌ Please select Performance Based Incentives Received to CHOs'); return false;
+    }
+    if (isEmpty((data as any).incentive_asha)) {
+      setToast('❌ Please select Performance Based Incentives Received to ASHAs'); return false;
+    }
+    if (isEmpty((data as any).incentive_hwc_team)) {
+      setToast('❌ Please select Performance Based Incentives Received to HWC Team'); return false;
+    }
+
+    return true;
+  };
+
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   const handleSubmit = async () => {
     setShowSubmitConfirm(false);
+    if (!validateForm()) {
+      setTimeout(() => setToast(''), 4000);
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = buildPayload('submitted');
@@ -527,16 +704,16 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 2: Progressive Functional HWC Infrastructure */}
       <SectionCard title="Progressive Functional HWC — Infrastructure (Criteria 1-6)" icon={Activity} color="blue">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="1. Branding Done" fieldKey="branding_done" value={formData.branding_done} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="2. Infrastructure Completed" fieldKey="infrastructure_completed" value={formData.infrastructure_completed} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="3. Herbal Garden Available" fieldKey="herbal_garden_available" value={formData.herbal_garden_available} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="1. Branding Done" fieldKey="branding_done" value={formData.branding_done} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="2. Infrastructure Completed" fieldKey="infrastructure_completed" value={formData.infrastructure_completed} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="3. Herbal Garden Available" fieldKey="herbal_garden_available" value={formData.herbal_garden_available} onChange={handleChange} disabled={disabled} required />
           {formData.herbal_garden_available === 'Yes' && (
-            <NumberField label="No. of Plants in Herbal Garden" fieldKey="herbal_garden_plants" value={formData.herbal_garden_plants} onChange={handleChange} disabled={disabled} />
+            <NumberField label="No. of Plants in Herbal Garden" fieldKey="herbal_garden_plants" value={formData.herbal_garden_plants} onChange={handleChange} disabled={disabled} required />
           )}
-          <YesNoField label="4. Medicine Available" fieldKey="medicine_available" value={formData.medicine_available} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="5. IT Network / Internet Available" fieldKey="it_network_available" value={formData.it_network_available} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="6. CHO Posted" fieldKey="cho_posted" value={formData.cho_posted} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="Yoga Instructor Appointed" fieldKey="yoga_instructor_appointed" value={formData.yoga_instructor_appointed} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="4. Medicine Available" fieldKey="medicine_available" value={formData.medicine_available} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="5. IT Network / Internet Available" fieldKey="it_network_available" value={formData.it_network_available} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="6. CHO Posted" fieldKey="cho_posted" value={formData.cho_posted} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="Yoga Instructor Appointed" fieldKey="yoga_instructor_appointed" value={formData.yoga_instructor_appointed} onChange={handleChange} disabled={disabled} required />
         </div>
       </SectionCard>
 
@@ -549,15 +726,15 @@ function Form1View({ session, hospital }: any) {
               if (val === 'Yes') handleChange('cho_trained_count', 1);
               else handleChange('cho_trained_count', '');
             }}
-            disabled={disabled} />
-          <YesNoField label="Training of Yoga Instructors Completed" fieldKey="yoga_instructor_training_completed" value={formData.yoga_instructor_training_completed} onChange={handleChange} disabled={disabled} />
+            disabled={disabled} required />
+          <YesNoField label="Training of Yoga Instructors Completed" fieldKey="yoga_instructor_training_completed" value={formData.yoga_instructor_training_completed} onChange={handleChange} disabled={disabled} required />
           {formData.yoga_instructor_training_completed === 'Yes' && (
-            <NumberField label="No. of Yoga Instructors Trained" fieldKey="yoga_instructors_trained" value={formData.yoga_instructors_trained} onChange={handleChange} disabled={disabled} />
+            <NumberField label="No. of Yoga Instructors Trained" fieldKey="yoga_instructors_trained" value={formData.yoga_instructors_trained} onChange={handleChange} disabled={disabled} required />
           )}
-          <YesNoField label="Training of ASHAs/ANMs Completed" fieldKey="asha_anm_training_completed" value={formData.asha_anm_training_completed} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="Training of ASHAs/ANMs Completed" fieldKey="asha_anm_training_completed" value={formData.asha_anm_training_completed} onChange={handleChange} disabled={disabled} required />
           {formData.asha_anm_training_completed === 'Yes' && (
             <>
-              <NumberField label="No. of ASHAs Trained in AYUSH" fieldKey="ashas_trained" value={formData.ashas_trained} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. of ASHAs Trained in AYUSH" fieldKey="ashas_trained" value={formData.ashas_trained} onChange={handleChange} disabled={disabled} required />
               <NumberField label="No. of ANMs Trained in AYUSH" fieldKey="anms_trained" value={formData.anms_trained} onChange={handleChange} disabled={disabled} />
             </>
           )}
@@ -567,7 +744,7 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 4: OPD */}
       <SectionCard title="OPD Services" icon={Activity} color="orange">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="OPD Started" fieldKey="opd_started" value={formData.opd_started} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="OPD Started" fieldKey="opd_started" value={formData.opd_started} onChange={handleChange} disabled={disabled} required />
           {formData.opd_started === 'Yes' && (
             <>
               {/* Male / Female / Other fields */}
@@ -578,7 +755,7 @@ function Form1View({ session, hospital }: any) {
                 const f = Number((formData as any).opd_footfall_female_current_month) || 0;
                 const o = Number((formData as any).opd_footfall_other_current_month) || 0;
                 handleChange('opd_footfall_current_month', m + f + o);
-              }} disabled={disabled} />
+              }} disabled={disabled} required />
 
               <NumberField label="No. of Female Footfall — Current Month" fieldKey="opd_footfall_female_current_month" value={(formData as any).opd_footfall_female_current_month} onChange={(key: string, val: string) => {
                 handleChange(key, val);
@@ -586,7 +763,7 @@ function Form1View({ session, hospital }: any) {
                 const f = Number(val) || 0;
                 const o = Number((formData as any).opd_footfall_other_current_month) || 0;
                 handleChange('opd_footfall_current_month', m + f + o);
-              }} disabled={disabled} />
+              }} disabled={disabled} required />
 
               <NumberField label="No. of Other Footfall — Current Month" fieldKey="opd_footfall_other_current_month" value={(formData as any).opd_footfall_other_current_month} onChange={(key: string, val: string) => {
                 handleChange(key, val);
@@ -641,7 +818,7 @@ function Form1View({ session, hospital }: any) {
                   </span>
                 </div>
               </div>
-              <NumberField label="Medicines Distributed — Current Month" fieldKey="medicines_distributed_current_month" value={(formData as any).medicines_distributed_current_month} onChange={handleChange} disabled={disabled} />
+              <NumberField label="Medicines Distributed — Current Month" fieldKey="medicines_distributed_current_month" value={(formData as any).medicines_distributed_current_month} onChange={handleChange} disabled={disabled} required />
             </>
           )}
         </div>
@@ -650,22 +827,22 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 5: Stage-I */}
       <SectionCard title="Functional HWC Stage-I (Criteria 7-12)" icon={CheckCircle} color="slate">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="7. Lab Services Available" fieldKey="lab_services_available" value={formData.lab_services_available} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="8. Laptop/Desktop Purchased" fieldKey="laptop_desktop_purchased" value={formData.laptop_desktop_purchased} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="7. Lab Services Available" fieldKey="lab_services_available" value={formData.lab_services_available} onChange={handleChange} disabled={disabled} required />
+          <YesNoField label="8. Laptop/Desktop Purchased" fieldKey="laptop_desktop_purchased" value={formData.laptop_desktop_purchased} onChange={handleChange} disabled={disabled} required />
         </div>
       </SectionCard>
 
       {/* SECTION 6: Family Empanelment & CBAC */}
       <SectionCard title="Stage-II — Family Empanelment & CBAC Survey" icon={Users} color="blue">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="Family Empanelment Started" fieldKey="family_empanelment_started" value={formData.family_empanelment_started} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="Family Empanelment Started" fieldKey="family_empanelment_started" value={formData.family_empanelment_started} onChange={handleChange} disabled={disabled} required />
           {formData.family_empanelment_started === 'Yes' && (
-            <NumberField label="No. of People Empanelled" fieldKey="people_empanelled" value={formData.people_empanelled} onChange={handleChange} disabled={disabled} />
+            <NumberField label="No. of People Empanelled" fieldKey="people_empanelled" value={formData.people_empanelled} onChange={handleChange} disabled={disabled} required />
           )}
-          <YesNoField label="CBAC Survey Started (30+ age)" fieldKey="cbac_survey_started" value={formData.cbac_survey_started} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="CBAC Survey Started (30+ age)" fieldKey="cbac_survey_started" value={formData.cbac_survey_started} onChange={handleChange} disabled={disabled} required />
           {formData.cbac_survey_started === 'Yes' && (
             <>
-              <NumberField label="No. Underwent CBAC — Current Month" fieldKey="cbac_survey_current_month" value={formData.cbac_survey_current_month} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. Underwent CBAC — Current Month" fieldKey="cbac_survey_current_month" value={formData.cbac_survey_current_month} onChange={handleChange} disabled={disabled} required />
               <div className="md:col-span-2">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-blue-700">CBAC Survey — Cumulative (FY {financialYear})</span>
@@ -680,17 +857,17 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 7: DM Screening */}
       <SectionCard title="Screening — Diabetes Mellitus (DM)" icon={Activity} color="red">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="Screening for DM Started" fieldKey="screening_dm" value={formData.screening_dm} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="Screening for DM Started" fieldKey="screening_dm" value={formData.screening_dm} onChange={handleChange} disabled={disabled} required />
           {formData.screening_dm === 'Yes' && (
             <>
-              <NumberField label="No. Screened for DM — Current Month" fieldKey="screened_dm_current_month" value={formData.screened_dm_current_month} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. Screened for DM — Current Month" fieldKey="screened_dm_current_month" value={formData.screened_dm_current_month} onChange={handleChange} disabled={disabled} required />
               <div className="md:col-span-2">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-blue-700">DM Screening — Cumulative (FY {financialYear})</span>
                   <span className="text-lg font-bold text-blue-700">{getCumulative('screened_dm_current_month').toLocaleString('en-IN')}</span>
                 </div>
               </div>
-              <NumberField label="No. of DM Cases on Treatment/Follow-up" fieldKey="dm_on_treatment" value={formData.dm_on_treatment} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. of DM Cases on Treatment/Follow-up" fieldKey="dm_on_treatment" value={formData.dm_on_treatment} onChange={handleChange} disabled={disabled} required />
             </>
           )}
         </div>
@@ -699,17 +876,17 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 8: HT Screening */}
       <SectionCard title="Screening — Hypertension (HT)" icon={Activity} color="red">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="Screening for HT Started" fieldKey="screening_ht" value={formData.screening_ht} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="Screening for HT Started" fieldKey="screening_ht" value={formData.screening_ht} onChange={handleChange} disabled={disabled} required />
           {formData.screening_ht === 'Yes' && (
             <>
-              <NumberField label="No. Screened for HT — Current Month" fieldKey="screened_ht_current_month" value={formData.screened_ht_current_month} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. Screened for HT — Current Month" fieldKey="screened_ht_current_month" value={formData.screened_ht_current_month} onChange={handleChange} disabled={disabled} required />
               <div className="md:col-span-2">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-blue-700">HT Screening — Cumulative (FY {financialYear})</span>
                   <span className="text-lg font-bold text-blue-700">{getCumulative('screened_ht_current_month').toLocaleString('en-IN')}</span>
                 </div>
               </div>
-              <NumberField label="No. of HT Cases on Treatment/Follow-up" fieldKey="ht_on_treatment" value={formData.ht_on_treatment} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. of HT Cases on Treatment/Follow-up" fieldKey="ht_on_treatment" value={formData.ht_on_treatment} onChange={handleChange} disabled={disabled} required />
             </>
           )}
         </div>
@@ -718,7 +895,7 @@ function Form1View({ session, hospital }: any) {
       {/* SECTION 9: Cancer Screening */}
       <SectionCard title="Cancer Screening" icon={Activity} color="purple">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="Screening for Oral Cancer" fieldKey="screening_oral_cancer" value={formData.screening_oral_cancer} onChange={handleChange} disabled={disabled} />
+          <YesNoField label="Screening for Oral Cancer" fieldKey="screening_oral_cancer" value={formData.screening_oral_cancer} onChange={handleChange} disabled={disabled} required />
           {formData.screening_oral_cancer === 'Yes' && (
             <>
               <div className="md:col-span-2">
@@ -727,8 +904,8 @@ function Form1View({ session, hospital }: any) {
                   <span className="text-lg font-bold text-blue-700">{getCumulative('screened_oral_cancer_current_month' as any).toLocaleString('en-IN')}</span>
                 </div>
               </div>
-              <NumberField label="No. Screened for Oral Cancer — Current Month" fieldKey="screened_oral_cancer_current_month" value={(formData as any).screened_oral_cancer_current_month} onChange={handleChange} disabled={disabled} />
-              <NumberField label="No. of Oral Cancer Cases Referred" fieldKey="referred_oral_cancer" value={formData.referred_oral_cancer} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. Screened for Oral Cancer — Current Month" fieldKey="screened_oral_cancer_current_month" value={(formData as any).screened_oral_cancer_current_month} onChange={handleChange} disabled={disabled} required />
+              <NumberField label="No. of Oral Cancer Cases Referred" fieldKey="referred_oral_cancer" value={formData.referred_oral_cancer} onChange={handleChange} disabled={disabled} required />
             </>
           )}
 
@@ -739,8 +916,8 @@ function Form1View({ session, hospital }: any) {
                 <span className="text-xs font-semibold text-blue-700">Breast Cancer Screening — Cumulative (FY {financialYear})</span>
                 <span className="text-lg font-bold text-blue-700">{getCumulative('screened_breast_cancer_current_month' as any).toLocaleString('en-IN')}</span>
               </div>
-              <NumberField label="No. Screened for Breast Cancer — Current Month" fieldKey="screened_breast_cancer_current_month" value={(formData as any).screened_breast_cancer_current_month} onChange={handleChange} disabled={disabled} />
-              <NumberField label="No. of Breast Cancer Cases Referred" fieldKey="referred_breast_cancer" value={formData.referred_breast_cancer} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. Screened for Breast Cancer — Current Month" fieldKey="screened_breast_cancer_current_month" value={(formData as any).screened_breast_cancer_current_month} onChange={handleChange} disabled={disabled} required={formData.screening_oral_cancer === 'Yes'} />
+              <NumberField label="No. of Breast Cancer Cases Referred" fieldKey="referred_breast_cancer" value={formData.referred_breast_cancer} onChange={handleChange} disabled={disabled} required={formData.screening_oral_cancer === 'Yes'} />
             </div>
           </div>
         </div>
@@ -754,12 +931,12 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Cervix Cancer Screening</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <NumberField label="No. of Cases Screened for Cervix Cancer — Current Month" fieldKey="screened_cervix_cancer_current_month" value={(formData as any).screened_cervix_cancer_current_month} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. of Cases Screened for Cervix Cancer — Current Month" fieldKey="screened_cervix_cancer_current_month" value={(formData as any).screened_cervix_cancer_current_month} onChange={handleChange} disabled={disabled} required />
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                 <span className="text-xs font-semibold text-blue-700">Cervix Cancer Screening — Cumulative (FY {financialYear})</span>
                 <span className="text-lg font-bold text-blue-700">{getCumulative('screened_cervix_cancer_current_month').toLocaleString('en-IN')}</span>
               </div>
-              <NumberField label="No. of Referrals for Cervix Cancer" fieldKey="referred_cervix_cancer" value={(formData as any).referred_cervix_cancer} onChange={handleChange} disabled={disabled} />
+              <NumberField label="No. of Referrals for Cervix Cancer" fieldKey="referred_cervix_cancer" value={(formData as any).referred_cervix_cancer} onChange={handleChange} disabled={disabled} required />
             </div>
           </div>
 
@@ -767,15 +944,15 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2 border-t border-slate-100 pt-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Prakriti Parikshan</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <YesNoField label="Prakriti Parikshan Started (18+ age population)" fieldKey="prakriti_parikshan_started" value={(formData as any).prakriti_parikshan_started} onChange={handleChange} disabled={disabled} />
+              <YesNoField label="Prakriti Parikshan Started (18+ age population)" fieldKey="prakriti_parikshan_started" value={(formData as any).prakriti_parikshan_started} onChange={handleChange} disabled={disabled} required />
               {(formData as any).prakriti_parikshan_started === 'Yes' && (
                 <>
-                  <NumberField label="No. of People Underwent Prakriti Parikshan — Current Month" fieldKey="prakriti_parikshan_current_month" value={(formData as any).prakriti_parikshan_current_month} onChange={handleChange} disabled={disabled} />
+                  <NumberField label="No. of People Underwent Prakriti Parikshan — Current Month" fieldKey="prakriti_parikshan_current_month" value={(formData as any).prakriti_parikshan_current_month} onChange={handleChange} disabled={disabled} required />
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-xs font-semibold text-blue-700">Prakriti Parikshan — Cumulative (FY {financialYear})</span>
                     <span className="text-lg font-bold text-blue-700">{getCumulative('prakriti_parikshan_current_month').toLocaleString('en-IN')}</span>
                   </div>
-                  <NumberField label="No. of People Counselled for Lifestyle after Prakriti Parikshan — Current Month" fieldKey="counselled_after_prakriti_current_month" value={(formData as any).counselled_after_prakriti_current_month} onChange={handleChange} disabled={disabled} />
+                  <NumberField label="No. of People Counselled for Lifestyle after Prakriti Parikshan — Current Month" fieldKey="counselled_after_prakriti_current_month" value={(formData as any).counselled_after_prakriti_current_month} onChange={handleChange} disabled={disabled} required />
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-xs font-semibold text-blue-700">Counselled after Prakriti — Cumulative (FY {financialYear})</span>
                     <span className="text-lg font-bold text-blue-700">{getCumulative('counselled_after_prakriti_current_month').toLocaleString('en-IN')}</span>
@@ -789,10 +966,13 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2 border-t border-slate-100 pt-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">IEC Activity</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <YesNoField label="IEC Activity Done at Community Level" fieldKey="iec_activity_done" value={(formData as any).iec_activity_done} onChange={handleChange} disabled={disabled} />
+              <YesNoField label="IEC Activity Done at Community Level" fieldKey="iec_activity_done" value={(formData as any).iec_activity_done} onChange={handleChange} disabled={disabled} required />
               {(formData as any).iec_activity_done === 'Yes' && (
                 <div className="md:col-span-2">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1.5">What kind of IEC activities undertaken (mention any 3 activities)</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1.5">
+                    What kind of IEC activities undertaken (mention any 3 activities)
+                    <span className="text-rose-500 ml-1 font-bold inline-block">*</span>
+                  </label>
                   <textarea disabled={disabled}
                     value={(formData as any).iec_activities_description ?? ''}
                     onChange={e => handleChange('iec_activities_description', e.target.value)}
@@ -807,15 +987,15 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2 border-t border-slate-100 pt-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Yoga Sessions</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <YesNoField label="Yoga Sessions Started" fieldKey="yoga_sessions_started" value={(formData as any).yoga_sessions_started} onChange={handleChange} disabled={disabled} />
+              <YesNoField label="Yoga Sessions Started" fieldKey="yoga_sessions_started" value={(formData as any).yoga_sessions_started} onChange={handleChange} disabled={disabled} required />
               {(formData as any).yoga_sessions_started === 'Yes' && (
                 <>
-                  <NumberField label="No. of Yoga Sessions Conducted — Current Month" fieldKey="yoga_sessions_current_month" value={(formData as any).yoga_sessions_current_month} onChange={handleChange} disabled={disabled} />
+                  <NumberField label="No. of Yoga Sessions Conducted — Current Month" fieldKey="yoga_sessions_current_month" value={(formData as any).yoga_sessions_current_month} onChange={handleChange} disabled={disabled} required />
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-xs font-semibold text-blue-700">Yoga Sessions — Cumulative (FY {financialYear})</span>
                     <span className="text-lg font-bold text-blue-700">{getCumulative('yoga_sessions_current_month').toLocaleString('en-IN')}</span>
                   </div>
-                  <YesNoField label="If Yes, Yoga Sessions Conducted at HWC and Community Level" fieldKey="yoga_sessions_at_community" value={(formData as any).yoga_sessions_at_community} onChange={handleChange} disabled={disabled} />
+                  <YesNoField label="If Yes, Yoga Sessions Conducted at HWC and Community Level" fieldKey="yoga_sessions_at_community" value={(formData as any).yoga_sessions_at_community} onChange={handleChange} disabled={disabled} required />
                 </>
               )}
             </div>
@@ -825,10 +1005,10 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2 border-t border-slate-100 pt-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Medicinal Plants Distribution</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <YesNoField label="Distribution of Brochure on Medicinal Plants / Or Medicinal Plant Started to Families" fieldKey="medicinal_plant_brochure" value={(formData as any).medicinal_plant_brochure} onChange={handleChange} disabled={disabled} />
+              <YesNoField label="Distribution of Brochure on Medicinal Plants / Or Medicinal Plant Started to Families" fieldKey="medicinal_plant_brochure" value={(formData as any).medicinal_plant_brochure} onChange={handleChange} disabled={disabled} required />
               {(formData as any).medicinal_plant_brochure === 'Yes' && (
                 <>
-                  <NumberField label="No. of Families Distributed Medicinal Plants OR Brochure in Catchment Area" fieldKey="families_medicinal_plant_distributed" value={(formData as any).families_medicinal_plant_distributed} onChange={handleChange} disabled={disabled} />
+                  <NumberField label="No. of Families Distributed Medicinal Plants OR Brochure in Catchment Area" fieldKey="families_medicinal_plant_distributed" value={(formData as any).families_medicinal_plant_distributed} onChange={handleChange} disabled={disabled} required />
                 </>
               )}
             </div>
@@ -838,9 +1018,9 @@ function Form1View({ session, hospital }: any) {
           <div className="md:col-span-2 border-t border-slate-100 pt-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Performance Based Incentives</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <YesNoField label="Performance Based Incentives Received to CHOs" fieldKey="incentive_cho" value={(formData as any).incentive_cho} onChange={handleChange} disabled={disabled} />
-              <YesNoField label="Performance Based Incentives Received to ASHAs" fieldKey="incentive_asha" value={(formData as any).incentive_asha} onChange={handleChange} disabled={disabled} />
-              <YesNoField label="Performance Based Incentives Received to HWC Team" fieldKey="incentive_hwc_team" value={(formData as any).incentive_hwc_team} onChange={handleChange} disabled={disabled} />
+              <YesNoField label="Performance Based Incentives Received to CHOs" fieldKey="incentive_cho" value={(formData as any).incentive_cho} onChange={handleChange} disabled={disabled} required />
+              <YesNoField label="Performance Based Incentives Received to ASHAs" fieldKey="incentive_asha" value={(formData as any).incentive_asha} onChange={handleChange} disabled={disabled} required />
+              <YesNoField label="Performance Based Incentives Received to HWC Team" fieldKey="incentive_hwc_team" value={(formData as any).incentive_hwc_team} onChange={handleChange} disabled={disabled} required />
             </div>
           </div>
 
@@ -869,7 +1049,7 @@ function Form1View({ session, hospital }: any) {
             className="flex-1 flex items-center justify-center gap-2 py-3.5 border-2 border-emerald-300 text-emerald-700 bg-emerald-50 rounded-2xl font-bold text-sm hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <><Loader2 size={16} className="animate-spin" />Saving...</> : <><Save size={16} />Save Draft</>}
           </button>
-          <button onClick={() => setShowSubmitConfirm(true)} disabled={saving || submitting || isTooEarly}
+          <button onClick={() => { if (validateForm()) { setShowSubmitConfirm(true); } else { setTimeout(() => setToast(''), 4000); } }} disabled={saving || submitting || isTooEarly}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed">
             {submitting ? <><Loader2 size={16} className="animate-spin" />Submitting...</> : <><Send size={16} />Submit Form</>}
           </button>
