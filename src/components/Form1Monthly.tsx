@@ -524,19 +524,6 @@ function Form1View({ session, hospital }: any) {
         )}
       </div>
 
-      {/* SECTION 1: Local Coordination */}
-      <SectionCard title="Local & Intersectoral Coordination" icon={Building2} color="emerald">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <YesNoField label="DPMU/District AYUSH Society Formed" fieldKey="dpmu_formed" value={formData.dpmu_formed} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="MOU with Local District (NHM)" fieldKey="mou_with_nhm" value={formData.mou_with_nhm} onChange={handleChange} disabled={disabled} />
-          <YesNoField label="MOU with Private Partners" fieldKey="mou_with_private" value={formData.mou_with_private} onChange={handleChange} disabled={disabled} />
-          {formData.mou_with_private === 'Yes' && (
-            <TextField label="Name of Organization (MOU Partner)" fieldKey="mou_partner_name" value={formData.mou_partner_name} onChange={handleChange} disabled={disabled} placeholder="Organization name" />
-          )}
-          <YesNoField label="Inter-sectoral Convergence (VHSNC/VHND)" fieldKey="intersectoral_convergence" value={formData.intersectoral_convergence} onChange={handleChange} disabled={disabled} />
-        </div>
-      </SectionCard>
-
       {/* SECTION 2: Progressive Functional HWC Infrastructure */}
       <SectionCard title="Progressive Functional HWC — Infrastructure (Criteria 1-6)" icon={Activity} color="blue">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1225,8 +1212,6 @@ function AdminView({ session }: any) {
                     ['AYUSH Stream', viewingForm.ayush_stream],
                     ['Submitted By', viewingForm.submitted_by],
                     ['Submitted At', viewingForm.submitted_at ? new Date(viewingForm.submitted_at).toLocaleString('en-IN') : '—'],
-                    ['DPMU Formed', viewingForm.dpmu_formed],
-                    ['MOU with NHM', viewingForm.mou_with_nhm],
                     ['Branding Done', viewingForm.branding_done],
                     ['CHO Posted', viewingForm.cho_posted],
                     ['OPD Started', viewingForm.opd_started],
