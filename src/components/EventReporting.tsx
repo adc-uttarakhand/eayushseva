@@ -739,7 +739,7 @@ function EventDashboard({ events, subEvents, reports, session }: {
   const [selectedSubEvent, setSelectedSubEvent] = useState<string>('all');
 
   const DISTRICTS = [
-    'Dehradun','Haridwar','Pauri','Tehri','Uttarkashi','Chamoli','Rudraprayag',
+    'Dehradun','Haridwar','Pauri Garhwal','Tehri Garhwal','Uttarkashi','Chamoli','Rudraprayag',
     'Almora','Nainital','Bageshwar','Pithoragarh','Champawat','US Nagar'
   ];
 
@@ -769,10 +769,15 @@ function EventDashboard({ events, subEvents, reports, session }: {
   const totalReports = filteredReports.length;
 
   // Normalize district name for matching
-  const normalizeDistrict = (d?: string) => (d || '').toLowerCase().trim()
-    .replace('us nagar', 'us nagar')
-    .replace('u.s. nagar', 'us nagar')
-    .replace('udham singh nagar', 'us nagar');
+  const normalizeDistrict = (d?: string) => {
+    let s = (d || '').toLowerCase().trim()
+      .replace('us nagar', 'us nagar')
+      .replace('u.s. nagar', 'us nagar')
+      .replace('udham singh nagar', 'us nagar');
+    if (s.includes('pauri')) return 'pauri garhwal';
+    if (s.includes('tehri')) return 'tehri garhwal';
+    return s;
+  };
 
   const districtsReported = new Set(
     filteredReports.map(r => normalizeDistrict(r.district)).filter(Boolean)
@@ -991,7 +996,7 @@ function EventDashboard({ events, subEvents, reports, session }: {
             </thead>
             <tbody>
               {(() => {
-                const normDist = (d?: string) => (d || '').toLowerCase().trim();
+                const normDist = (d?: string) => normalizeDistrict(d);
                 const rows = DISTRICTS.map(district => {
                   const distReports = filteredReports.filter(r =>
                     normDist(r.district) === normDist(district)
