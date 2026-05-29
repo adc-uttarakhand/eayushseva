@@ -285,12 +285,14 @@ const PRINT_CSS = `
     body * { visibility: hidden !important; }
     .incentive-print-slip, .incentive-print-slip * { visibility: visible !important; }
     .incentive-print-slip {
-      position: fixed !important;
+      position: absolute !important;
       top: 0 !important; left: 0 !important;
-      width: 100% !important; background: white !important;
+      width: 100% !important;
       padding: 0 !important; margin: 0 !important;
+      overflow: visible !important;
     }
-    @page { size: A4 portrait; margin: 12mm 15mm; }
+    @page { size: A4 portrait; margin: 10mm; }
+    html, body { height: auto !important; overflow: visible !important; }
   }
 `;
 
@@ -356,10 +358,7 @@ function PrintContent({ form, hospital, selectedMonth, selectedYear, financialYe
             </td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px' }} colSpan={2}>
-              <strong>Prepared by:</strong> {form.cho_name || '—'}
-            </td>
-            <td style={{ padding: '2px 4px' }} colSpan={2}>
+            <td style={{ padding: '2px 4px' }} colSpan={4}>
               <strong>Date:</strong> {printDate}
             </td>
           </tr>
@@ -469,7 +468,6 @@ function PrintContent({ form, hospital, selectedMonth, selectedYear, financialYe
 
       {/* ── Signatures ── */}      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', gap: '16px' }}>
         {[
-          { title: 'CHO Signature', sub: form.cho_name || '________________________' },
           { title: 'Medical Officer / Incharge Signature', sub: 'Name & Designation' },
           { title: 'Counter Sign By DAUO', sub: 'Name & Designation' },
         ].map((sig, i) => (
@@ -507,7 +505,7 @@ function PrintSlip({ form, hospital, selectedMonth, selectedYear, financialYear,
       <div className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex flex-col items-center justify-start overflow-y-auto p-4 pt-6">
 
         {/* Modal chrome (buttons etc.) */}
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-slate-700 to-slate-600 text-white">
             <div className="flex items-center gap-2">
               <Printer size={17} />
@@ -528,7 +526,7 @@ function PrintSlip({ form, hospital, selectedMonth, selectedYear, financialYear,
           </div>
 
           {/* A4 preview on screen */}
-          <div className="bg-slate-200 p-4">
+          <div className="bg-slate-200 p-4 flex-1 overflow-y-auto">
             <div className="bg-white shadow-lg rounded p-6" style={{ minHeight: '297mm' }}>
               <PrintContent
                 form={form} hospital={hospital}
@@ -543,8 +541,7 @@ function PrintSlip({ form, hospital, selectedMonth, selectedYear, financialYear,
       </div>
 
       {/* Actual print target — invisible on screen, shown by print CSS */}
-      <div className="incentive-print-slip" style={{ position: 'fixed', top: 0, left: 0, zIndex: -999, opacity: 0, pointerEvents: 'none' }}>
-        <div style={{ padding: '0' }}>
+      <div className="incentive-print-slip" style={{ position: 'absolute', top: 0, left: 0, zIndex: -999, opacity: 0, pointerEvents: 'none' }}>
           <PrintContent
             form={form} hospital={hospital}
             selectedMonth={selectedMonth} selectedYear={selectedYear}
@@ -552,7 +549,6 @@ function PrintSlip({ form, hospital, selectedMonth, selectedYear, financialYear,
             rawPcts={rawPcts} pcts={pcts} targets={targets}
             choIncentive={choIncentive} ashaIncentive={ashaIncentive}
           />
-        </div>
       </div>
     </>
   );
