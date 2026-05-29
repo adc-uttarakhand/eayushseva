@@ -279,23 +279,6 @@ function isSuperOrState(s: any) { return ['SUPER_ADMIN', 'STATE_ADMIN'].includes
 function isDistrictAdmin(s: any) { return s?.role === 'DISTRICT_ADMIN'; }
 function isAdmin(s: any) { return isSuperOrState(s) || isDistrictAdmin(s); }
 
-// ── Print Styles (injected once) ──────────────────────────────────────────────
-const PRINT_CSS = `
-  @media print {
-    body * { visibility: hidden !important; }
-    .incentive-print-slip, .incentive-print-slip * { visibility: visible !important; }
-    .incentive-print-slip {
-      position: absolute !important;
-      top: 0 !important; left: 0 !important;
-      width: 100% !important;
-      padding: 0 !important; margin: 0 !important;
-      overflow: visible !important;
-    }
-    @page { size: A4 portrait; margin: 10mm; }
-    html, body { height: auto !important; overflow: visible !important; }
-  }
-`;
-
 // Table cell styles (used in PrintContent)
 const TH: React.CSSProperties = {
   border: '1px solid #999', padding: '4px 5px',
@@ -494,63 +477,95 @@ function PrintContent({ form, hospital, selectedMonth, selectedYear, financialYe
 function PrintSlip({ form, hospital, selectedMonth, selectedYear, financialYear,
   rawPcts, pcts, targets, choIncentive, ashaIncentive, onClose }: any) {
 
-  const handlePrint = () => window.print();
+  // Opens a new window with the preview's innerHTML and triggers print.
+  // This is the most reliable approach in React SPAs — avoids visibility/opacity
+  // conflicts that cause blank pages with the dual-render CSS trick.
+  const handlePrint = () => {
+    const content = document.getElementById('incentive-print-content');
+    if (!content) return;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Popup blocked — please allow popups for this site to print.');
+      return;
+    }
+
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Incentive Statement — ${MONTHS[selectedMonth - 1]} ${selectedYear}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+      color: #000;
+      background: #fff;
+      padding: 0;
+    }
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    table { border-collapse: collapse; width: 100%; }
+    p { margin: 0; }
+  </style>
+</head>
+<body>
+  ${content.innerHTML}
+</body>
+</html>`);
+
+    win.document.close();
+
+    // Small delay so browser finishes rendering before print dialog opens
+    setTimeout(() => {
+      win.focus();
+      win.print();
+    }, 350);
+  };
 
   return (
-    <>
-      {/* Inject print CSS */}
-      <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
+    <div className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex flex-col items-center justify-start overflow-y-auto p-4 pt-6">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
 
-      {/* Screen modal — hidden on print via visibility trick */}
-      <div className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex flex-col items-center justify-start overflow-y-auto p-4 pt-6">
-
-        {/* Modal chrome (buttons etc.) */}
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-          <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-slate-700 to-slate-600 text-white">
-            <div className="flex items-center gap-2">
-              <Printer size={17} />
-              <span className="font-bold text-sm">Incentive Statement — {MONTHS[selectedMonth - 1]} {selectedYear}</span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                <Printer size={14} /> Print / Save PDF
-              </button>
-              <button
-                onClick={onClose}
-                className="text-slate-300 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-slate-700 to-slate-600 text-white flex-shrink-0 rounded-t-2xl">
+          <div className="flex items-center gap-2">
+            <Printer size={17} />
+            <span className="font-bold text-sm">
+              Incentive Statement — {MONTHS[selectedMonth - 1]} {selectedYear}
+            </span>
           </div>
-
-          {/* A4 preview on screen */}
-          <div className="bg-slate-200 p-4 flex-1 overflow-y-auto">
-            <div className="bg-white shadow-lg rounded p-6" style={{ minHeight: '297mm' }}>
-              <PrintContent
-                form={form} hospital={hospital}
-                selectedMonth={selectedMonth} selectedYear={selectedYear}
-                financialYear={financialYear}
-                rawPcts={rawPcts} pcts={pcts} targets={targets}
-                choIncentive={choIncentive} ashaIncentive={ashaIncentive}
-              />
-            </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+              <Printer size={14} /> Print / Save PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="text-slate-300 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors">
+              <X size={16} />
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Actual print target — invisible on screen, shown by print CSS */}
-      <div className="incentive-print-slip" style={{ position: 'absolute', top: 0, left: 0, zIndex: -999, opacity: 0, pointerEvents: 'none' }}>
-          <PrintContent
-            form={form} hospital={hospital}
-            selectedMonth={selectedMonth} selectedYear={selectedYear}
-            financialYear={financialYear}
-            rawPcts={rawPcts} pcts={pcts} targets={targets}
-            choIncentive={choIncentive} ashaIncentive={ashaIncentive}
-          />
+        {/* Preview — this div's innerHTML is sent to the print window */}
+        <div className="bg-slate-200 p-4 flex-1 overflow-y-auto">
+          <div
+            id="incentive-print-content"
+            className="bg-white shadow-lg rounded p-6">
+            <PrintContent
+              form={form} hospital={hospital}
+              selectedMonth={selectedMonth} selectedYear={selectedYear}
+              financialYear={financialYear}
+              rawPcts={rawPcts} pcts={pcts} targets={targets}
+              choIncentive={choIncentive} ashaIncentive={ashaIncentive}
+            />
+          </div>
+        </div>
+
       </div>
-    </>
+    </div>
   );
 }
 
