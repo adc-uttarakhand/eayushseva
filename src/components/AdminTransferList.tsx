@@ -189,6 +189,7 @@ export default function AdminTransferList({ session }: { session: any }) {
                         <thead className="bg-slate-100 text-slate-700 sticky top-0">
                             <tr>
                                 <th className="p-4 font-semibold">Applicant Name</th>
+                                <th className="p-4 font-semibold">Role</th>
                                 <th className="p-4 font-semibold">Home District</th>
                                 <th className="p-4 font-semibold">Present District</th>
                                 <th className="p-4 font-semibold">Posting Place</th>
@@ -205,7 +206,7 @@ export default function AdminTransferList({ session }: { session: any }) {
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={10} className="p-8 text-center text-slate-500">
+                                    <td colSpan={13} className="p-8 text-center text-slate-500">
                                         <Loader2 size={32} className="animate-spin mx-auto mb-2" />
                                         Loading applications...
                                     </td>
@@ -217,6 +218,7 @@ export default function AdminTransferList({ session }: { session: any }) {
                                     className="hover:bg-slate-50 cursor-pointer transition-all"
                                 >
                                     <td className="p-4 font-medium text-slate-900">{app.applicant_name}</td>
+                                    <td className="p-4">{app.category || '-'}</td>
                                     <td className="p-4">{app.home_district || '-'}</td>
                                     <td className="p-4">{app.present_posting}</td>
                                     <td className="p-4">{app.present_posting_hospital || app.present_posting_place || app.main_posting_name || app.present_posting_name || '-'}</td>
