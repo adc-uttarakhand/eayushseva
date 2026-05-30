@@ -14,6 +14,15 @@ export default function AdminTransferList({ session }: { session: any }) {
 
     const [applications, setApplications] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null);
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     const filterOptions = React.useMemo(() => {
         const roles = Array.from(new Set(applications.map(a => a.category).filter(Boolean)));
@@ -39,6 +48,33 @@ export default function AdminTransferList({ session }: { session: any }) {
             return matchesAdminDistrict && matchesSearch && matchesRole && matchesDistrict && matchesCategory && matchesSubCategory;
         });
     }, [applications, searchTerm, selectedRole, selectedDistrict, selectedCategory, selectedSubCategory, session]);
+
+    const sortedApplications = React.useMemo(() => {
+        let sortableApplications = [...filteredApplications];
+        if (sortConfig !== null) {
+            sortableApplications.sort((a, b) => {
+                let aValue = a[sortConfig.key];
+                let bValue = b[sortConfig.key];
+                
+                if (aValue === undefined || aValue === null) aValue = '';
+                if (bValue === undefined || bValue === null) bValue = '';
+                
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableApplications;
+    }, [filteredApplications, sortConfig]);
+
+    const SortIcon = ({ columnKey }: { columnKey: string }) => {
+        if (sortConfig?.key !== columnKey) return null;
+        return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
+    };
 
     useEffect(() => {
         const fetchApplications = async () => {
@@ -188,19 +224,19 @@ export default function AdminTransferList({ session }: { session: any }) {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-100 text-slate-700 sticky top-0">
                             <tr>
-                                <th className="p-4 font-semibold">Applicant Name</th>
-                                <th className="p-4 font-semibold">Role</th>
-                                <th className="p-4 font-semibold">Home District</th>
-                                <th className="p-4 font-semibold">Present District</th>
-                                <th className="p-4 font-semibold">Posting Place</th>
-                                <th className="p-4 font-semibold">Posting Since</th>
-                                <th className="p-4 font-semibold">Category</th>
-                                <th className="p-4 font-semibold">Sub-category</th>
-                                <th className="p-4 font-semibold">Sugam Days</th>
-                                <th className="p-4 font-semibold">Durgam Days (&lt;7000ft)</th>
-                                <th className="p-4 font-semibold">Durgam Days (&gt;7000ft)</th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('applicant_name')}>Applicant Name <SortIcon columnKey="applicant_name" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('category')}>Role <SortIcon columnKey="category" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('home_district')}>Home District <SortIcon columnKey="home_district" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('present_posting')}>Present District <SortIcon columnKey="present_posting" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('present_posting_place')}>Posting Place <SortIcon columnKey="present_posting_place" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('present_posting_since')}>Posting Since <SortIcon columnKey="present_posting_since" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('application_type')}>Category <SortIcon columnKey="application_type" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('transfer_category')}>Sub-category <SortIcon columnKey="transfer_category" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('calculated_sugam_days')}>Sugam Days <SortIcon columnKey="calculated_sugam_days" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('calculated_durgam_below_7000_days')}>Durgam Days (&lt;7000ft) <SortIcon columnKey="calculated_durgam_below_7000_days" /></th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('calculated_durgam_above_7000_days')}>Durgam Days (&gt;7000ft) <SortIcon columnKey="calculated_durgam_above_7000_days" /></th>
                                 <th className="p-4 font-semibold">Choices</th>
-                                <th className="p-4 font-semibold">Status</th>
+                                <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => handleSort('form_submitted')}>Status <SortIcon columnKey="form_submitted" /></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -211,7 +247,7 @@ export default function AdminTransferList({ session }: { session: any }) {
                                         Loading applications...
                                     </td>
                                 </tr>
-                            ) : filteredApplications.map((app) => (
+                            ) : sortedApplications.map((app) => (
                                 <tr 
                                     key={app.id} 
                                     onClick={() => handleRowClick(app)}
