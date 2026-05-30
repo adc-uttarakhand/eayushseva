@@ -826,19 +826,19 @@ function EventDashboard({ events, subEvents, reports, session }: {
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+          <div className="flex items-center gap-2 flex-1 min-w-[160px]">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">Event:</label>
             <select value={selectedEvent} onChange={e => handleEventChange(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1">
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1 min-w-0">
               <option value="all">All Events</option>
               {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
             </select>
           </div>
           {availableSubEvents.length > 0 && (
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <div className="flex items-center gap-2 flex-1 min-w-[160px]">
               <label className="text-xs font-bold uppercase tracking-wider text-purple-400 whitespace-nowrap">Sub-Event:</label>
               <select value={selectedSubEvent} onChange={e => setSelectedSubEvent(e.target.value)}
-                className="border border-purple-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1 bg-purple-50">
+                className="border border-purple-200 rounded-xl px-3 py-2 text-sm focus:outline-none flex-1 min-w-0 bg-purple-50">
                 <option value="all">All Sub-Events</option>
                 <option value="main_only">Main Event Only</option>
                 {availableSubEvents.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
