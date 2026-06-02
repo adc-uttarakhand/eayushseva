@@ -1124,14 +1124,19 @@ export default function EventReporting({ session }: { session: any }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: evts }, { data: subs }, { data: reps }] = await Promise.all([
+    const [{ data: evts }, { data: subs }] = await Promise.all([
       supabase.from('events').select('*').order('created_at', { ascending: false }),
       supabase.from('sub_events').select('*').order('start_date', { ascending: true }),
-      supabase.from('event_reports').select('*').order('created_at', { ascending: false }),
     ]);
+    
+    const [{ data: reps1 }, { data: reps2 }] = await Promise.all([
+      supabase.from('event_reports').select('*').range(0, 999).order('created_at', { ascending: false }),
+      supabase.from('event_reports').select('*').range(1000, 1999).order('created_at', { ascending: false }),
+    ]);
+    
     setEvents(evts || []);
     setSubEvents(subs || []);
-    setReports(reps || []);
+    setReports([...(reps1 || []), ...(reps2 || [])]);
     setLoading(false);
   }, []);
 
