@@ -1129,14 +1129,20 @@ export default function EventReporting({ session }: { session: any }) {
       supabase.from('sub_events').select('*').order('start_date', { ascending: true }),
     ]);
     
-    const [{ data: reps1 }, { data: reps2 }] = await Promise.all([
-      supabase.from('event_reports').select('*').range(0, 999).order('created_at', { ascending: false }),
-      supabase.from('event_reports').select('*').range(1000, 1999).order('created_at', { ascending: false }),
-    ]);
+    let allReports: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data: reps } = await supabase.from('event_reports').select('*').range(page * pageSize, (page + 1) * pageSize - 1).order('created_at', { ascending: false });
+        if (!reps || reps.length === 0) break;
+        allReports = [...allReports, ...reps];
+        if (reps.length < pageSize) break;
+        page++;
+    }
     
     setEvents(evts || []);
     setSubEvents(subs || []);
-    setReports([...(reps1 || []), ...(reps2 || [])]);
+    setReports(allReports);
     setLoading(false);
   }, []);
 
@@ -1203,6 +1209,15 @@ export default function EventReporting({ session }: { session: any }) {
   const totalParticipants = reports.reduce((s, r) => s + (r.participants_total || 0), 0);
   const fieldReports = reports.filter(r => r.report_level === 'field').length;
   const districtReports = reports.filter(r => r.report_level === 'district').length;
+
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+
+  const confirmDeleteReport = async () => {
+    if(!reportToDelete) return;
+    await supabase.from('event_reports').delete().eq('id', reportToDelete);
+    setReportToDelete(null);
+    fetchAll();
+  };
 
   // Filtered reports for Reports view
   const filteredReports = reports.filter(r => {
@@ -1417,6 +1432,11 @@ export default function EventReporting({ session }: { session: any }) {
                           <div className="flex flex-col gap-1">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${levelBadge(report.report_level)}`}>{report.report_level}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusBadge(report.status)}`}>{report.status}</span>
+                            {isSuperOrState(session) && (
+                              <button onClick={() => setReportToDelete(report.id)} className="p-1 text-red-400 hover:text-red-600 text-xs">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1426,6 +1446,20 @@ export default function EventReporting({ session }: { session: any }) {
               </div>
             )}
           </>
+        )}
+
+        {/* Delete Confirmation */}
+        {reportToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                    <h3 className="font-bold text-lg mb-2">Delete Report</h3>
+                    <p className="text-slate-600 text-sm mb-6">Are you sure you want to delete this report? This action cannot be undone.</p>
+                    <div className="flex gap-3">
+                        <button onClick={() => setReportToDelete(null)} className="flex-1 px-4 py-2 bg-slate-100 rounded-xl text-sm font-semibold">Cancel</button>
+                        <button onClick={confirmDeleteReport} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold">Delete</button>
+                    </div>
+                </div>
+            </div>
         )}
 
         {/* Modals */}
