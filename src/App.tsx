@@ -35,6 +35,7 @@ import TransferModule from './components/TransferModule';
 import AdminTransferList from './components/AdminTransferList';
 import Sthananataran from './components/Sthananataran';
 import IncentiveCalculator from './components/IncentiveCalculator';
+import TrainingModule from './components/TrainingModule';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import DiseaseManagement from './components/DiseaseManagement';
@@ -1560,6 +1561,11 @@ export default function App() {
         {activeTab === 'admin_management' && session && (session.role === 'SUPER_ADMIN' || (session.role === 'STATE_ADMIN' && (!session.access_pages?.length || session.access_pages.includes('admin_management')))) && (
           <motion.div key="admin_management" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <AdminCreator session={session} />
+          </motion.div>
+        )}
+        {activeTab === 'training' && session && (
+          <motion.div key="training" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <TrainingModule session={session} />
           </motion.div>
         )}
         {activeTab === 'live' && (
