@@ -748,7 +748,7 @@ function AttendanceModal({ training, session, onClose }: { training: Training; s
 function TrainingCard({ training, session, myApplication, hasAssessment, assessmentDone, onApply, onAttendance, onAssessment, onFeedback }: {
   training: Training; session: UserSession; myApplication?: Application;
   hasAssessment: boolean; assessmentDone: boolean;
-  onApply: (t: Training) => void; onAttendance: (t: Training) => void;
+  onApply: (t: Training) => void | Promise<void>; onAttendance: (t: Training) => void;
   onAssessment: (t: Training) => void; onFeedback: (t: Training) => void;
 }) {
   const active = isTrainingActive(training);
@@ -861,29 +861,75 @@ function TrainingCard({ training, session, myApplication, hasAssessment, assessm
 }
 
 // ─── Admin Attendance View ──────────────────────────────────────────────────
-function AttendanceAdminView({ trainingId }: { trainingId: string }) {
-  const [records, setRecords] = useState<any[]>([]);
+function AttendanceAdminView({ trainingId, trainingApps }: { trainingId: string; trainingApps: Application[] }) {
+  const [data, setData] = useState<{ attendance: Set<string>; assessments: Set<string>; feedback: Set<string> } | null>(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    supabase.from('training_attendance').select('*').eq('training_id', trainingId).order('attendance_date')
-      .then(({ data }) => { setRecords(data || []); setLoading(false); });
-  }, []);
-  if (loading) return <Loader2 className="animate-spin mx-auto text-emerald-600 my-4" size={24} />;
-  if (records.length === 0) return <p className="text-slate-400 text-sm text-center py-8">No attendance marked yet</p>;
+    const fetchAll = async () => {
+      const [att, ass, feed] = await Promise.all([
+        supabase.from('training_attendance').select('staff_id').eq('training_id', trainingId),
+        supabase.from('training_assessment_responses').select('staff_id').eq('training_id', trainingId),
+        supabase.from('training_feedback').select('staff_id').eq('training_id', trainingId),
+      ]);
+      setData({
+        attendance: new Set((att.data || []).map(r => r.staff_id)),
+        assessments: new Set((ass.data || []).map(r => r.staff_id)),
+        feedback: new Set((feed.data || []).map(r => r.staff_id)),
+      });
+      setLoading(false);
+    };
+    fetchAll();
+  }, [trainingId]);
+
+  const handleDownload = () => {
+    const headers = ['Name', 'Attendance', 'Assessment', 'Feedback'];
+    const rows = trainingApps.map(app => [
+      app.staff_name,
+      data?.attendance.has(app.staff_id) ? 'Yes' : 'No',
+      data?.assessments.has(app.staff_id) ? 'Yes' : 'No',
+      data?.feedback.has(app.staff_id) ? 'Yes' : 'No',
+    ]);
+    const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance_sheet.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading || !data) return <Loader2 className="animate-spin mx-auto text-emerald-600 my-4" size={24} />;
+
   return (
-    <div className="space-y-2">
-      {records.map(att => (
-        <div key={att.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-sm">
-          <span className="font-medium text-slate-700">{att.staff_id}</span>
-          <span className="text-slate-500">{formatDate(att.attendance_date)}</span>
-          {att.latitude && att.longitude && (
-            <button onClick={() => window.open(`https://www.google.com/maps?q=${att.latitude},${att.longitude}`, '_blank')}
-              className="text-blue-500 text-xs font-bold flex items-center gap-1 hover:underline">
-              <MapPin size={12} /> View GPS
-            </button>
-          )}
-        </div>
-      ))}
+    <div className="overflow-x-auto">
+      <div className="flex justify-end mb-4">
+        <button onClick={handleDownload}
+          className="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-slate-900 transition-all">
+          Download CSV
+        </button>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-slate-500 border-b">
+            <th className="p-3 font-bold">Name</th>
+            <th className="p-3 text-center font-bold">Attendance</th>
+            <th className="p-3 text-center font-bold">Assessment</th>
+            <th className="p-3 text-center font-bold">Feedback</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {trainingApps.map(app => (
+            <tr key={app.staff_id}>
+              <td className="p-3 font-medium text-slate-700">{app.staff_name}</td>
+              <td className="p-3 text-center">{data.attendance.has(app.staff_id) ? <CheckCircle2 size={16} className="text-emerald-500 mx-auto" /> : '-'}</td>
+              <td className="p-3 text-center">{data.assessments.has(app.staff_id) ? <CheckCircle2 size={16} className="text-emerald-500 mx-auto" /> : '-'}</td>
+              <td className="p-3 text-center">{data.feedback.has(app.staff_id) ? <CheckCircle2 size={16} className="text-emerald-500 mx-auto" /> : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1073,7 +1119,7 @@ function AdminPanel({ session }: { session: UserSession }) {
                         ))}
                       </div>
                     )}
-                    {activeSubTab === 'attendance' && <AttendanceAdminView trainingId={training.id} />}
+                    {activeSubTab === 'attendance' && <AttendanceAdminView trainingId={training.id} trainingApps={trainingApps} />}
                     {activeSubTab === 'feedback' && <FeedbackAdminView trainingId={training.id} trainers={training.trainers || []} />}
                   </div>
                 </motion.div>
